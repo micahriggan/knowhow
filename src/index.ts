@@ -1,3 +1,5 @@
+import { saveHashes } from "./hashes";
+import axios from "axios";
 import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
@@ -10,10 +12,12 @@ import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 
 import { OpenAIEmbeddings } from "langchain/embeddings/openai";
 import { ChatOpenAI } from "langchain/chat_models/openai";
+import { Prompts } from "./prompts";
+import { Config, Hashes, Embeddable } from "./types";
+import { getHashes, checkNoFilesChanged } from "./hashes";
+import { readFile, writeFile, fileExists } from "./utils";
+import { getConfig, loadPrompt } from "./config";
 
-const readFile = promisify(fs.readFile);
-const writeFile = promisify(fs.writeFile);
-const mkdir = promisify(fs.mkdir);
 const OPENAI_KEY = process.env.OPENAI_KEY;
 const embeddingModel = new OpenAIEmbeddings({ openAIApiKey: OPENAI_KEY });
 const chatModel = new ChatOpenAI({
@@ -22,145 +26,64 @@ const chatModel = new ChatOpenAI({
   modelName: "gpt-4",
   maxRetries: 2,
 });
-export interface Embeddable<T = any> {
-  id: string;
-  text: string;
-  metadata: T;
-}
-
-export async function init() {
-  // create the folder structure
-  await mkdir(".knowhow", { recursive: true });
-  await mkdir(".knowhow/prompts", { recursive: true });
-  await mkdir(".knowhow/docs", { recursive: true });
-
-  // create knowhow.json
-  const config = {
-    promptsDir: ".knowhow/prompts",
-    sources: [
-      {
-        input: "components/**/*.mdx",
-        output: ".knowhow/docs/components/",
-        prompt: "ComponentDocumenter",
-      },
-      {
-        input: ".knowhow/docs/**/*.mdx",
-        output: ".knowhow/README.mdx",
-        prompt: "ProjectDocumenter",
-      },
-    ],
-  };
-  await writeFile(".knowhow/knowhow.json", JSON.stringify(config, null, 2));
-}
-
-export async function generate() {
-  // load config
-  const config = await getConfig();
-
-  // process each source
-  for (const source of config.sources) {
-    // read the configured prompt into memory
-    const prompt = await readFile(
-      path.join(config.promptsDir, `${source.prompt}.mdx`),
-      "utf8"
-    );
-
-    // get the hash of the prompt
-    const promptHash = crypto.createHash("md5").update(prompt).digest("hex");
-
-    // get the files matching the input pattern
-    const files = glob.sync(source.input);
-    const hashes = await getHashes();
-
-    for (const file of files) {
-      // get the hash of the file
-      const fileContent = await readFile(file, "utf8");
-      const fileHash = crypto
-        .createHash("md5")
-        .update(fileContent)
-        .digest("hex");
-
-      if (!hashes[file]) {
-        hashes[file] = { promptHash: "", fileHash: "" };
-      }
-
-      if (hashes[file].promptHash === promptHash) {
-        continue;
-      }
-
-      if (hashes[file].fileHash === fileHash) {
-        continue;
-      }
-
-      // summarize the file
-      const summary = await summarizeFile(file, prompt);
-
-      // write the summary to the output file
-      const outputFile = path.join(
-        source.output,
-        path.basename(file).replace(".mdx", ".summary.mdx")
-      );
-      await writeFile(outputFile, summary);
-
-      hashes[file] = { promptHash, fileHash };
-      await saveHashes(hashes);
-    }
-  }
-}
-
-export async function getHashes() {
-  const hashes = JSON.parse(await readFile(".knowhow/.hashes.json", "utf8"));
-  return hashes;
-}
-
-export async function saveHashes(hashes: any) {
-  await writeFile(".knowhow/.hashes.json", JSON.stringify(hashes, null, 2));
-}
-
-export async function getConfig() {
-  const config = JSON.parse(await readFile(".knowhow/knowhow.json", "utf8"));
-  return config;
-}
 
 export async function embed() {
   // load config
   const config = await getConfig();
 
   // get all the files in .knowhow/docs
-  const files = glob.sync(".knowhow/docs/**/*.mdx");
+  for (const source of config.embedSources) {
+    const files = glob.sync(source.input);
+    const prompt = source.prompt ? await loadPrompt(source.prompt) : "";
 
-  const embeddings: Embeddable[] = [];
+    const embeddings: Embeddable[] = await loadEmbedding(source.output);
 
-  for (const file of files) {
-    // get the content of the file
-    const text = await readFile(file, "utf8");
+    for (const file of files) {
+      if (embeddings.find((e) => e.id === file)) {
+        console.log("Skipping already embedded file", file);
+        continue;
+      }
 
-    // generate the embedding
-    //const embedding = await embeddingModel.embedQuery(text);
+      // get the content of the file
+      const fileContent = await readFile(file, "utf8");
+      let text = fileContent;
 
-    // create the Embeddable object
-    const embeddable: Embeddable = {
-      id: file,
-      text,
-      metadata: {
-        filepath: file,
-        date: new Date().toISOString(),
-      },
-    };
+      // if there is a prompt, summarize the file
+      if (prompt) {
+        console.log("Summarizing", file);
+        text = await summarizeTexts([text], prompt);
+      }
 
-    embeddings.push(embeddable);
+      // generate the embedding
+      //const embedding = await embeddingModel.embedQuery(text);
+
+      // create the Embeddable object
+      const embeddable: Embeddable = {
+        id: file,
+        text,
+        metadata: {
+          content: fileContent,
+          filepath: file,
+          date: new Date().toISOString(),
+        },
+      };
+
+      embeddings.push(embeddable);
+      await writeFile(source.output, JSON.stringify(embeddings, null, 2));
+    }
+
+    // save the embeddings to .knowhow/embedding.json
   }
-
-  // save the embeddings to .knowhow/embedding.json
-  await writeFile(
-    ".knowhow/embeddable.json",
-    JSON.stringify(embeddings, null, 2)
-  );
 }
 
-async function summarizeFile(file: string, template: string) {
-  const text = await readFile(file, "utf8");
+export async function loadEmbedding(path: string) {
+  if (fileExists(path)) {
+    return JSON.parse(await readFile(path, "utf8")) as Embeddable[];
+  }
+  return [];
+}
 
+async function summarizeTexts(texts: string[], template: string) {
   const prompt = new PromptTemplate({
     template,
     inputVariables: ["text"],
@@ -174,11 +97,137 @@ async function summarizeFile(file: string, template: string) {
   const textSplitter = new RecursiveCharacterTextSplitter({
     chunkSize: 1000,
   });
-  const docs = await textSplitter.createDocuments([text]);
+
+  const docs = await textSplitter.createDocuments(texts);
 
   const result = await summarizationChain.call({
-    input_documents: docs,
+    input_documents: docs.slice(0, 5),
   });
 
+  console.log("Summary", result.text);
+
   return result.text as string;
+}
+
+async function summarizeFiles(files: string[], template: string) {
+  const texts = [];
+  for (const file of files) {
+    const text = await readFile(file, "utf8");
+    texts.push(text);
+  }
+  return summarizeTexts(texts, template);
+}
+
+async function summarizeFile(file: string, template: string) {
+  return await summarizeFiles([file], template);
+}
+
+export async function upload() {
+  const config = await getConfig();
+  for (const source of config.embedSources) {
+    const items = JSON.parse(await readFile(source.output, "utf8"));
+    const [embedding_name] = path.basename(source.output).split(".");
+    const data = {
+      embedding_name,
+      items,
+    };
+
+    console.log("Uploading", source.output, "to", embedding_name);
+    let config = {
+      method: "post",
+      url: "https://xgg4923dx7.execute-api.us-west-2.amazonaws.com/prod/agents/embeddings",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.AGENT_API_KEY,
+      },
+      data: data,
+    };
+    await axios.request(config);
+  }
+}
+
+export async function generate() {
+  // load config
+  const config = await getConfig();
+
+  // process each source
+  for (const source of config.sources) {
+    // read the configured prompt into memory
+    const prompt = await loadPrompt(source.prompt);
+    const files = glob.sync(source.input);
+
+    if (source.output.endsWith(".mdx")) {
+      await handleSingleOutputGeneration(files, prompt, source.output);
+    } else {
+      await handleMultiOutputGeneration(files, prompt, source.output);
+    }
+  }
+}
+
+export async function handleMultiOutputGeneration(
+  files: Array<string>,
+  prompt: string,
+  output: string
+) {
+  // get the hash of the prompt
+  const promptHash = crypto.createHash("md5").update(prompt).digest("hex");
+
+  // get the files matching the input pattern
+  const hashes = await getHashes();
+
+  for (const file of files) {
+    // get the hash of the file
+    const fileContent = await readFile(file, "utf8");
+    const fileHash = crypto.createHash("md5").update(fileContent).digest("hex");
+
+    if (!hashes[file]) {
+      hashes[file] = { promptHash: "", fileHash: "" };
+    }
+
+    if (
+      hashes[file].promptHash === promptHash &&
+      hashes[file].fileHash === fileHash
+    ) {
+      console.log("Skipping file", file, "because it hasn't changed");
+      continue;
+    }
+
+    // summarize the file
+    console.log("Summarizing", file);
+    const summary = await summarizeFile(file, prompt);
+
+    // write the summary to the output file
+    const [fileName, fileExt] = path.basename(file).split(".");
+    const outputFile = path.join(output, fileName + ".mdx");
+
+    console.log("Writing summary to", outputFile);
+    await writeFile(outputFile, summary);
+
+    hashes[file] = { promptHash, fileHash };
+    await saveHashes(hashes);
+  }
+}
+
+export async function handleSingleOutputGeneration(
+  files: Array<string>,
+  prompt: string,
+  outputFile: string
+) {
+  const hashes = await getHashes();
+  const promptHash = crypto.createHash("md5").update(prompt).digest("hex");
+
+  const noChanges = await checkNoFilesChanged(files, promptHash, hashes);
+  if (noChanges) {
+    console.log(`Skipping ${files.length} files because they haven't changed`);
+    return;
+  }
+
+  console.log("Summarizing", files.length, "files");
+  const summary = await summarizeFiles(files, prompt);
+  const fileHash = crypto.createHash("md5").update(summary).digest("hex");
+
+  console.log("Writing summary to", outputFile);
+  await writeFile(outputFile, summary);
+  hashes[outputFile] = { promptHash, fileHash };
+  await saveHashes(hashes);
 }

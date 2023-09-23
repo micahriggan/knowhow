@@ -21,3 +21,5 @@ npm-debug.log
 dist
 src/vendor
 src/dist
+ts_build
+.knowhow

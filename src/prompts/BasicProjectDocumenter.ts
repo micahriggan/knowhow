@@ -1,0 +1,1 @@
+export default "Summarize this project documentation, with the goal of creating a useful primer for others to understand the project in a technical way. Focus on how the different pieces of the project interact with each other, design patterns, naming conventions, etc. \n\n {text}";

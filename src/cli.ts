@@ -1,4 +1,6 @@
-import { init, generate, embed } from "./index";
+#!/usr/bin/env node
+import { generate, embed, upload } from "./index";
+import { init } from "./config";
 
 const command = process.argv[2];
 
@@ -11,6 +13,9 @@ switch (command) {
     break;
   case "embed":
     embed();
+    break;
+  case "upload":
+    upload();
     break;
   default:
     console.log(
