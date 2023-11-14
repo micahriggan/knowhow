@@ -17,6 +17,12 @@ export type Config = {
     output: string;
     prompt?: string;
   }>;
+
+  embedJsonSources: Array<{
+    input: string;
+    output: string;
+    prompt?: string;
+  }>;
 };
 
 export interface Embeddable<T = any> {

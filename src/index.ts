@@ -17,6 +17,7 @@ import { Config, Hashes, Embeddable } from "./types";
 import { getHashes, checkNoFilesChanged } from "./hashes";
 import { readFile, writeFile, fileExists } from "./utils";
 import { getConfig, loadPrompt } from "./config";
+import { embedJson } from "./embedJson";
 
 const OPENAI_KEY = process.env.OPENAI_KEY;
 const embeddingModel = new OpenAIEmbeddings({ openAIApiKey: OPENAI_KEY });
@@ -39,6 +40,11 @@ export async function embed() {
     const embeddings: Embeddable[] = await loadEmbedding(source.output);
 
     for (const file of files) {
+      if (file.endsWith(".json")) {
+        await embedJson(source);
+        continue;
+      }
+
       if (embeddings.find((e) => e.id === file)) {
         console.log("Skipping already embedded file", file);
         continue;
@@ -71,19 +77,17 @@ export async function embed() {
       embeddings.push(embeddable);
       await writeFile(source.output, JSON.stringify(embeddings, null, 2));
     }
-
-    // save the embeddings to .knowhow/embedding.json
   }
 }
 
 export async function loadEmbedding(path: string) {
-  if (fileExists(path)) {
+  if (await fileExists(path)) {
     return JSON.parse(await readFile(path, "utf8")) as Embeddable[];
   }
   return [];
 }
 
-async function summarizeTexts(texts: string[], template: string) {
+export async function summarizeTexts(texts: string[], template: string) {
   const prompt = new PromptTemplate({
     template,
     inputVariables: ["text"],
