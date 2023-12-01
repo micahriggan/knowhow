@@ -1,3 +1,4 @@
+import { summarizeFiles } from "./ai";
 import { saveHashes } from "./hashes";
 import axios from "axios";
 import * as fs from "fs";
@@ -16,8 +17,18 @@ import { Prompts } from "./prompts";
 import { Config, Hashes, Embeddable } from "./types";
 import { getHashes, checkNoFilesChanged } from "./hashes";
 import { readFile, writeFile, fileExists } from "./utils";
-import { getConfig, loadPrompt } from "./config";
-import { embedJson } from "./embedJson";
+import {
+  getConfig,
+  loadPrompt,
+  updateConfig,
+  getAssistantsConfig,
+  updateAssistants,
+} from "./config";
+import { embedJson, embedFile } from "./embeddings";
+import { summarizeFile, uploadToOpenAi, createAssistant } from "./ai";
+
+import gitignoreToGlob from "gitignore-to-glob";
+import { abort } from "process";
 
 const OPENAI_KEY = process.env.OPENAI_KEY;
 const embeddingModel = new OpenAIEmbeddings({ openAIApiKey: OPENAI_KEY });
@@ -31,99 +42,26 @@ const chatModel = new ChatOpenAI({
 export async function embed() {
   // load config
   const config = await getConfig();
+  const ignorePattern = gitignoreToGlob().map((pattern) =>
+    pattern.replace("!", "./")
+  );
 
   // get all the files in .knowhow/docs
   for (const source of config.embedSources) {
-    const files = glob.sync(source.input);
-    const prompt = source.prompt ? await loadPrompt(source.prompt) : "";
-
-    const embeddings: Embeddable[] = await loadEmbedding(source.output);
-
+    console.log("Embedding", source.input, "to", source.output);
+    console.log("Ignoring", ignorePattern);
+    const files = await glob.sync(source.input, { ignore: ignorePattern });
+    console.log(`Found ${files.length} files`);
+    if (files.length > 100) {
+      console.error(
+        "woah there, that's a lot of files. I'm not going to embed that many"
+      );
+    }
+    console.log(files);
     for (const file of files) {
-      if (file.endsWith(".json")) {
-        await embedJson(source);
-        continue;
-      }
-
-      if (embeddings.find((e) => e.id === file)) {
-        console.log("Skipping already embedded file", file);
-        continue;
-      }
-
-      // get the content of the file
-      const fileContent = await readFile(file, "utf8");
-      let text = fileContent;
-
-      // if there is a prompt, summarize the file
-      if (prompt) {
-        console.log("Summarizing", file);
-        text = await summarizeTexts([text], prompt);
-      }
-
-      // generate the embedding
-      //const embedding = await embeddingModel.embedQuery(text);
-
-      // create the Embeddable object
-      const embeddable: Embeddable = {
-        id: file,
-        text,
-        metadata: {
-          content: fileContent,
-          filepath: file,
-          date: new Date().toISOString(),
-        },
-      };
-
-      embeddings.push(embeddable);
-      await writeFile(source.output, JSON.stringify(embeddings, null, 2));
+      await embedFile(file, source);
     }
   }
-}
-
-export async function loadEmbedding(path: string) {
-  if (await fileExists(path)) {
-    return JSON.parse(await readFile(path, "utf8")) as Embeddable[];
-  }
-  return [];
-}
-
-export async function summarizeTexts(texts: string[], template: string) {
-  const prompt = new PromptTemplate({
-    template,
-    inputVariables: ["text"],
-  });
-
-  const summarizationChain = await loadSummarizationChain(chatModel, {
-    prompt,
-    type: "stuff",
-  });
-
-  const textSplitter = new RecursiveCharacterTextSplitter({
-    chunkSize: 1000,
-  });
-
-  const docs = await textSplitter.createDocuments(texts);
-
-  const result = await summarizationChain.call({
-    input_documents: docs.slice(0, 5),
-  });
-
-  console.log("Summary", result.text);
-
-  return result.text as string;
-}
-
-async function summarizeFiles(files: string[], template: string) {
-  const texts = [];
-  for (const file of files) {
-    const text = await readFile(file, "utf8");
-    texts.push(text);
-  }
-  return summarizeTexts(texts, template);
-}
-
-async function summarizeFile(file: string, template: string) {
-  return await summarizeFiles([file], template);
 }
 
 export async function upload() {
@@ -139,7 +77,7 @@ export async function upload() {
     console.log("Uploading", source.output, "to", embedding_name);
     let config = {
       method: "post",
-      url: "https://xgg4923dx7.execute-api.us-west-2.amazonaws.com/prod/agents/embeddings",
+      url: "https://sqi4o2vea57u2fdazbqqsvycwi0zjsyt.lambda-url.us-west-2.on.aws/agents/embeddings",
       headers: {
         "Content-Type": "application/json",
         "x-api-key": process.env.AGENT_API_KEY,
@@ -147,6 +85,41 @@ export async function upload() {
       data: data,
     };
     await axios.request(config);
+  }
+}
+
+export async function uploadOpenAi() {
+  const config = await getConfig();
+  const assistantsConfig = await getAssistantsConfig();
+  const ignorePattern = gitignoreToGlob().map((pattern) =>
+    pattern.replace("!", "./")
+  );
+
+  for (const assistant of config.assistants) {
+    if (!assistant.id) {
+      const fileIds = [];
+      for (const globPath of assistant.files) {
+        const files = await glob.sync(globPath, { ignore: ignorePattern });
+        for (const file of files) {
+          if (!assistantsConfig.files[file]) {
+            const uploaded = await uploadToOpenAi(file);
+            fileIds.push(uploaded.id);
+            assistantsConfig.files[file] = uploaded.id;
+            await updateAssistants(assistantsConfig);
+          }
+        }
+      }
+
+      const toCreate = {
+        ...assistant,
+        files: fileIds,
+      };
+      const createdAssistant = await createAssistant(toCreate);
+      assistant.id = createdAssistant.id;
+      await updateConfig(config);
+    }
+
+    console.log(`Assistant ${assistant.id} is ready`);
   }
 }
 

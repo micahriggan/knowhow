@@ -26,10 +26,13 @@
   "dependencies": {
     "axios": "^1.5.0",
     "express": "^4.17.3",
+    "gitignore-to-glob": "^0.3.0",
     "langchain": "^0.0.153",
+    "marked": "^10.0.0",
+    "marked-terminal": "^6.1.0",
     "morgan": "^1.10.0",
     "node-fetch": "^3.2.3",
-    "openai": "^4.10.0",
+    "openai": "^4.17.5",
     "typescript": "^4.6.3"
   }
 }
