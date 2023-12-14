@@ -35,6 +35,7 @@ export async function init() {
         input: ".knowhow/docs/**/*.mdx",
         output: ".knowhow/embeddings",
         prompt: "BasicEmbeddingExplainer",
+        chunkSize: 500,
       },
     ],
     assistants: [

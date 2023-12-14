@@ -53,16 +53,16 @@ export async function embed(
       continue;
     }
 
-    let text = chunks[index];
+    let chunkText = chunks[index];
     if (prompt) {
-      console.log("Summarizing", text);
-      text = await summarizeTexts([text], prompt);
+      console.log("Summarizing", chunkText);
+      chunkText = await summarizeTexts([chunkText], prompt);
     }
 
     let vector = [];
     if (!uploadMode) {
       const queryEmbedding = await openai.embeddings.create({
-        input: text,
+        input: chunkText,
         model: "text-embedding-ada-002",
       });
       vector = queryEmbedding.data[0].embedding;
@@ -70,7 +70,7 @@ export async function embed(
 
     const embeddable: Embeddable = {
       id: chunkId,
-      text,
+      text: chunkText,
       vector,
       metadata: {
         ...metadata,
