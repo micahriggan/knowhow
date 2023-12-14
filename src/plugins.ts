@@ -1,21 +1,24 @@
 import glob from "glob";
 import { readFile } from "./utils";
+import { Language } from "./types";
+import { getConfig, getLanguageConfig } from "./config";
 
 interface Plugin {
-  call(): Promise<string>;
+  call(user_input?: string): Promise<string>;
 }
 
 class PluginService {
   plugins = {
     vim: new VimPlugin(),
+    language: new LanguagePlugin(),
   } as Record<string, Plugin>;
 
   registerPlugin(name, plugin: Plugin) {
     this.plugins[name] = plugin;
   }
 
-  async callMany(plugins: string[]) {
-    const calls = plugins.map((p) => this.plugins[p].call());
+  async callMany(plugins: string[], user_input?: string) {
+    const calls = plugins.map((p) => this.plugins[p].call(user_input));
     return (await Promise.all(calls)).join("\n");
   }
 }
@@ -48,6 +51,44 @@ class VimPlugin implements Plugin {
       "VIM PLUGIN: The following files are open in vim: " +
       JSON.stringify(fileContents)
     );
+  }
+}
+
+class LanguagePlugin implements Plugin {
+  constructor() {}
+
+  async call(userPrompt: string): Promise<string> {
+    const languageConfig = await getLanguageConfig();
+    // Extract terms from the language configuration
+    const terms = Object.keys(languageConfig);
+
+    // Find all matching terms in the userPrompt
+    const matchingTerms = terms.filter((term) => userPrompt.includes(term));
+
+    // Load the files for the matching terms
+    const filesToLoad = matchingTerms
+      .flatMap((term) => languageConfig[term].sources)
+      .filter((f) => f.kind === "file")
+      .map((f) => f.data)
+      .flat();
+
+    // Read the contents of the files
+    const fileContents = await Promise.all(
+      filesToLoad.map(async (filePath) => {
+        return { filePath, content: await readFile(filePath, "utf8") };
+      })
+    );
+
+    const textContexts = matchingTerms
+      .flatMap((term) =>
+        languageConfig[term].sources.filter((s) => s.kind === "text")
+      )
+      .map((s) => s.data);
+
+    // Return the file contents in a format that can be added to the prompt context
+    return `LANGUAGE PLUGIN: The following terms triggered expansions ${matchingTerms} expanded to: ${JSON.stringify(
+      fileContents
+    )}, ${JSON.stringify(textContexts)}`;
   }
 }
 

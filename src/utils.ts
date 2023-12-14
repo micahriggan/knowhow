@@ -11,11 +11,13 @@ export const readFile = promisify(fs.readFile);
 export const writeFile = promisify(fs.writeFile);
 export const mkdir = promisify(fs.mkdir);
 
-const readline = require("readline").createInterface({
-  input: process.stdin,
-  output: process.stdout,
-});
-export const ask = util.promisify(readline.question).bind(readline);
+export const ask = (text) => {
+  const readline = require("readline").createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+  return util.promisify(readline.question).bind(readline)(text);
+};
 
 export const Marked = marked;
 

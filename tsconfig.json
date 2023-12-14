@@ -9,7 +9,7 @@
     "experimentalDecorators": true,
     "moduleResolution": "node",
     "esModuleInterop": true,
-    "target": "es2022",
+    "target": "esnext",
     "typeRoots": ["./node_modules/@types"],
     "baseUrl": ".",
     "paths": {

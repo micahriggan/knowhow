@@ -17,7 +17,7 @@ export async function init() {
   // create knowhow.json
   const config = {
     promptsDir: ".knowhow/prompts",
-    plugins: ["vim"],
+    plugins: ["language", "vim"],
     sources: [
       {
         input: "src/**/*.mdx",
@@ -82,6 +82,11 @@ export async function updateAssistants(assistants: AssistantConfig) {
     ".knowhow/.assistants.json",
     JSON.stringify(assistants, null, 2)
   );
+}
+
+export async function getLanguageConfig() {
+  const language = JSON.parse(await readFile(".knowhow/language.json", "utf8"));
+  return language as Language;
 }
 
 export async function updateConfig(config: Config) {

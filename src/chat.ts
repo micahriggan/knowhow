@@ -5,6 +5,9 @@ import { Marked } from "./utils";
 import { ask } from "./utils";
 import { ChatCompletionMessageParam } from "openai/resources/chat";
 import { Plugins } from "./plugins";
+import Ora from "ora";
+
+let DEBUGGER = false;
 
 export async function queryEmbedding<E>(
   query: string,
@@ -88,7 +91,6 @@ export async function queryGpt4<E extends EmbeddingBase>(
   count = 10
 ) {
   const results = await queryEmbedding(query, embeddings);
-  console.log("Synthesizing answer ...");
   const context = results
     .map((r) => ({ ...r, vector: undefined }))
     .slice(0, count);
@@ -103,7 +105,9 @@ Our knowledgebase contains this information which can be used to answer the ques
 
   Output Format in Markdown
 `;
-  console.log(gptPrompt);
+  if (DEBUGGER) {
+    console.log(gptPrompt);
+  }
 
   const thread = [
     {
@@ -137,17 +141,30 @@ export async function askGpt<E extends GptQuestionEmbedding>(
   let answer: E | undefined;
   let results = "";
   while (input !== "exit") {
-    if (input == "search") {
-      await askEmbedding(embeddings, "searching", (question, answer) => {
-        console.log(JSON.stringify(answer.metadata, null, 2));
-      });
-    } else {
-      const pluginText = await Plugins.callMany(plugins);
-      const fullPrompt = `${input} \n ${pluginText}`;
-      results = await queryGpt4(fullPrompt, embeddings, 7);
-      console.log("\n\n");
-      console.log(Marked.parse(results));
+    try {
+      switch (input) {
+        case "debugger":
+          DEBUGGER = !DEBUGGER;
+          break;
+        case "search":
+          await askEmbedding(embeddings, "searching", (question, answer) => {
+            console.log(JSON.stringify(answer.metadata, null, 2));
+          });
+          break;
+
+        default:
+          const pluginText = await Plugins.callMany(plugins, input);
+          const fullPrompt = `${input} \n ${pluginText}`;
+          const spinner = Ora().start("Thinking ...");
+          results = await queryGpt4(fullPrompt, embeddings, 7);
+          spinner.succeed();
+          console.log("\n\n");
+          console.log(Marked.parse(results));
+          break;
+      }
+      input = await ask(`Ask ${aiName} AI?: `);
+    } catch (e) {
+      console.log(e);
     }
-    input = await ask(`Ask ${aiName} AI?: `);
   }
 }
