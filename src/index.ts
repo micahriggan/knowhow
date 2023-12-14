@@ -103,10 +103,10 @@ export async function uploadOpenAi() {
         for (const file of files) {
           if (!assistantsConfig.files[file]) {
             const uploaded = await uploadToOpenAi(file);
-            fileIds.push(uploaded.id);
             assistantsConfig.files[file] = uploaded.id;
             await updateAssistants(assistantsConfig);
           }
+          fileIds.push(assistantsConfig.files[file]);
         }
       }
 
