@@ -51,10 +51,9 @@ export interface Embeddable<T = any> {
   metadata: T;
 }
 
-export type EmbeddingBase = {
-  vector?: Array<number>;
+export interface EmbeddingBase<T = any> extends Embeddable<T> {
   similarity?: number;
-};
+}
 
 export type GptQuestionEmbedding = any & EmbeddingBase;
 

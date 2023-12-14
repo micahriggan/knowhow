@@ -24,11 +24,12 @@ import {
   getAssistantsConfig,
   updateAssistants,
 } from "./config";
-import { embedJson, embedFile } from "./embeddings";
+import { embedJson, embedFile, getConfiguredEmbeddings } from "./embeddings";
 import { summarizeFile, uploadToOpenAi, createAssistant } from "./ai";
 
 import gitignoreToGlob from "gitignore-to-glob";
 import { abort } from "process";
+import { askGpt } from "./chat";
 
 const OPENAI_KEY = process.env.OPENAI_KEY;
 const embeddingModel = new OpenAIEmbeddings({ openAIApiKey: OPENAI_KEY });
@@ -207,4 +208,10 @@ export async function handleSingleOutputGeneration(
   await writeFile(outputFile, summary);
   hashes[outputFile] = { promptHash, fileHash };
   await saveHashes(hashes);
+}
+
+export async function chat() {
+  const config = await getConfig();
+  const embeddings = await getConfiguredEmbeddings();
+  await askGpt("knowhow", embeddings, config.plugins);
 }

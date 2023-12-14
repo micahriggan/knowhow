@@ -1,7 +1,10 @@
 import { promisify } from "util";
 import * as util from "util";
 import * as fs from "fs";
-import * as marked from "marked";
+import { marked } from "marked";
+import { markedTerminal } from "marked-terminal";
+
+marked.use(markedTerminal());
 
 export const fileExists = promisify(fs.exists);
 export const readFile = promisify(fs.readFile);
@@ -13,11 +16,6 @@ const readline = require("readline").createInterface({
   output: process.stdout,
 });
 export const ask = util.promisify(readline.question).bind(readline);
-
-const TerminalRenderer = require("marked-terminal");
-marked.setOptions({
-  renderer: TerminalRenderer,
-});
 
 export const Marked = marked;
 

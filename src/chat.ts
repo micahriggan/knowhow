@@ -1,19 +1,21 @@
 import { openai } from "./ai";
 import { cosineSimilarity } from "./utils";
-import { EmbeddingBase, GptQuestionEmbedding } from "./types";
+import { EmbeddingBase, GptQuestionEmbedding, Embeddable } from "./types";
 import { Marked } from "./utils";
 import { ask } from "./utils";
+import { ChatCompletionMessageParam } from "openai/resources/chat";
+import { Plugins } from "./plugins";
 
-export async function queryEmbedding<E extends EmbeddingBase>(
+export async function queryEmbedding<E>(
   query: string,
-  embeddings: Array<E>
+  embeddings: Array<Embeddable<E>>
 ) {
   const queryEmbedding = await openai.embeddings.create({
     input: query,
     model: "text-embedding-ada-002",
   });
   const queryVector = queryEmbedding.data[0].embedding;
-  const results = new Array<E>();
+  const results = new Array<EmbeddingBase<E>>();
   for (const embedding of embeddings) {
     const similarity = cosineSimilarity(embedding.vector, queryVector);
     results.push({
@@ -25,14 +27,14 @@ export async function queryEmbedding<E extends EmbeddingBase>(
 }
 
 export async function askEmbedding<E>(
-  embeddings: Array<E>,
+  embeddings: Array<Embeddable<E>>,
   promptText: string,
-  handleAnswer: (question: string, answer: E) => void
+  handleAnswer?: (question: string, answer: EmbeddingBase<any>) => void
 ) {
   console.log("Commands: next, exit");
   let input = await ask(promptText + ": ");
-  let answer: E | undefined;
-  let results = new Array<E>();
+  let answer: EmbeddingBase<any> | undefined;
+  let results = new Array<EmbeddingBase>();
   while (input !== "exit") {
     switch (input) {
       case "next":
@@ -43,7 +45,7 @@ export async function askEmbedding<E>(
         answer = results.shift();
         break;
     }
-    if (answer) {
+    if (answer && handleAnswer) {
       handleAnswer(input, answer);
     }
 
@@ -80,63 +82,72 @@ Generate an article or document that answers the question.
   return queryEmbedding(fakeDoc, embeddings);
 }
 
-export async function queryGPT3<E extends EmbeddingBase>(
+export async function queryGpt4<E extends EmbeddingBase>(
   query: string,
-  embeddings: Array<E>
+  embeddings: Array<E>,
+  count = 10
 ) {
-  const results = await queryEmbeddingHyde(query, embeddings);
+  const results = await queryEmbedding(query, embeddings);
   console.log("Synthesizing answer ...");
   const context = results
     .map((r) => ({ ...r, vector: undefined }))
-    .map((r) => JSON.stringify(r))
-    .map((r) => r.slice(0, 3000))
-    .slice(0, 10)
-    .join("\n")
-    .slice(0, 7500);
+    .slice(0, count);
   const gptPrompt = `
 
-AngelList knowledge base Assistant
-
-Using the below context, answer this question, include code samples if helpful:
-
+The user has asked:
   ${query}
 
-The following are the top most similar entries from our knowledge base:
+Our knowledgebase contains this information which can be used to answer the question:
 
-  ${context}
+  ${JSON.stringify(context, null, 2)}
 
   Output Format in Markdown
-
 `;
-  const gptResponse = await openai.completions.create({
-    prompt: gptPrompt,
-    model: "text-davinci-003",
-    max_tokens: 1000,
+  console.log(gptPrompt);
+
+  const thread = [
+    {
+      role: "system",
+      content:
+        "Helpful Codebase assistant. Answer users questions using the embedding data that is provided with the user's question. You have limited access to the codebase based off of how similar the codebase is to the user's question. You may reference file paths by using the IDs present in the embedding data, but be sure to remove the chunk from the end of the filepaths.",
+    },
+    { role: "user", content: gptPrompt },
+  ] as Array<ChatCompletionMessageParam>;
+
+  const response = await openai.chat.completions.create({
+    messages: thread,
+    max_tokens: 2500,
+    model: "gpt-4-1106-preview",
     temperature: 0,
     top_p: 1,
     presence_penalty: 0,
     frequency_penalty: 0,
-    best_of: 1,
-    n: 1,
-    stream: false,
   });
 
-  return gptResponse.choices[0].text;
+  return response.choices[0].message.content;
 }
 
 export async function askGpt<E extends GptQuestionEmbedding>(
   aiName: string,
-  embeddings: Array<E>
+  embeddings: Array<Embeddable<E>>,
+  plugins: Array<string> = []
 ) {
-  console.log("Commands: next, exit");
+  console.log("Commands: search, exit");
   let input = await ask(`Ask ${aiName} AI?: `);
   let answer: E | undefined;
   let results = "";
   while (input !== "exit") {
-    results = await queryGPT3(input, embeddings);
-    console.log("\n\n");
-    console.log(Marked.parse(results));
-    console.log("\n\n");
+    if (input == "search") {
+      await askEmbedding(embeddings, "searching", (question, answer) => {
+        console.log(JSON.stringify(answer.metadata, null, 2));
+      });
+    } else {
+      const pluginText = await Plugins.callMany(plugins);
+      const fullPrompt = `${input} \n ${pluginText}`;
+      results = await queryGpt4(fullPrompt, embeddings, 7);
+      console.log("\n\n");
+      console.log(Marked.parse(results));
+    }
     input = await ask(`Ask ${aiName} AI?: `);
   }
 }
