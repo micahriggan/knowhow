@@ -153,9 +153,9 @@ export async function askGpt<E extends GptQuestionEmbedding>(
           break;
 
         default:
+          console.log("Thinking...");
           const pluginText = await Plugins.callMany(plugins, input);
           const fullPrompt = `${input} \n ${pluginText}`;
-          console.log("Thinking...");
           //const spinner = Ora().start("Thinking ...");
           results = await queryGpt4(fullPrompt, embeddings, 7);
           //spinner.succeed();
