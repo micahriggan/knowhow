@@ -155,16 +155,18 @@ export async function askGpt<E extends GptQuestionEmbedding>(
         default:
           const pluginText = await Plugins.callMany(plugins, input);
           const fullPrompt = `${input} \n ${pluginText}`;
-          const spinner = Ora().start("Thinking ...");
+          console.log("Thinking...");
+          //const spinner = Ora().start("Thinking ...");
           results = await queryGpt4(fullPrompt, embeddings, 7);
-          spinner.succeed();
+          //spinner.succeed();
           console.log("\n\n");
           console.log(Marked.parse(results));
           break;
       }
-      input = await ask(`Ask ${aiName} AI?: `);
     } catch (e) {
       console.log(e);
+    } finally {
+      input = await ask(`Ask ${aiName} AI?: `);
     }
   }
 }

@@ -1,5 +1,5 @@
 import glob from "glob";
-import { readFile } from "./utils";
+import { readFile, fileExists, fileStat } from "./utils";
 import { Language } from "./types";
 import { getConfig, getLanguageConfig } from "./config";
 
@@ -39,7 +39,23 @@ class VimPlugin implements Plugin {
 
   async getFileContents(swapFile: string) {
     const filePath = await this.getSourcePath(swapFile);
-    return { filePath, content: await readFile(filePath, "utf8") };
+    const exists = await fileExists(filePath);
+    if (!exists) {
+      throw new Error(`File ${filePath} does not exist`);
+    }
+
+    const stat = await fileStat(filePath);
+    if (stat.isDirectory()) {
+      return { filePath, content: "DIRECTORY" };
+    }
+    if (stat.size > 32000) {
+      console.error(`File ${filePath} is too large with size ${stat.size}`);
+      return { filePath, content: "FILE TOO LARGE" };
+    }
+
+    console.log(`Reading file ${filePath}`);
+    const content = await readFile(filePath, "utf8");
+    return { filePath, content };
   }
 
   async call() {
@@ -75,7 +91,12 @@ class LanguagePlugin implements Plugin {
     // Read the contents of the files
     const fileContents = await Promise.all(
       filesToLoad.map(async (filePath) => {
-        return { filePath, content: await readFile(filePath, "utf8") };
+        const exists = await fileExists(filePath);
+        if (!exists) {
+          throw new Error(`File ${filePath} does not exist`);
+        }
+        let content = await readFile(filePath, "utf8").toString();
+        return { filePath, content };
       })
     );
 

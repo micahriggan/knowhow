@@ -74,7 +74,7 @@ export async function embed(
       vector,
       metadata: {
         ...metadata,
-        text,
+        text: chunkText,
       },
     };
 
