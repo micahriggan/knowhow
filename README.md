@@ -7,19 +7,19 @@ Knowhow is a powerful tool designed to ingest a codebase and automatically gener
 
 ## Key Features
 
-    * Automated Documentation: Generates markdown files for each source file in the codebase.
-    * Change Detection: Utilizes MD5 hashes to detect changes in source files and prompts, ensuring documentation is up-to-date.
-    * Embedding Creation: Transforms documentation into embeddings for advanced search and retrieval capabilities.
-    * Chat Feature: Supports querying the knowledgebase through a chat interface, with context-aware responses.
-    * Language Configuration: Allows defining terms that map to specific folders, files, or data sources, enriching the chat context.
-	* Plugins: Supports chat plugins for vim, embedding search, github, and language expansion
+* Automated Documentation: Generates markdown files for each source file in the codebase.
+* Change Detection: Utilizes MD5 hashes to detect changes in source files and prompts, ensuring documentation is up-to-date.
+* Embedding Creation: Transforms documentation into embeddings for advanced search and retrieval capabilities.
+* Chat Feature: Supports querying the knowledgebase through a chat interface, with context-aware responses.
+* Language Configuration: Allows defining terms that map to specific folders, files, or data sources, enriching the chat context.
+* Plugins: Supports chat plugins for vim, embedding search, github, and language expansion
 
 ## Getting Started
 
-    1. Initialization: Run knowhow init to create the necessary folder structure and configuration files.
-    2. Generation: Use knowhow generate to process source files and produce documentation.
-    3. Embedding: Execute knowhow embed to create embeddings from the generated documentation.
-	4. Chat: Run knowhow chat to start a chat session with additional context provided by the plugins
+1. Initialization: Run knowhow init to create the necessary folder structure and configuration files.
+2. Generation: Use knowhow generate to process source files and produce documentation.
+3. Embedding: Execute knowhow embed to create embeddings from the generated documentation.
+4. Chat: Run knowhow chat to start a chat session with additional context provided by the plugins
 
 ## Configuration
 
@@ -84,9 +84,9 @@ The VIM Plugin is an integral part of the Knowhow tool, designed to enhance the 
 
 #### Key Features
 
-    * File Detection: The plugin can identify all files that are currently being edited in VIM by looking for swap files (*.swp) within the project directory.
-    * Content Retrieval: It can read the contents of the files that are open in VIM, allowing for real-time interaction and updates within the Knowhow tool.
-    * Error Handling: The plugin includes error handling for cases where the file does not exist or is too large to process, ensuring stability and reliability.
+* File Detection: The plugin can identify all files that are currently being edited in VIM by looking for swap files (.swp) within the project directory.
+* Content Retrieval: It can read the contents of the files that are open in VIM, allowing for real-time interaction and updates within the Knowhow tool.
+* Error Handling: The plugin includes error handling for cases where the file does not exist or is too large to process, ensuring stability and reliability.
 
 #### Usage
 
