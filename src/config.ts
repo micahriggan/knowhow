@@ -18,7 +18,7 @@ export async function init() {
   // create knowhow.json
   const config = {
     promptsDir: ".knowhow/prompts",
-    plugins: ["embeddings", "language", "vim"],
+    plugins: ["embeddings", "language", "vim", "github"],
     sources: [
       {
         input: "src/**/*.mdx",
