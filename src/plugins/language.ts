@@ -2,11 +2,13 @@ import { readFile, fileExists, fileStat } from "../utils";
 import { Language } from "../types";
 import { getConfig, getLanguageConfig } from "../config";
 import { Plugin } from "./types";
+import { GitHubPlugin } from "./github";
 
 export class LanguagePlugin implements Plugin {
   constructor() {}
 
   async call(userPrompt: string): Promise<string> {
+    const config = await getConfig();
     const languageConfig = await getLanguageConfig();
     // Extract terms from the language configuration
     const terms = Object.keys(languageConfig);
@@ -14,9 +16,14 @@ export class LanguagePlugin implements Plugin {
     // Find all matching terms in the userPrompt
     const matchingTerms = terms.filter((term) => userPrompt.includes(term));
 
+    const sources = matchingTerms.flatMap(
+      (term) => languageConfig[term].sources
+    );
+
+    const contexts = [];
+
     // Load the files for the matching terms
-    const filesToLoad = matchingTerms
-      .flatMap((term) => languageConfig[term].sources)
+    const filesToLoad = sources
       .filter((f) => f.kind === "file")
       .map((f) => f.data)
       .flat();
@@ -32,16 +39,31 @@ export class LanguagePlugin implements Plugin {
         return { filePath, content };
       })
     );
+    contexts.push(...fileContents);
 
     const textContexts = matchingTerms
       .flatMap((term) =>
         languageConfig[term].sources.filter((s) => s.kind === "text")
       )
       .map((s) => s.data);
+    contexts.push(...textContexts);
+
+    if (config.plugins.includes("github")) {
+      const githubPlugin = new GitHubPlugin();
+      const githubUrls = sources
+        .filter((s) => s.kind === "github")
+        .map((s) => s.data)
+        .flat()
+        .join("\n");
+
+      const urls = githubPlugin.extractUrls(githubUrls);
+      const diffs = urls ? await githubPlugin.getParsedDiffs(urls) : [];
+      contexts.push(...diffs);
+    }
 
     // Return the file contents in a format that can be added to the prompt context
     return `LANGUAGE PLUGIN: The following terms triggered expansions ${matchingTerms} expanded to: ${JSON.stringify(
-      fileContents
-    )}, ${JSON.stringify(textContexts)}`;
+      contexts
+    )}`;
   }
 }
