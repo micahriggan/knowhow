@@ -11,36 +11,48 @@ export class GitHubPlugin implements Plugin {
     });
   }
 
-  async call(userPrompt: string): Promise<string> {
-    // Regular expression to match GitHub pull request URLs
+  extractUrls(userPrompt: string): string[] {
     const prUrlRegex =
       /https:\/\/github\.com\/([\w-]+)\/([\w-]+)\/pull\/(\d+)/g;
     const matches = userPrompt.match(prUrlRegex);
+    return matches;
+  }
 
-    if (matches) {
-      const responses = await Promise.all(
-        matches.map(async (url) => {
-          const [owner, repo, _, pull_number] = url.split("/").slice(-4);
-          console.log(`Loading diff for ${owner}/${repo}#${pull_number}`);
-          const { data: diff } = await this.octokit.rest.pulls.get({
-            owner,
-            repo,
-            pull_number: parseInt(pull_number),
-            mediaType: {
-              format: "diff",
-            },
-          });
+  async getDiff(url: string) {
+    const [owner, repo, _, pull_number] = url.split("/").slice(-4);
+    console.log(`Loading diff for ${owner}/${repo}#${pull_number}`);
+    const { data: diff } = await this.octokit.rest.pulls.get({
+      owner,
+      repo,
+      pull_number: parseInt(pull_number),
+      mediaType: {
+        format: "diff",
+      },
+    });
 
-          let parsed = parseDiff(diff.toString());
+    return diff;
+  }
 
-          parsed = parsed.filter((file) => {
-            return file.additions < 200 && file.deletions < 200;
-          });
+  async getParsedDiffs(urls: string[]) {
+    return Promise.all(
+      urls.map(async (url) => {
+        const diff = await this.getDiff(url);
+        let parsed = parseDiff(diff.toString());
 
-          return parsed;
-        })
-      );
+        parsed = parsed.filter((file) => {
+          return file.additions < 200 && file.deletions < 200;
+        });
 
+        return parsed;
+      })
+    );
+  }
+
+  async call(userPrompt: string): Promise<string> {
+    const urls = this.extractUrls(userPrompt);
+
+    if (urls) {
+      const responses = await this.getParsedDiffs(urls);
       // Format the diffs in Markdown
       const markdownDiffs = responses
         .map((diff) => `\`\`\`diff\n${JSON.stringify(diff)}\n\`\`\``)
