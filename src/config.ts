@@ -68,6 +68,7 @@ export async function init() {
 
   await writeFile(".knowhow/language.json", JSON.stringify(language, null, 2));
   await writeFile(".knowhow/.hashes.json", "{}");
+  await writeFile(".knowhow/.ignore", "");
   await updateAssistants(assistants);
 }
 

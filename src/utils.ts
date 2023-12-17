@@ -1,3 +1,4 @@
+import gitignoreToGlob from "gitignore-to-glob";
 import { promisify } from "util";
 import * as util from "util";
 import * as fs from "fs";
@@ -11,6 +12,7 @@ export const readFile = promisify(fs.readFile);
 export const writeFile = promisify(fs.writeFile);
 export const mkdir = promisify(fs.mkdir);
 export const fileStat = promisify(fs.stat);
+
 const readline = require("readline").createInterface({
   input: process.stdin,
   output: process.stdout,
@@ -35,3 +37,7 @@ export function cosineSimilarity(A, B) {
     dotp(A, B) / (Math.sqrt(dotp(A, A)) * Math.sqrt(dotp(B, B)));
   return similarity;
 }
+
+export const KNOWHOW_IGNORE = gitignoreToGlob()
+  .concat(gitignoreToGlob(".knowhow/.ignore"))
+  .map((pattern) => pattern.replace("!", "./"));

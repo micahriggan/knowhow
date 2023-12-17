@@ -1,7 +1,7 @@
 import * as path from "path";
 import { getConfig, loadPrompt } from "./config";
 import { Config, Hashes, Embeddable } from "./types";
-import { readFile, writeFile, fileExists } from "./utils";
+import { readFile, writeFile, fileExists, fileStat } from "./utils";
 import { summarizeTexts, openai, chunkText } from "./ai";
 
 export async function loadEmbedding(path: string) {
@@ -13,7 +13,7 @@ export async function loadEmbedding(path: string) {
 
 export async function getConfiguredEmbeddings() {
   const config = await getConfig();
-  const files = config.embedSources.map((s) => s.output);
+  const files = Array.from(new Set(config.embedSources.map((s) => s.output)));
   const embeddings: Embeddable[] = [];
   for (const file of files) {
     const fileEmbeddings = await loadEmbedding(file);
@@ -48,12 +48,13 @@ export async function embed(
 
   for (let index = 0; index < chunks.length; index++) {
     const chunkId = chunkSize ? `${id}-${index}` : id;
+    let chunkText = chunks[index];
 
-    if (embeddings.find((e) => e.id === chunkId)) {
+    if (embeddings.find((e) => e.id === chunkId && e.text === chunkText)) {
+      console.log("Skipping", chunkId);
       continue;
     }
 
-    let chunkText = chunks[index];
     if (prompt) {
       console.log("Summarizing", chunkText);
       chunkText = await summarizeTexts([chunkText], prompt);
@@ -61,6 +62,7 @@ export async function embed(
 
     let vector = [];
     if (!uploadMode) {
+      console.log("Embedding", chunkId);
       const queryEmbedding = await openai.embeddings.create({
         input: chunkText,
         model: "text-embedding-ada-002",
@@ -133,13 +135,17 @@ export async function embedFile(
   source: Config["embedSources"][0]
 ) {
   const { prompt, output, uploadMode, chunkSize } = source;
+
+  const stat = await fileStat(inputFile);
+  if (stat.isDirectory()) {
+    return;
+  }
+
   if (inputFile.endsWith(".json") && (await isEmbeddingFile(inputFile))) {
     return embedJson(inputFile, source);
   }
 
-  console.log("Embedding", inputFile);
   const embeddings: Embeddable[] = await loadEmbedding(output);
-  // get the content of the file
   const fileContent = await readFile(inputFile, "utf8");
 
   const embeddable = await embed(
