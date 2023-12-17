@@ -1,8 +1,9 @@
 import * as path from "path";
+import gitignoreToGlob from "gitignore-to-glob";
 import { Prompts } from "./prompts";
 import { promisify } from "util";
 import { Config, Language, AssistantConfig } from "./types";
-import { mkdir, writeFile, readFile } from "./utils";
+import { mkdir, writeFile, readFile, fileExists } from "./utils";
 
 export async function init() {
   // create the folder structure
@@ -17,7 +18,7 @@ export async function init() {
   // create knowhow.json
   const config = {
     promptsDir: ".knowhow/prompts",
-    plugins: ["language", "vim"],
+    plugins: ["embeddings", "language", "vim"],
     sources: [
       {
         input: "src/**/*.mdx",
@@ -115,4 +116,13 @@ export async function loadPrompt(promptName: string) {
     "utf8"
   );
   return prompt;
+}
+
+export async function getIgnorePattern() {
+  let ignoreList = gitignoreToGlob();
+  const exists = await fileExists(".knowhow/.ignore");
+  if (exists) {
+    ignoreList.push(...gitignoreToGlob(".knowhow/.ignore"));
+  }
+  return ignoreList.map((pattern) => pattern.replace("!", "./"));
 }

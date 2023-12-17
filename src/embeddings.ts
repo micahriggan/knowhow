@@ -1,7 +1,13 @@
 import * as path from "path";
 import { getConfig, loadPrompt } from "./config";
-import { Config, Hashes, Embeddable } from "./types";
-import { readFile, writeFile, fileExists, fileStat } from "./utils";
+import { Config, Hashes, Embeddable, EmbeddingBase } from "./types";
+import {
+  readFile,
+  writeFile,
+  fileExists,
+  fileStat,
+  cosineSimilarity,
+} from "./utils";
 import { summarizeTexts, openai, chunkText } from "./ai";
 
 export async function loadEmbedding(path: string) {
@@ -20,6 +26,10 @@ export async function getConfiguredEmbeddings() {
     embeddings.push(...fileEmbeddings);
   }
   return embeddings;
+}
+
+function getChunkId(id: string, index: number, chunkSize: number) {
+  return chunkSize ? `${id}-${index}` : id;
 }
 
 export async function embed(
@@ -46,9 +56,11 @@ export async function embed(
     chunks = chunks.slice(0, 25);
   }
 
+  const chunkIds = [];
   for (let index = 0; index < chunks.length; index++) {
-    const chunkId = chunkSize ? `${id}-${index}` : id;
+    const chunkId = getChunkId(id, index, chunkSize);
     let chunkText = chunks[index];
+    chunkIds.push(chunkId);
 
     if (embeddings.find((e) => e.id === chunkId && e.text === chunkText)) {
       console.log("Skipping", chunkId);
@@ -83,6 +95,8 @@ export async function embed(
     embeddings.push(embeddable);
   }
 
+  // mutate the embedding array
+  pruneEmbedding(id, chunkIds, embeddings);
   return embeddings;
 }
 
@@ -162,4 +176,40 @@ export async function embedFile(
   );
 
   await writeFile(output, JSON.stringify(embeddings, null, 2));
+}
+
+export function pruneEmbedding(
+  id: string,
+  chunkIds: string[],
+  embeddings: Embeddable[]
+) {
+  const relatedChunks = embeddings.filter((e) => e.id.startsWith(id));
+  for (let chunk of relatedChunks) {
+    if (!chunkIds.includes(chunk.id)) {
+      console.log("Removing", chunk.id);
+      const index = embeddings.findIndex((e) => e.id === chunk.id);
+      embeddings.splice(index, 1);
+    }
+  }
+  return embeddings;
+}
+
+export async function queryEmbedding<E>(
+  query: string,
+  embeddings: Array<Embeddable<E>>
+) {
+  const queryEmbedding = await openai.embeddings.create({
+    input: query,
+    model: "text-embedding-ada-002",
+  });
+  const queryVector = queryEmbedding.data[0].embedding;
+  const results = new Array<EmbeddingBase<E>>();
+  for (const embedding of embeddings) {
+    const similarity = cosineSimilarity(embedding.vector, queryVector);
+    results.push({
+      ...embedding,
+      similarity,
+    });
+  }
+  return results.sort((a, b) => b.similarity - a.similarity);
 }

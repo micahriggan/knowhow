@@ -1,33 +1,14 @@
+import { ChatCompletionMessageParam } from "openai/resources/chat";
+import Ora from "ora";
 import { openai } from "./ai";
 import { cosineSimilarity } from "./utils";
 import { EmbeddingBase, GptQuestionEmbedding, Embeddable } from "./types";
 import { Marked } from "./utils";
 import { ask } from "./utils";
-import { ChatCompletionMessageParam } from "openai/resources/chat";
-import { Plugins } from "./plugins";
-import Ora from "ora";
+import { Plugins } from "./plugins/plugins";
+import { queryEmbedding } from "./embeddings";
 
 let DEBUGGER = false;
-
-export async function queryEmbedding<E>(
-  query: string,
-  embeddings: Array<Embeddable<E>>
-) {
-  const queryEmbedding = await openai.embeddings.create({
-    input: query,
-    model: "text-embedding-ada-002",
-  });
-  const queryVector = queryEmbedding.data[0].embedding;
-  const results = new Array<EmbeddingBase<E>>();
-  for (const embedding of embeddings) {
-    const similarity = cosineSimilarity(embedding.vector, queryVector);
-    results.push({
-      ...embedding,
-      similarity,
-    });
-  }
-  return results.sort((a, b) => b.similarity - a.similarity);
-}
 
 export async function askEmbedding<E>(
   embeddings: Array<Embeddable<E>>,
@@ -85,23 +66,11 @@ Generate an article or document that answers the question.
   return queryEmbedding(fakeDoc, embeddings);
 }
 
-export async function queryGpt4<E extends EmbeddingBase>(
-  query: string,
-  embeddings: Array<E>,
-  count = 10
-) {
-  const results = await queryEmbedding(query, embeddings);
-  const context = results
-    .map((r) => ({ ...r, vector: undefined }))
-    .slice(0, count);
+export async function queryGpt4<E extends EmbeddingBase>(query: string) {
   const gptPrompt = `
 
 The user has asked:
   ${query}
-
-Our knowledgebase contains this information which can be used to answer the question:
-
-  ${JSON.stringify(context, null, 2)}
 
   Output Format in Markdown
 `;
@@ -157,7 +126,7 @@ export async function askGpt<E extends GptQuestionEmbedding>(
           const pluginText = await Plugins.callMany(plugins, input);
           const fullPrompt = `${input} \n ${pluginText}`;
           //const spinner = Ora().start("Thinking ...");
-          results = await queryGpt4(fullPrompt, embeddings, 7);
+          results = await queryGpt4(fullPrompt);
           //spinner.succeed();
           console.log("\n\n");
           console.log(Marked.parse(results));

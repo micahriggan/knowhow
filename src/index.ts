@@ -16,15 +16,21 @@ import { ChatOpenAI } from "langchain/chat_models/openai";
 import { Prompts } from "./prompts";
 import { Config, Hashes, Embeddable } from "./types";
 import { getHashes, checkNoFilesChanged } from "./hashes";
-import { readFile, writeFile, fileExists, KNOWHOW_IGNORE } from "./utils";
+import { readFile, writeFile, fileExists } from "./utils";
 import {
   getConfig,
   loadPrompt,
   updateConfig,
   getAssistantsConfig,
   updateAssistants,
+  getIgnorePattern,
 } from "./config";
-import { embedJson, embedFile, getConfiguredEmbeddings } from "./embeddings";
+import {
+  embedJson,
+  embedFile,
+  getConfiguredEmbeddings,
+  pruneEmbedding,
+} from "./embeddings";
 import { summarizeFile, uploadToOpenAi, createAssistant } from "./ai";
 
 import { abort } from "process";
@@ -42,10 +48,11 @@ const chatModel = new ChatOpenAI({
 export async function embed() {
   // load config
   const config = await getConfig();
+  const ignorePattern = await getIgnorePattern();
   // get all the files in .knowhow/docs
   for (const source of config.embedSources) {
     console.log("Embedding", source.input, "to", source.output);
-    const files = await glob.sync(source.input, { ignore: KNOWHOW_IGNORE });
+    const files = await glob.sync(source.input, { ignore: ignorePattern });
     console.log(`Found ${files.length} files`);
     if (files.length > 100) {
       console.error(
@@ -85,12 +92,13 @@ export async function upload() {
 
 export async function uploadOpenAi() {
   const config = await getConfig();
+  const ignorePattern = await getIgnorePattern();
   const assistantsConfig = await getAssistantsConfig();
   for (const assistant of config.assistants) {
     if (!assistant.id) {
       const fileIds = [];
       for (const globPath of assistant.files) {
-        const files = await glob.sync(globPath, { ignore: KNOWHOW_IGNORE });
+        const files = await glob.sync(globPath, { ignore: ignorePattern });
         for (const file of files) {
           if (!assistantsConfig.files[file]) {
             const uploaded = await uploadToOpenAi(file);

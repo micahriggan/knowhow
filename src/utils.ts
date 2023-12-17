@@ -37,7 +37,3 @@ export function cosineSimilarity(A, B) {
     dotp(A, B) / (Math.sqrt(dotp(A, A)) * Math.sqrt(dotp(B, B)));
   return similarity;
 }
-
-export const KNOWHOW_IGNORE = gitignoreToGlob()
-  .concat(gitignoreToGlob(".knowhow/.ignore"))
-  .map((pattern) => pattern.replace("!", "./"));
