@@ -61,6 +61,10 @@ export class LanguagePlugin implements Plugin {
       contexts.push(...diffs);
     }
 
+    if (!matchingTerms) {
+      return "LANGUAGE PLUGIN: No matching terms found";
+    }
+
     // Return the file contents in a format that can be added to the prompt context
     return `LANGUAGE PLUGIN: The following terms triggered expansions ${matchingTerms} expanded to: ${JSON.stringify(
       contexts
