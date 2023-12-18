@@ -5,6 +5,7 @@ import { LanguagePlugin } from "./language";
 import { EmbeddingPlugin } from "./embedding";
 import { GitHubPlugin } from "./github";
 import { AsanaPlugin } from "./asana";
+import { LinearPlugin } from "./linear";
 
 class PluginService {
   plugins = {
@@ -13,6 +14,7 @@ class PluginService {
     language: new LanguagePlugin(),
     github: new GitHubPlugin(),
     asana: new AsanaPlugin(),
+    linear: new LinearPlugin(),
   } as Record<string, Plugin>;
 
   registerPlugin(name, plugin: Plugin) {
