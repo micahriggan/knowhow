@@ -15,6 +15,24 @@ export class JiraPlugin implements Plugin {
     });
   }
 
+  async getTasksFromUrls(urls: string[]) {
+    const tasks = await Promise.all(
+      urls.map(async (url) => {
+        return this.getTaskFromUrl(url);
+      })
+    );
+    return tasks;
+  }
+
+  async getTaskFromUrl(url: string) {
+    const issueId = url.split("/").pop();
+    if (issueId) {
+      console.log(`Fetching Jira issue ${issueId}`);
+      return await this.getIssueData(issueId);
+    }
+    return null;
+  }
+
   async getIssueData(issueId: string) {
     try {
       const issue = await this.jiraClient.findIssue(issueId);
@@ -52,17 +70,7 @@ export class JiraPlugin implements Plugin {
       return "JIRA PLUGIN: No issues found";
     }
 
-    const issuesData = await Promise.all(
-      urls.map(async (url) => {
-        const issueKey = this.extractIdFromUrl(url);
-        if (!issueKey) {
-          return null;
-        }
-        console.log(`Fetching Jira issue ${issueKey}`);
-        return await this.getIssueData(issueKey);
-      })
-    );
-
+    const issuesData = await this.getTasksFromUrls(urls);
     const issuesDataFiltered = issuesData.filter((issue) => issue !== null);
 
     if (issuesDataFiltered.length === 0) {
