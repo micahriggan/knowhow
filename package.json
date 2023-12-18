@@ -17,6 +17,7 @@
     "@types/asana": "^0.18.16",
     "@types/express": "^4.17.13",
     "@types/jest": "^27.4.1",
+    "@types/jira-client": "^7.1.9",
     "@types/node": "^20.6.3",
     "jest": "^27.5.1",
     "prettier": "2.6.2",

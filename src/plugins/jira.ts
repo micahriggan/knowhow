@@ -25,15 +25,39 @@ export class JiraPlugin implements Plugin {
     }
   }
 
-  async call(userPrompt: string): Promise<string> {
-    const issueKeyRegex = /[A-Z]+-\d+/g;
-    const matches = userPrompt.match(issueKeyRegex);
+  // https://${process.env.JIRA_HOST}/browse/${issue.key}
+  extractUrls(userPrompt: string): string[] {
+    const host = process.env.JIRA_HOST;
+    const regex = new RegExp(`https://${host}/browse/[A-Z]+-\\d+`, "g");
+    const matches = userPrompt.match(regex);
     if (!matches) {
+      return [];
+    }
+    return matches;
+  }
+
+  extractIdFromUrl(url: string): string {
+    const host = process.env.JIRA_HOST;
+    const regex = new RegExp(`https://${host}/browse/([A-Z]+-\\d+)`, "g");
+    const matches = regex.exec(url);
+    if (matches && matches[1]) {
+      return matches[1];
+    }
+    return null;
+  }
+
+  async call(userPrompt: string): Promise<string> {
+    const urls = this.extractUrls(userPrompt);
+    if (!urls) {
       return "JIRA PLUGIN: No issues found";
     }
 
     const issuesData = await Promise.all(
-      matches.map(async (issueKey) => {
+      urls.map(async (url) => {
+        const issueKey = this.extractIdFromUrl(url);
+        if (!issueKey) {
+          return null;
+        }
         console.log(`Fetching Jira issue ${issueKey}`);
         return await this.getIssueData(issueKey);
       })
@@ -48,7 +72,7 @@ export class JiraPlugin implements Plugin {
     const markdownIssues = issuesDataFiltered
       .map(
         (issue) =>
-          `### Issue: ${issue.key}\n- Summary: ${issue.fields.summary}\n- URL: ${process.env.JIRA_HOST}/browse/${issue.key}`
+          `### Issue: ${issue.key}\n- Summary: ${issue.fields.summary}\n- URL: ${process.env.JIRA_HOST}/browse/${issue.key} \n- Description: ${issue.fields.description}`
       )
       .join("\n\n");
     return `JIRA PLUGIN: The following issues were loaded:\n\n${markdownIssues}`;
