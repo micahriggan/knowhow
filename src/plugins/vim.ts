@@ -42,6 +42,9 @@ export class VimPlugin implements Plugin {
     const fileContents = await Promise.all(
       vimFiles.map((f) => this.getFileContents(f))
     );
+    if (fileContents.length === 0) {
+      return "VIM PLUGIN: No files open in vim";
+    }
     return (
       "VIM PLUGIN: The following files are open in vim: " +
       JSON.stringify(fileContents)
