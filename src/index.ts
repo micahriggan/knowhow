@@ -30,6 +30,7 @@ import {
   embedFile,
   getConfiguredEmbeddings,
   pruneEmbedding,
+  loadEmbedding,
 } from "./embeddings";
 import { summarizeFile, uploadToOpenAi, createAssistant } from "./ai";
 
@@ -60,8 +61,9 @@ export async function embed() {
       );
     }
     console.log(files);
+    const embeddings: Embeddable[] = await loadEmbedding(source.output);
     for (const file of files) {
-      await embedFile(file, source);
+      await embedFile(file, source, embeddings);
     }
   }
 }

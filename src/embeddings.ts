@@ -146,7 +146,8 @@ export async function embedJson(
 
 export async function embedFile(
   inputFile: string,
-  source: Config["embedSources"][0]
+  source: Config["embedSources"][0],
+  embeddings = [] as Embeddable[]
 ) {
   const { prompt, output, uploadMode, chunkSize } = source;
 
@@ -159,7 +160,6 @@ export async function embedFile(
     return embedJson(inputFile, source);
   }
 
-  const embeddings: Embeddable[] = await loadEmbedding(output);
   const fileContent = await readFile(inputFile, "utf8");
 
   const embeddable = await embed(
