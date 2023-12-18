@@ -25,7 +25,7 @@ export class JiraPlugin implements Plugin {
   }
 
   async getTaskFromUrl(url: string) {
-    const issueId = url.split("/").pop();
+    const issueId = this.extractIdFromUrl(url);
     if (issueId) {
       console.log(`Fetching Jira issue ${issueId}`);
       return await this.getIssueData(issueId);

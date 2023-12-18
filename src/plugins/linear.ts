@@ -21,7 +21,7 @@ export class LinearPlugin implements Plugin {
   }
 
   async getTaskFromUrl(url: string) {
-    const issueId = url.split("/").pop();
+    const issueId = this.getIdFromUrl(url);
     if (issueId) {
       console.log(`Fetching Linear issue ${issueId}`);
       return await this.getIssueData(issueId);
