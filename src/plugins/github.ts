@@ -60,6 +60,6 @@ export class GitHubPlugin implements Plugin {
       return `GITHUB PLUGIN: The following diffs were loaded:\n\n${markdownDiffs}`;
     }
 
-    return "No GitHub pull request URLs detected.";
+    return "GITHUB PLUGIN: No pull request URLs detected.";
   }
 }
