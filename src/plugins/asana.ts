@@ -18,6 +18,24 @@ export class AsanaPlugin implements Plugin {
     return matches || [];
   }
 
+  async getTasksFromUrls(urls: string[]) {
+    const tasks = await Promise.all(
+      urls.map(async (url) => {
+        return this.getTaskFromUrl(url);
+      })
+    );
+    return tasks;
+  }
+
+  async getTaskFromUrl(url: string) {
+    const taskId = url.split("/").pop();
+    if (taskId) {
+      console.log(`Fetching Asana task ${taskId}`);
+      return await this.getTaskData(taskId);
+    }
+    return null;
+  }
+
   async getTaskData(taskId: string) {
     try {
       const task = await this.asanaClient.tasks.findById(taskId);
@@ -30,17 +48,7 @@ export class AsanaPlugin implements Plugin {
 
   async call(userPrompt: string): Promise<string> {
     const urls = this.extractUrls(userPrompt);
-    const tasksData = await Promise.all(
-      urls.map(async (url) => {
-        const taskId = url.split("/").pop();
-        if (taskId) {
-          console.log(`Fetching Asana task ${taskId}`);
-          return await this.getTaskData(taskId);
-        }
-        return null;
-      })
-    );
-
+    const tasksData = await this.getTasksFromUrls(urls);
     const tasksDataFiltered = tasksData.filter((task) => task !== null);
 
     if (tasksDataFiltered.length === 0) {

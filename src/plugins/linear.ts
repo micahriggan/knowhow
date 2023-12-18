@@ -20,6 +20,24 @@ export class LinearPlugin implements Plugin {
     }
   }
 
+  async getTaskFromUrl(url: string) {
+    const issueId = this.getIdFromUrl(url);
+    if (issueId) {
+      console.log(`Fetching Linear issue ${issueId}`);
+      return await this.getIssueData(issueId);
+    }
+    return null;
+  }
+
+  async getTasksFromUrls(urls: string[]) {
+    const tasks = await Promise.all(
+      urls.map(async (url) => {
+        return this.getTaskFromUrl(url);
+      })
+    );
+    return tasks;
+  }
+
   extractUrls(userPrompt: string): string[] {
     const urlRegex = /https:\/\/linear\.app\/[^\/]+\/issue\/[^\/]+\/[^\/]+/g;
     const matches = userPrompt.match(urlRegex);
@@ -44,17 +62,7 @@ export class LinearPlugin implements Plugin {
       return "LINEAR PLUGIN: No issues found";
     }
 
-    const issuesData = await Promise.all(
-      urls.map(async (url) => {
-        const issueId = this.getIdFromUrl(url);
-        if (!issueId) {
-          return null;
-        }
-        console.log(`Fetching Linear issue ${issueId}`);
-        return await this.getIssueData(issueId);
-      })
-    );
-
+    const issuesData = await this.getTasksFromUrls(urls);
     const issuesDataFiltered = issuesData.filter((issue) => issue !== null);
 
     if (issuesDataFiltered.length === 0) {

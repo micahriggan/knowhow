@@ -57,7 +57,7 @@ export class GitHubPlugin implements Plugin {
       const markdownDiffs = responses
         .map((diff) => `\`\`\`diff\n${JSON.stringify(diff)}\n\`\`\``)
         .join("\n\n");
-      return `GITHUB PLUGIN: The following diffs were loaded:\n\n${markdownDiffs}`;
+      return `GITHUB PLUGIN: ${urls} loaded:\n\n${markdownDiffs}`;
     }
 
     return "GITHUB PLUGIN: No pull request URLs detected.";

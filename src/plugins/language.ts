@@ -3,6 +3,9 @@ import { Language } from "../types";
 import { getConfig, getLanguageConfig } from "../config";
 import { Plugin } from "./types";
 import { GitHubPlugin } from "./github";
+import { AsanaPlugin } from "./asana";
+import { JiraPlugin } from "./jira";
+import { LinearPlugin } from "./linear";
 
 export class LanguagePlugin implements Plugin {
   constructor() {}
@@ -59,6 +62,45 @@ export class LanguagePlugin implements Plugin {
       const urls = githubPlugin.extractUrls(githubUrls);
       const diffs = urls ? await githubPlugin.getParsedDiffs(urls) : [];
       contexts.push(...diffs);
+    }
+
+    if (config.plugins.includes("asana")) {
+      const asanaPlugin = new AsanaPlugin();
+      const asanaUrls = sources
+        .filter((s) => s.kind === "asana")
+        .map((s) => s.data)
+        .flat()
+        .join("\n");
+
+      const urls = asanaPlugin.extractUrls(asanaUrls);
+      const tasks = urls ? await asanaPlugin.getTasksFromUrls(urls) : [];
+      contexts.push(...tasks);
+    }
+
+    if (config.plugins.includes("jira")) {
+      const jiraPlugin = new JiraPlugin();
+      const jiraUrls = sources
+        .filter((s) => s.kind === "jira")
+        .map((s) => s.data)
+        .flat()
+        .join("\n");
+
+      const urls = jiraPlugin.extractUrls(jiraUrls);
+      const tasks = urls ? await jiraPlugin.getTasksFromUrls(urls) : [];
+      contexts.push(...tasks);
+    }
+
+    if (config.plugins.includes("linear")) {
+      const linearPlugin = new LinearPlugin();
+      const linearUrls = sources
+        .filter((s) => s.kind === "linear")
+        .map((s) => s.data)
+        .flat()
+        .join("\n");
+
+      const urls = linearPlugin.extractUrls(linearUrls);
+      const tasks = urls ? await linearPlugin.getTasksFromUrls(urls) : [];
+      contexts.push(...tasks);
     }
 
     if (!matchingTerms) {
