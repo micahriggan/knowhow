@@ -4,6 +4,7 @@ import { VimPlugin } from "./vim";
 import { LanguagePlugin } from "./language";
 import { EmbeddingPlugin } from "./embedding";
 import { GitHubPlugin } from "./github";
+import { AsanaPlugin } from "./asana";
 
 class PluginService {
   plugins = {
@@ -11,6 +12,7 @@ class PluginService {
     vim: new VimPlugin(),
     language: new LanguagePlugin(),
     github: new GitHubPlugin(),
+    asana: new AsanaPlugin(),
   } as Record<string, Plugin>;
 
   registerPlugin(name, plugin: Plugin) {
