@@ -7,6 +7,7 @@ import { GitHubPlugin } from "./github";
 import { AsanaPlugin } from "./asana";
 import { LinearPlugin } from "./linear";
 import { JiraPlugin } from "./jira";
+import { NotionPlugin } from "./notion";
 
 class PluginService {
   plugins = {
@@ -17,6 +18,7 @@ class PluginService {
     asana: new AsanaPlugin(),
     linear: new LinearPlugin(),
     jira: new JiraPlugin(),
+    notion: new NotionPlugin(),
   } as Record<string, Plugin>;
 
   registerPlugin(name, plugin: Plugin) {

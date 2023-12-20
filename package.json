@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@linear/sdk": "^12.0.0",
+    "@notionhq/client": "^2.2.14",
     "@octokit/rest": "^20.0.2",
     "asana": "^1.0.2",
     "axios": "^1.5.0",

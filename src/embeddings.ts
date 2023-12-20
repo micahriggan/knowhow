@@ -40,7 +40,7 @@ export async function embed(
   prompt?: string,
   chunkSize?: number,
   uploadMode?: boolean
-) {
+): Promise<Array<string>> {
   let chunks = [text];
 
   if (chunkSize) {
@@ -57,6 +57,7 @@ export async function embed(
   }
 
   const chunkIds = [];
+  const updates = new Array<string>();
   for (let index = 0; index < chunks.length; index++) {
     const chunkId = getChunkId(id, index, chunkSize);
     let chunkText = chunks[index];
@@ -93,11 +94,12 @@ export async function embed(
     };
 
     embeddings.push(embeddable);
+    updates.push(chunkId);
   }
 
   // mutate the embedding array
   pruneEmbedding(id, chunkIds, embeddings);
-  return embeddings;
+  return updates;
 }
 
 export async function isEmbeddingFile(inputFile: string) {
@@ -130,7 +132,7 @@ export async function embedJson(
       continue;
     }
 
-    const embeddable = await embed(
+    await embed(
       row.id,
       row.text,
       row.metadata,
@@ -140,13 +142,17 @@ export async function embedJson(
       uploadMode
     );
 
-    await writeFile(output, JSON.stringify(embeddings, null, 2));
+    const fileString =
+      "[" + embeddings.map((e) => JSON.stringify(e)).join(",") + "]";
+    await writeFile(output, fileString);
   }
 }
 
 export async function embedFile(
   inputFile: string,
-  source: Config["embedSources"][0]
+  source: Config["embedSources"][0],
+  embeddings = [] as Embeddable[],
+  save = true
 ) {
   const { prompt, output, uploadMode, chunkSize } = source;
 
@@ -159,10 +165,9 @@ export async function embedFile(
     return embedJson(inputFile, source);
   }
 
-  const embeddings: Embeddable[] = await loadEmbedding(output);
   const fileContent = await readFile(inputFile, "utf8");
 
-  const embeddable = await embed(
+  const updates = await embed(
     inputFile,
     fileContent,
     {
@@ -175,7 +180,15 @@ export async function embedFile(
     uploadMode
   );
 
-  await writeFile(output, JSON.stringify(embeddings, null, 2));
+  if (save && updates.length > 0) {
+    await saveEmbedding(output, embeddings);
+  }
+}
+
+export async function saveEmbedding(output: string, embeddings: Embeddable[]) {
+  const fileString =
+    "[" + embeddings.map((e) => JSON.stringify(e)).join(",") + "]";
+  await writeFile(output, fileString);
 }
 
 export function pruneEmbedding(

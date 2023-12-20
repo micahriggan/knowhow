@@ -30,6 +30,8 @@ import {
   embedFile,
   getConfiguredEmbeddings,
   pruneEmbedding,
+  loadEmbedding,
+  saveEmbedding,
 } from "./embeddings";
 import { summarizeFile, uploadToOpenAi, createAssistant } from "./ai";
 
@@ -60,9 +62,24 @@ export async function embed() {
       );
     }
     console.log(files);
+    const embeddings: Embeddable[] = await loadEmbedding(source.output);
+    let batch = [];
+    let index = 0;
     for (const file of files) {
-      await embedFile(file, source);
+      index++;
+      const shouldSave = batch.length > 20 || index === files.length;
+      if (shouldSave) {
+        await Promise.all(batch);
+        batch = [];
+      }
+      batch.push(embedFile(file, source, embeddings, shouldSave));
     }
+    if (batch.length > 0) {
+      await Promise.all(batch);
+    }
+
+    // Save one last time just in case
+    await saveEmbedding(source.output, embeddings);
   }
 }
 
