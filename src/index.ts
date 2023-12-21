@@ -32,6 +32,7 @@ import {
   pruneEmbedding,
   loadEmbedding,
   saveEmbedding,
+  embedSource,
 } from "./embeddings";
 import { summarizeFile, uploadToOpenAi, createAssistant } from "./ai";
 
@@ -51,40 +52,9 @@ export async function embed() {
   // load config
   const config = await getConfig();
   const ignorePattern = await getIgnorePattern();
-  // get all the files in .knowhow/docs
+
   for (const source of config.embedSources) {
-    console.log("Embedding", source.input, "to", source.output);
-    let files = await glob.sync(source.input, { ignore: ignorePattern });
-
-    if (source.kind && files.length === 0) {
-      files = [source.input];
-    }
-
-    console.log(`Found ${files.length} files`);
-    if (files.length > 100) {
-      console.error(
-        "woah there, that's a lot of files. I'm not going to embed that many"
-      );
-    }
-    console.log(files);
-    const embeddings: Embeddable[] = await loadEmbedding(source.output);
-    let batch = [];
-    let index = 0;
-    for (const file of files) {
-      index++;
-      const shouldSave = batch.length > 20 || index === files.length;
-      if (shouldSave) {
-        await Promise.all(batch);
-        batch = [];
-      }
-      batch.push(embedKind(file, source, embeddings, shouldSave));
-    }
-    if (batch.length > 0) {
-      await Promise.all(batch);
-    }
-
-    // Save one last time just in case
-    await saveEmbedding(source.output, embeddings);
+    await embedSource(source, ignorePattern);
   }
 }
 

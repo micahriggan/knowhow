@@ -1,3 +1,4 @@
+import glob from "glob";
 import * as path from "path";
 import { getConfig, loadPrompt } from "./config";
 import { Config, Hashes, Embeddable, EmbeddingBase } from "./types";
@@ -31,6 +32,44 @@ export async function getConfiguredEmbeddings() {
 
 function getChunkId(id: string, index: number, chunkSize: number) {
   return chunkSize ? `${id}-${index}` : id;
+}
+
+export async function embedSource(
+  source: Config["embedSources"][0],
+  ignorePattern: string[]
+) {
+  console.log("Embedding", source.input, "to", source.output);
+  let files = await glob.sync(source.input, { ignore: ignorePattern });
+
+  if (source.kind && files.length === 0) {
+    files = [source.input];
+  }
+
+  console.log(`Found ${files.length} files`);
+  if (files.length > 100) {
+    console.error(
+      "woah there, that's a lot of files. I'm not going to embed that many"
+    );
+  }
+  console.log(files);
+  const embeddings: Embeddable[] = await loadEmbedding(source.output);
+  let batch = [];
+  let index = 0;
+  for (const file of files) {
+    index++;
+    const shouldSave = batch.length > 20 || index === files.length;
+    if (shouldSave) {
+      await Promise.all(batch);
+      batch = [];
+    }
+    batch.push(embedKind(file, source, embeddings, shouldSave));
+  }
+  if (batch.length > 0) {
+    await Promise.all(batch);
+  }
+
+  // Save one last time just in case
+  await saveEmbedding(source.output, embeddings);
 }
 
 export async function embed(
