@@ -9,7 +9,7 @@ import {
   cosineSimilarity,
 } from "./utils";
 import { summarizeTexts, openai, chunkText } from "./ai";
-import { NotionPlugin } from "./plugins/notion";
+import { Plugins } from "./plugins/plugins";
 
 export async function loadEmbedding(path: string) {
   if (await fileExists(path)) {
@@ -209,10 +209,10 @@ export async function handleAllKinds(
   let contents = "";
   let ids = [];
 
+  if (Plugins.isPlugin(kind)) {
+    return Plugins.embed(kind, input);
+  }
   switch (kind) {
-    case "notion":
-      const plugin = new NotionPlugin();
-      return plugin.embed(input);
     case "file":
     default:
       return handleFileKind(id);

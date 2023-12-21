@@ -1,7 +1,7 @@
 import { Client } from "@notionhq/client";
 import { Plugin } from "./types";
 import { PageObjectResponse } from "@notionhq/client/build/src/api-endpoints";
-import { Embeddable } from "../types";
+import { Embeddable, MinimalEmbedding } from "../types";
 
 export class NotionPlugin implements Plugin {
   notionClient: Client;
@@ -84,43 +84,45 @@ export class NotionPlugin implements Plugin {
     return response;
   }
 
-  async embed(url: string) {
-    const embeddings = new Array<Partial<Embeddable>>();
-    const results = await this.getPageFromUrl(url);
+  async embed(user_input: string) {
+    const embeddings = new Array<MinimalEmbedding>();
+    const urls = this.extractUrls(user_input);
+    const results = await this.getPagesFromUrls(urls);
     if (!results) {
       return embeddings;
     }
 
-    let { page, blocks } = results;
-    const childPages = blocks.results.filter(
-      (b) => "has_children" in b && b.has_children
-    );
+    for (const result of results) {
+      let { page, blocks } = result;
+      const childPages = blocks.results.filter(
+        (b) => "has_children" in b && b.has_children
+      );
 
-    console.log(JSON.stringify(results, null, 2));
+      console.log(JSON.stringify(results, null, 2));
 
-    const childBlocks = await Promise.all(
-      childPages.map(async (childPage) => {
-        const blocks = await this.getAllChildBlocks(childPage.id);
-        return { childPage, blocks };
-      })
-    );
+      const childBlocks = await Promise.all(
+        childPages.map(async (childPage) => {
+          const blocks = await this.getAllChildBlocks(childPage.id);
+          return { childPage, blocks };
+        })
+      );
 
-    for (const child of childBlocks) {
-      const title =
-        "child_page" in child.childPage && child.childPage.child_page;
-      embeddings.push({
-        id: child.childPage.id,
-        text: JSON.stringify(
-          child.blocks.results.map((b) => this.findKeyInObject(b))
-        ),
-        metadata: {
-          ...title,
-        },
-      });
+      for (const child of childBlocks) {
+        const title =
+          "child_page" in child.childPage && child.childPage.child_page;
+        embeddings.push({
+          id: child.childPage.id,
+          text: JSON.stringify(
+            child.blocks.results.map((b) => this.findKeyInObject(b))
+          ),
+          metadata: {
+            ...title,
+          },
+        });
+      }
     }
 
     console.log(JSON.stringify(embeddings, null, 2));
-
     return embeddings;
   }
 

@@ -1,5 +1,6 @@
 import { LinearClient } from "@linear/sdk";
 import { Plugin } from "./types";
+import { MinimalEmbedding } from "../types";
 
 export class LinearPlugin implements Plugin {
   linearClient: LinearClient;
@@ -7,6 +8,20 @@ export class LinearPlugin implements Plugin {
   constructor() {
     this.linearClient = new LinearClient({
       apiKey: process.env.LINEAR_API_KEY,
+    });
+  }
+
+  async embed(userPrompt: string): Promise<MinimalEmbedding[]> {
+    const urls = this.extractUrls(userPrompt);
+    const tasksData = await this.getTasksFromUrls(urls);
+    const tasksDataFiltered = tasksData.filter((task) => task !== null);
+
+    return tasksDataFiltered.map((task) => {
+      return {
+        id: task.url,
+        text: this.getTaskString(task),
+        metadata: {},
+      };
     });
   }
 
@@ -56,6 +71,10 @@ export class LinearPlugin implements Plugin {
     return null;
   }
 
+  getTaskString(task: any): string {
+    return `Issue: ${task.identifier}\nTitle: ${task.title}\nURL: ${task.url} \nDescription: ${task.description}`;
+  }
+
   async call(userPrompt: string): Promise<string> {
     const urls = this.extractUrls(userPrompt);
     if (!urls) {
@@ -70,10 +89,7 @@ export class LinearPlugin implements Plugin {
     }
 
     const markdownIssues = issuesDataFiltered
-      .map(
-        (issue) =>
-          `### Issue: ${issue.identifier}\n- Title: ${issue.title}\n- URL: ${issue.url} \n- Description: ${issue.description}`
-      )
+      .map((issue) => this.getTaskString(issue))
       .join("\n\n");
     return `LINEAR PLUGIN: The following issues were loaded:\n\n${markdownIssues}`;
   }

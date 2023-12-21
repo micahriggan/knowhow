@@ -10,6 +10,10 @@ import { LinearPlugin } from "./linear";
 export class LanguagePlugin implements Plugin {
   constructor() {}
 
+  async embed(userPrompt: string) {
+    return [];
+  }
+
   async call(userPrompt: string): Promise<string> {
     const config = await getConfig();
     const languageConfig = await getLanguageConfig();

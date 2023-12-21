@@ -3,6 +3,10 @@ import { readFile, fileExists, fileStat } from "../utils";
 import { Plugin } from "./types";
 
 export class VimPlugin implements Plugin {
+  async embed(userPrompt: string) {
+    return [];
+  }
+
   async getVimFiles() {
     const vimFiles = await glob.sync("./**/*.swp", { dot: true });
     return vimFiles;

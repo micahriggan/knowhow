@@ -2,6 +2,10 @@ import { getConfiguredEmbeddings, queryEmbedding } from "../embeddings";
 import { Plugin } from "./types";
 
 export class EmbeddingPlugin implements Plugin {
+  async embed() {
+    return [];
+  }
+
   async call(userPrompt: string): Promise<string> {
     const count = 7;
     const embeddings = await getConfiguredEmbeddings();

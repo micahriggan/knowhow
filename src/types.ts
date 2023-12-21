@@ -52,6 +52,11 @@ export interface Embeddable<T = any> {
   metadata: T;
 }
 
+export type MinimalEmbedding<T = any> = Pick<
+  Embeddable<T>,
+  "id" | "text" | "metadata"
+>;
+
 export interface EmbeddingBase<T = any> extends Embeddable<T> {
   similarity?: number;
 }

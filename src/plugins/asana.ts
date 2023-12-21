@@ -1,5 +1,6 @@
 import { Client } from "asana";
 import { Plugin } from "./types";
+import { Embeddable, MinimalEmbedding } from "../types";
 
 export class AsanaPlugin implements Plugin {
   asanaClient: Client;
@@ -10,6 +11,24 @@ export class AsanaPlugin implements Plugin {
         "Asana-Enable": "new_user_task_lists,new_goal_memberships",
       },
     }).useAccessToken(process.env.ASANA_TOKEN);
+  }
+
+  getTaskString(task: any) {
+    return `### Task: ${task.name}\n- Description: ${task.notes}\n- URL: ${task.permalink_url}`;
+  }
+
+  async embed(userPrompt: string): Promise<MinimalEmbedding[]> {
+    const urls = this.extractUrls(userPrompt);
+    const tasksData = await this.getTasksFromUrls(urls);
+    const tasksDataFiltered = tasksData.filter((task) => task !== null);
+
+    return tasksDataFiltered.map((task) => {
+      return {
+        id: task.permalink_url,
+        text: this.getTaskString(task),
+        metadata: {},
+      };
+    });
   }
 
   extractUrls(userPrompt: string): string[] {
@@ -56,10 +75,7 @@ export class AsanaPlugin implements Plugin {
     }
 
     const markdownTasks = tasksDataFiltered
-      .map(
-        (task) =>
-          `### Task: ${task.name}\n- Description: ${task.notes}\n- URL: ${task.permalink_url}`
-      )
+      .map((task) => this.getTaskString(task))
       .join("\n\n");
     return `ASANA PLUGIN: The following tasks were loaded:\n\n${markdownTasks}`;
   }

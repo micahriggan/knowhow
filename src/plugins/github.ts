@@ -1,6 +1,7 @@
 import { Octokit } from "@octokit/rest";
 import { Plugin } from "./types";
 import parseDiff from "parse-diff";
+import { MinimalEmbedding } from "../types";
 
 export class GitHubPlugin implements Plugin {
   octokit: Octokit;
@@ -8,6 +9,20 @@ export class GitHubPlugin implements Plugin {
   constructor() {
     this.octokit = new Octokit({
       auth: process.env.GITHUB_TOKEN,
+    });
+  }
+
+  async embed(userPrompt: string): Promise<MinimalEmbedding[]> {
+    const urls = this.extractUrls(userPrompt);
+    const diffs = await this.getParsedDiffs(urls);
+    const diffsFiltered = diffs.filter((diff) => diff !== null);
+
+    return diffsFiltered.map((diff, index) => {
+      return {
+        id: urls[index],
+        text: JSON.stringify(diff),
+        metadata: {},
+      };
     });
   }
 

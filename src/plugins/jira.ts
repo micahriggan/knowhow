@@ -1,5 +1,6 @@
 import JiraClient from "jira-client";
 import { Plugin } from "./types";
+import { MinimalEmbedding } from "../types";
 
 export class JiraPlugin implements Plugin {
   jiraClient: JiraClient;
@@ -12,6 +13,20 @@ export class JiraPlugin implements Plugin {
       password: process.env.JIRA_PASSWORD,
       apiVersion: "2",
       strictSSL: true,
+    });
+  }
+
+  async embed(userPrompt: string): Promise<MinimalEmbedding[]> {
+    const urls = this.extractUrls(userPrompt);
+    const tasks = await this.getTasksFromUrls(urls);
+    const tasksFiltered = tasks.filter((task) => task !== null);
+
+    return tasksFiltered.map((task, index) => {
+      return {
+        id: urls[index],
+        text: JSON.stringify(task),
+        metadata: {},
+      };
     });
   }
 
@@ -64,6 +79,10 @@ export class JiraPlugin implements Plugin {
     return null;
   }
 
+  getTaskString(task: any) {
+    return `### Issue: ${task.key}\n- Summary: ${task.fields.summary}\n- URL: ${process.env.JIRA_HOST}/browse/${task.key} \n- Description: ${task.fields.description}`;
+  }
+
   async call(userPrompt: string): Promise<string> {
     const urls = this.extractUrls(userPrompt);
     if (!urls) {
@@ -78,10 +97,7 @@ export class JiraPlugin implements Plugin {
     }
 
     const markdownIssues = issuesDataFiltered
-      .map(
-        (issue) =>
-          `### Issue: ${issue.key}\n- Summary: ${issue.fields.summary}\n- URL: ${process.env.JIRA_HOST}/browse/${issue.key} \n- Description: ${issue.fields.description}`
-      )
+      .map((issue) => this.getTaskString(issue))
       .join("\n\n");
     return `JIRA PLUGIN: The following issues were loaded:\n\n${markdownIssues}`;
   }
