@@ -127,9 +127,13 @@ export async function loadPrompt(promptName: string) {
 }
 
 export async function getIgnorePattern() {
-  let ignoreList = gitignoreToGlob();
-  const exists = await fileExists(".knowhow/.ignore");
-  if (exists) {
+  const ignoreList = new Array<string>();
+  const gitIgnore = await fileExists(".gitignore");
+  if (gitIgnore) {
+    ignoreList.push(...gitignoreToGlob(".gitignore"));
+  }
+  const knowhowIgnore = await fileExists(".knowhow/.ignore");
+  if (knowhowIgnore) {
     ignoreList.push(...gitignoreToGlob(".knowhow/.ignore"));
   }
   return ignoreList.map((pattern) => pattern.replace("!", "./"));

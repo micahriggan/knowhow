@@ -9,6 +9,7 @@ import {
   cosineSimilarity,
 } from "./utils";
 import { summarizeTexts, openai, chunkText } from "./ai";
+import { NotionPlugin } from "./plugins/notion";
 
 export async function loadEmbedding(path: string) {
   if (await fileExists(path)) {
@@ -148,40 +149,73 @@ export async function embedJson(
   }
 }
 
-export async function embedFile(
-  inputFile: string,
+export async function embedKind(
+  id: string,
   source: Config["embedSources"][0],
   embeddings = [] as Embeddable[],
   save = true
 ) {
   const { prompt, output, uploadMode, chunkSize } = source;
 
-  const stat = await fileStat(inputFile);
-  if (stat.isDirectory()) {
+  const stat = !source.kind && (await fileStat(id));
+  if (stat && stat.isDirectory()) {
     return;
   }
 
-  if (inputFile.endsWith(".json") && (await isEmbeddingFile(inputFile))) {
-    return embedJson(inputFile, source);
+  if (id.endsWith(".json") && (await isEmbeddingFile(id))) {
+    return embedJson(id, source);
   }
 
-  const fileContent = await readFile(inputFile, "utf8");
+  const toEmbed = await handleAllKinds(id, source);
 
-  const updates = await embed(
-    inputFile,
-    fileContent,
-    {
-      filepath: inputFile,
-      date: new Date().toISOString(),
-    },
-    embeddings,
-    prompt,
-    chunkSize,
-    uploadMode
-  );
+  const updates = [];
+  for (const row of toEmbed) {
+    const { id, text, metadata } = row;
+    const embedded = await embed(
+      id,
+      text,
+      metadata,
+      embeddings,
+      prompt,
+      chunkSize,
+      uploadMode
+    );
+    updates.push(...embedded);
+  }
 
   if (save && updates.length > 0) {
     await saveEmbedding(output, embeddings);
+  }
+}
+
+async function handleFileKind(filePath: string) {
+  return [
+    {
+      id: filePath,
+      text: await readFile(filePath, "utf8"),
+      metadata: {
+        filepath: filePath,
+        date: new Date().toISOString(),
+      },
+    },
+  ];
+}
+
+export async function handleAllKinds(
+  id: string,
+  source: Config["embedSources"][0]
+): Promise<Partial<Embeddable>[]> {
+  const { input, kind } = source;
+  let contents = "";
+  let ids = [];
+
+  switch (kind) {
+    case "notion":
+      const plugin = new NotionPlugin();
+      return plugin.embed(input);
+    case "file":
+    default:
+      return handleFileKind(id);
   }
 }
 

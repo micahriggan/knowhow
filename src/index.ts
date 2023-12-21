@@ -27,7 +27,7 @@ import {
 } from "./config";
 import {
   embedJson,
-  embedFile,
+  embedKind,
   getConfiguredEmbeddings,
   pruneEmbedding,
   loadEmbedding,
@@ -54,7 +54,12 @@ export async function embed() {
   // get all the files in .knowhow/docs
   for (const source of config.embedSources) {
     console.log("Embedding", source.input, "to", source.output);
-    const files = await glob.sync(source.input, { ignore: ignorePattern });
+    let files = await glob.sync(source.input, { ignore: ignorePattern });
+
+    if (source.kind && files.length === 0) {
+      files = [source.input];
+    }
+
     console.log(`Found ${files.length} files`);
     if (files.length > 100) {
       console.error(
@@ -72,7 +77,7 @@ export async function embed() {
         await Promise.all(batch);
         batch = [];
       }
-      batch.push(embedFile(file, source, embeddings, shouldSave));
+      batch.push(embedKind(file, source, embeddings, shouldSave));
     }
     if (batch.length > 0) {
       await Promise.all(batch);
