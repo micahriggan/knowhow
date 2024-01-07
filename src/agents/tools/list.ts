@@ -99,7 +99,8 @@ export const Tools = [
     type: "function",
     function: {
       name: "applyPatchFile",
-      description: "Apply a patch file to a file",
+      description:
+        "Apply a patch file to a file. Use this to modify files without specifying full file contents",
       parameters: {
         type: "object",
         properties: {

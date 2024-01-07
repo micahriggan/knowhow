@@ -32,14 +32,16 @@ export function writeFile(filePath: string, content: string): string {
 }
 
 // Tool to create a patch file
-export function createPatchFile(
-  originalFile: string,
-  updatedFile: string
-): string {
-  const originalContent = fs.readFileSync(originalFile, "utf8");
-  const updatedContent = fs.readFileSync(updatedFile, "utf8");
-  return createPatch(originalFile, originalContent, updatedContent);
-}
+/*
+ *export function createPatchFile(
+ *  originalFile: string,
+ *  updatedFile: string
+ *): string {
+ *  const originalContent = fs.readFileSync(originalFile, "utf8");
+ *  const updatedContent = fs.readFileSync(updatedFile, "utf8");
+ *  return createPatch(originalFile, originalContent, updatedContent);
+ *}
+ */
 
 // Tool to apply a patch file
 export function applyPatchFile(filePath: string, patch: string): string {
@@ -54,4 +56,23 @@ export const execCommand = util.promisify(exec);
 
 export function finalAnswer(answer: string): string {
   return answer;
+}
+
+export function addInternalTools(fns: { [fnName: string]: Function }) {
+  const callParallel = (
+    fnsToCall: Array<{ recipient_name: string; parameters: any }>
+  ) => {
+    const promises = fnsToCall.map((param) => {
+      const name = param.recipient_name.split(".").pop();
+      const fn = fns[name];
+      const args = Object.values(param.parameters);
+      return fn(...args);
+    });
+
+    return Promise.all(promises);
+  };
+
+  fns["multi_tool_use.parallel"] = callParallel;
+
+  return fns;
 }
