@@ -82,7 +82,7 @@ export class CodebaseAgent {
           tool_call_id: toolCall.id,
           role: "tool",
           name: functionName,
-          ...(functionResponse && { content: functionResponse }),
+          content: functionResponse || "Done",
         } as ChatCompletionToolMessageParam;
 
         // Add the tool responses to the thread

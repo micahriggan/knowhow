@@ -26,8 +26,9 @@ export function scanFile(
 }
 
 // Tool to write the full contents of a file
-export function writeFile(filePath: string, content: string): void {
+export function writeFile(filePath: string, content: string): string {
   fs.writeFileSync(filePath, content);
+  return `File ${filePath} written`;
 }
 
 // Tool to create a patch file
@@ -41,10 +42,11 @@ export function createPatchFile(
 }
 
 // Tool to apply a patch file
-export function applyPatchFile(filePath: string, patch: string): void {
+export function applyPatchFile(filePath: string, patch: string): string {
   const originalContent = fs.readFileSync(filePath, "utf8");
   const updatedContent = applyPatch(originalContent, patch);
   fs.writeFileSync(filePath, updatedContent);
+  return "Patch applied";
 }
 
 // Tool to execute a command
@@ -53,4 +55,3 @@ export const execCommand = util.promisify(exec);
 export function finalAnswer(answer: string): string {
   return answer;
 }
-
