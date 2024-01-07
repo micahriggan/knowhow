@@ -1,9 +1,8 @@
-const fs = require("fs");
-
-// Mocking file system and plugins
 jest.mock("fs");
+jest.mock("../src/plugins/plugins");
 
-// Requiring tools after mocking
+import * as fs from "fs";
+
 import {
   searchFiles,
   readFile,
@@ -13,11 +12,13 @@ import {
 } from "../src/agents/tools";
 import { Plugins } from "../src/plugins/plugins";
 
+const mockFs = jest.mocked(fs);
+
 test("searchFiles should call the embeddings plugin with the correct keyword", async () => {
+  const mocked = Plugins as jest.Mocked<typeof Plugins>;
   const keyword = "test";
   const expectedResult = JSON.stringify({ files: ["test1.js", "test2.js"] });
 
-  const mocked = jest.mocked(Plugins);
   // Setting up the plugin to return the expected result
   mocked.call.mockResolvedValue(expectedResult);
 
@@ -34,7 +35,7 @@ test("readFile should return the content of a file", () => {
   const fileContent = "Hello World";
 
   // Mock readFile to return the fileContent
-  fs.readFileSync.mockReturnValue(fileContent);
+  mockFs.readFileSync.mockReturnValue(fileContent);
 
   const result = readFile(filePath);
 
@@ -51,7 +52,7 @@ test("scanFile should return the contents of a specified range of lines from a f
   const endLine = 3;
 
   // Mock fs.readFileSync to return joined fileContentLines
-  fs.readFileSync.mockReturnValue(fileContentLines.join("\n"));
+  mockFs.readFileSync.mockReturnValue(fileContentLines.join("\n"));
 
   const result = scanFile(filePath, startLine, endLine);
 
@@ -68,7 +69,7 @@ test("writeFile should write the full contents to a file", () => {
   const contentToWrite = "Writing to file";
 
   // Mock fs.writeFileSync to not actually write to disk
-  fs.writeFileSync.mockImplementation(() => {});
+  mockFs.writeFileSync.mockImplementation(() => {});
 
   const result = writeFile(filePath, contentToWrite);
 
@@ -85,9 +86,9 @@ test("applyPatchFile should apply a patch to a file", () => {
   const patch = "@@ -1,1 +1,1 @@\n-Original content\n+Patched content\n";
 
   // Mock fs.readFileSync to return the originalContent
-  fs.readFileSync.mockReturnValue(originalContent);
+  mockFs.readFileSync.mockReturnValue(originalContent);
   // Mock fs.writeFileSync to not actually write to disk
-  fs.writeFileSync.mockImplementation(() => {});
+  mockFs.writeFileSync.mockImplementation(() => {});
 
   const result = applyPatchFile(filePath, patch);
 

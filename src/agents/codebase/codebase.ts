@@ -27,6 +27,8 @@ const availableFunctions = addInternalTools({
 });
 
 export class CodebaseAgent {
+  messages = new Array<ChatCompletionMessageParam>();
+
   getInitialMessages(user_input: string) {
     return [
       {
@@ -61,16 +63,23 @@ export class CodebaseAgent {
     return toolMessage;
   }
 
+  clear() {
+    this.messages = [];
+  }
+
   async call(
     user_input: string,
     _messages?: Array<ChatCompletionMessageParam>
   ) {
     const model = "gpt-4-1106-preview";
-    const messages = _messages || this.getInitialMessages(user_input);
+
+    if (this.messages.length === 0) {
+      this.messages = _messages || this.getInitialMessages(user_input);
+    }
 
     const response = await openai.chat.completions.create({
       model,
-      messages: messages,
+      messages: this.messages,
       tools: Tools,
       tool_choice: "auto",
     });
@@ -80,12 +89,12 @@ export class CodebaseAgent {
     const toolCalls = responseMessage.tool_calls;
     if (responseMessage.tool_calls) {
       // extend conversation with assistant's reply
-      messages.push(responseMessage);
+      this.messages.push(responseMessage);
 
       for (const toolCall of toolCalls) {
         const toolMessage = await this.useTool(toolCall);
         // Add the tool responses to the thread
-        messages.push(toolMessage as ChatCompletionToolMessageParam);
+        this.messages.push(toolMessage as ChatCompletionToolMessageParam);
 
         if (toolMessage.name === "finalAnswer") {
           return toolMessage.content;
@@ -95,13 +104,18 @@ export class CodebaseAgent {
       // Send the tool responses back to the model
       const secondResponse = await openai.chat.completions.create({
         model,
-        messages: messages,
+        messages: this.messages,
       });
 
       const aiResp = secondResponse.choices.map((c) => c.message);
-      messages.push(...aiResp);
+      console.log(aiResp);
+      this.messages.push(...aiResp);
 
-      return this.call(user_input, messages);
+      return this.call(user_input, this.messages);
+    }
+
+    if (responseMessage.content) {
+      return responseMessage.content;
     }
   }
 }

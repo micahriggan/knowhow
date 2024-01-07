@@ -3,6 +3,7 @@ import * as util from "util";
 import { exec } from "child_process";
 import { applyPatch } from "diff";
 import { Plugins } from "../../plugins/plugins";
+//import puppeteer from 'puppeteer';
 
 // Tool to search for files related to the user's goal
 export async function searchFiles(keyword: string): Promise<string> {
@@ -31,7 +32,7 @@ export function writeFile(filePath: string, content: string): string {
   return `File ${filePath} written`;
 }
 
-// Tool to apply a patch file
+// Tool to apply a patch file to a file
 export function applyPatchFile(filePath: string, patch: string): string {
   const originalContent = fs.readFileSync(filePath, "utf8");
   const updatedContent = applyPatch(originalContent, patch);
@@ -39,13 +40,22 @@ export function applyPatchFile(filePath: string, patch: string): string {
   return "Patch applied";
 }
 
-// Tool to execute a command
-export const execCommand = util.promisify(exec);
+// Tool to execute a command in the system's command line interface
+const execAsync = util.promisify(exec);
+export const execCommand = async (command: string): Promise<string> => {
+  const { stdout, stderr } = await execAsync(command);
+  if (stderr) {
+    throw new Error(stderr);
+  }
+  return stdout;
+};
 
+// Finalize the AI's task and return the answer to the user
 export function finalAnswer(answer: string): string {
   return answer;
 }
 
+// Add new internal tools to the existing suite
 export function addInternalTools(fns: { [fnName: string]: Function }) {
   const callParallel = (
     fnsToCall: Array<{ recipient_name: string; parameters: any }>
@@ -64,3 +74,26 @@ export function addInternalTools(fns: { [fnName: string]: Function }) {
 
   return fns;
 }
+
+// New tool to perform Google search using Puppeteer
+/*
+ *export async function searchGoogleWithPuppeteer(query: string): Promise<Array<{ href: string; text: string }>> {
+ *  const browser = await puppeteer.launch();
+ *  const page = await browser.newPage();
+ *
+ *  await page.goto('https://google.com');
+ *  await page.type('input[name=q]', query);
+ *  await page.keyboard.press('Enter');
+ *
+ *  await page.waitForSelector('div#search');
+ *
+ *  const searchResults = await page.evaluate(() => {
+ *    const anchors = Array.from(document.querySelectorAll('div#search .g .rc .r a'));
+ *    return anchors.map(anchor => ({ href: anchor.href, text: anchor.textContent || '' }));
+ *  });
+ *
+ *  await browser.close();
+ *
+ *  return searchResults;
+ *};
+ */
