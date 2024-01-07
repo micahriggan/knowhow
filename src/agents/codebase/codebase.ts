@@ -1,14 +1,9 @@
-import { ChatCompletionTool } from "openai/resources/chat";
 import {
   ChatCompletionMessageParam,
   ChatCompletionToolMessageParam,
   ChatCompletionMessageToolCall,
 } from "openai/resources/chat";
 import { openai } from "../../ai";
-import * as fs from "fs";
-import { exec } from "child_process";
-import * as util from "util";
-import { createPatch, applyPatch } from "diff";
 import {
   searchFiles,
   scanFile,

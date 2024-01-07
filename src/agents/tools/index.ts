@@ -1,7 +1,7 @@
 import * as fs from "fs";
-import { exec } from "child_process";
 import * as util from "util";
-import { createPatch, applyPatch } from "diff";
+import { exec } from "child_process";
+import { applyPatch } from "diff";
 import { Plugins } from "../../plugins/plugins";
 
 // Tool to search for files related to the user's goal
@@ -30,18 +30,6 @@ export function writeFile(filePath: string, content: string): string {
   fs.writeFileSync(filePath, content);
   return `File ${filePath} written`;
 }
-
-// Tool to create a patch file
-/*
- *export function createPatchFile(
- *  originalFile: string,
- *  updatedFile: string
- *): string {
- *  const originalContent = fs.readFileSync(originalFile, "utf8");
- *  const updatedContent = fs.readFileSync(updatedFile, "utf8");
- *  return createPatch(originalFile, originalContent, updatedContent);
- *}
- */
 
 // Tool to apply a patch file
 export function applyPatchFile(filePath: string, patch: string): string {
