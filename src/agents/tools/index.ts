@@ -49,3 +49,8 @@ export function applyPatchFile(filePath: string, patch: string): void {
 
 // Tool to execute a command
 export const execCommand = util.promisify(exec);
+
+export function finalAnswer(answer: string): string {
+  return answer;
+}
+
