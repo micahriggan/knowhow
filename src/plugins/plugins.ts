@@ -34,6 +34,10 @@ class PluginService {
     return (await Promise.all(calls)).join("\n\n");
   }
 
+  async call(kind: string, user_input?: string) {
+    return this.plugins[kind].call(user_input);
+  }
+
   async embed(kind: string, user_input: string) {
     return this.plugins[kind].embed(user_input);
   }

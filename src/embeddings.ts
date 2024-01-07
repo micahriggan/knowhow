@@ -79,7 +79,8 @@ export async function embed(
   embeddings: Embeddable[],
   prompt?: string,
   chunkSize?: number,
-  uploadMode?: boolean
+  uploadMode?: boolean,
+  minLength?: number
 ): Promise<Array<string>> {
   let chunks = [text];
 
@@ -96,13 +97,19 @@ export async function embed(
     chunks = chunks.slice(0, 25);
   }
 
-  const chunkIds = [];
+  const dontPrune = [];
   const updates = new Array<string>();
   for (let index = 0; index < chunks.length; index++) {
     const chunkId = getChunkId(id, index, chunkSize);
     let chunkText = chunks[index];
-    chunkIds.push(chunkId);
 
+    const tooShort = minLength && chunkText.length < minLength;
+    if (tooShort) {
+      console.log("Skipping (too short)", chunkId);
+      continue;
+    }
+
+    dontPrune.push(chunkId);
     if (embeddings.find((e) => e.id === chunkId && e.text === chunkText)) {
       console.log("Skipping", chunkId);
       continue;
@@ -138,7 +145,7 @@ export async function embed(
   }
 
   // mutate the embedding array
-  pruneEmbedding(id, chunkIds, embeddings);
+  pruneEmbedding(id, dontPrune, embeddings);
   return updates;
 }
 
@@ -179,7 +186,8 @@ export async function embedJson(
       embeddings,
       prompt,
       chunkSize,
-      uploadMode
+      uploadMode,
+      source.minLength
     );
 
     const fileString =
