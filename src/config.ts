@@ -26,6 +26,7 @@ export async function init() {
       "asana",
       "jira",
       "linear",
+      "download",
     ],
     sources: [
       {
@@ -119,6 +120,10 @@ export async function getConfig() {
 
 export async function loadPrompt(promptName: string) {
   const config = await getConfig();
+  if (!promptName) {
+    return "";
+  }
+
   const prompt = await readFile(
     path.join(config.promptsDir, `${promptName}.mdx`),
     "utf8"

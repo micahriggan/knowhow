@@ -8,6 +8,7 @@ import { AsanaPlugin } from "./asana";
 import { LinearPlugin } from "./linear";
 import { JiraPlugin } from "./jira";
 import { NotionPlugin } from "./notion";
+import { DownloaderPlugin } from "./downloader/plugin";
 
 class PluginService {
   plugins = {
@@ -19,6 +20,7 @@ class PluginService {
     linear: new LinearPlugin(),
     jira: new JiraPlugin(),
     notion: new NotionPlugin(),
+    download: new DownloaderPlugin()
   } as Record<string, Plugin>;
 
   listPlugins() {

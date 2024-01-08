@@ -38,6 +38,8 @@ import { summarizeFile, uploadToOpenAi, createAssistant } from "./ai";
 
 import { abort } from "process";
 import { askGpt } from "./chat";
+import { convertToText } from "./conversion";
+import { Plugins } from "./plugins/plugins";
 
 const OPENAI_KEY = process.env.OPENAI_KEY;
 const embeddingModel = new OpenAIEmbeddings({ openAIApiKey: OPENAI_KEY });
@@ -115,27 +117,49 @@ export async function uploadOpenAi() {
 }
 
 export async function generate() {
-  // load config
   const config = await getConfig();
-
-  // process each source
   for (const source of config.sources) {
-    // read the configured prompt into memory
-    const prompt = await loadPrompt(source.prompt);
-    const files = glob.sync(source.input);
-
-    if (source.output.endsWith(".mdx")) {
-      await handleSingleOutputGeneration(files, prompt, source.output);
-    } else {
-      await handleMultiOutputGeneration(files, prompt, source.output);
-    }
+    await handleAllKindsGeneration(source);
   }
 }
 
+async function handleAllKindsGeneration(source: Config["sources"][0]) {
+  const { kind, input } = source;
+  if (Plugins.isPlugin(kind)) {
+    const data = await Plugins.call(kind, input);
+    if (source.output.endsWith("/")) {
+      throw new Error("Plugins can only output to a single file");
+    }
+    await writeFile(source.output, data);
+  }
+  return handleFileKindGeneration(source);
+}
+
+async function handleFileKindGeneration(source: Config["sources"][0]) {
+  const prompt = await loadPrompt(source.prompt);
+  const files = glob.sync(source.input);
+
+  if (source.output.endsWith("/")) {
+    await handleMultiOutputGeneration(
+      files,
+      prompt,
+      source.output,
+      source.kind
+    );
+  } else {
+    await handleSingleOutputGeneration(
+      files,
+      prompt,
+      source.output,
+      source.kind
+    );
+  }
+}
 export async function handleMultiOutputGeneration(
   files: Array<string>,
   prompt: string,
-  output: string
+  output: string,
+  kind?: string
 ) {
   // get the hash of the prompt
   const promptHash = crypto.createHash("md5").update(prompt).digest("hex");
@@ -145,7 +169,7 @@ export async function handleMultiOutputGeneration(
 
   for (const file of files) {
     // get the hash of the file
-    const fileContent = await readFile(file, "utf8");
+    const fileContent = await convertToText(file);
     const fileHash = crypto.createHash("md5").update(fileContent).digest("hex");
 
     if (!hashes[file]) {
@@ -162,7 +186,7 @@ export async function handleMultiOutputGeneration(
 
     // summarize the file
     console.log("Summarizing", file);
-    const summary = await summarizeFile(file, prompt);
+    const summary = prompt ? await summarizeFile(file, prompt) : fileContent;
 
     // write the summary to the output file
     const [fileName, fileExt] = path.basename(file).split(".");
@@ -179,7 +203,8 @@ export async function handleMultiOutputGeneration(
 export async function handleSingleOutputGeneration(
   files: Array<string>,
   prompt: string,
-  outputFile: string
+  outputFile: string,
+  kind: string
 ) {
   const hashes = await getHashes();
   const promptHash = crypto.createHash("md5").update(prompt).digest("hex");
@@ -191,7 +216,10 @@ export async function handleSingleOutputGeneration(
   }
 
   console.log("Summarizing", files.length, "files");
-  const summary = await summarizeFiles(files, prompt);
+  const summary = prompt
+    ? await summarizeFiles(files, prompt)
+    : (await Promise.all(files.map(convertToText))).join("\n\n");
+
   const fileHash = crypto.createHash("md5").update(summary).digest("hex");
 
   console.log("Writing summary to", outputFile);

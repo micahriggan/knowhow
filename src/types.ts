@@ -10,6 +10,7 @@ export type Config = {
     input: string;
     output: string;
     prompt: string;
+    kind?: string;
   }>;
 
   embedSources: Array<{

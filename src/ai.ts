@@ -8,6 +8,7 @@ import { OpenAIEmbeddings } from "langchain/embeddings/openai";
 import { ChatOpenAI } from "langchain/chat_models/openai";
 import OpenAI from "openai";
 import { Assistant } from "./types";
+import { convertToText } from "./conversion";
 
 const OPENAI_KEY = process.env.OPENAI_KEY;
 const chatModel = new ChatOpenAI({
@@ -61,7 +62,7 @@ export async function chunkText(text: string, chunkSize?: number) {
 export async function summarizeFiles(files: string[], template: string) {
   const texts = [];
   for (const file of files) {
-    const text = await readFile(file, "utf8");
+    const text = await convertToText(file);
     texts.push(text);
   }
   return summarizeTexts(texts, template);

@@ -12,19 +12,33 @@ export class VimPlugin implements Plugin {
     return vimFiles;
   }
 
-  async getSourcePath(vimPath: string) {
+  async getSourcePath(vimPath: string, dotFile = false) {
     const pathParts = vimPath.split("/");
     const fileName = pathParts[pathParts.length - 1];
     const cleanedFileName = fileName.slice(1, fileName.length - 4);
     const sourcePath = pathParts.slice(0, pathParts.length - 1).join("/");
-    return sourcePath + "/" + cleanedFileName;
+    const finalPath = sourcePath + "/" + cleanedFileName;
+    const dotFilePath = sourcePath + "/." + cleanedFileName;
+
+    const finalFileExists = await fileExists(finalPath);
+
+    if (finalFileExists) {
+      return finalPath;
+    }
+
+    const dotFileExists = await fileExists(dotFilePath);
+    if (dotFileExists) {
+      return dotFilePath;
+    }
+
+    return finalPath;
   }
 
   async getFileContents(swapFile: string) {
     const filePath = await this.getSourcePath(swapFile);
     const exists = await fileExists(filePath);
     if (!exists) {
-      throw new Error(`File ${filePath} does not exist`);
+      return { filePath, content: "FILE DOES NOT EXIST" };
     }
 
     const stat = await fileStat(filePath);

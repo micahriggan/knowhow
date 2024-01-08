@@ -1,6 +1,7 @@
 import * as crypto from "crypto";
 import { Hashes } from "./types";
 import { readFile, writeFile } from "./utils";
+import { convertToText } from "./conversion";
 
 export async function getHashes() {
   const hashes = JSON.parse(await readFile(".knowhow/.hashes.json", "utf8"));
@@ -18,7 +19,7 @@ export async function checkNoFilesChanged(
 ) {
   for (const file of files) {
     // get the hash of the file
-    const fileContent = await readFile(file, "utf8");
+    const fileContent = await convertToText(file);
     const fileHash = crypto.createHash("md5").update(fileContent).digest("hex");
 
     if (!hashes[file]) {
