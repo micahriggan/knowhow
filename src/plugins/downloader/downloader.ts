@@ -3,7 +3,7 @@ import * as path from "path";
 import ytdl from "youtube-dl-exec";
 import Logger from "progress-estimator";
 import { DownloadInfo } from "./types";
-import { execAsync } from "../../utils";
+import { execAsync, fileExists, readFile } from "../../utils";
 import { openai } from "../../ai";
 
 const logger = Logger();
@@ -11,6 +11,13 @@ const logger = Logger();
 class DownloaderService {
   async download(url: string, outputDir: string) {
     const info = await this.info(url);
+    const exists = await fileExists(`${outputDir}/${info.id}.${info.ext}`);
+
+    if (exists) {
+      console.log("File already exists, skipping download");
+      return info;
+    }
+
     const scrape = ytdl(url, { output: `${outputDir}/%(id)s.%(ext)s` });
     const result = await logger(scrape, `Obtaining ${url}`);
     return info;
@@ -39,6 +46,15 @@ class DownloaderService {
 
     // create a temp directory
     const outputDirPath = path.join(outputDir, `${fileName}/chunks`);
+    const existingChunks = await fs.promises.readdir(outputDirPath);
+
+    if (existingChunks.length > 0) {
+      console.log("Chunks already exist, skipping");
+      return existingChunks.map((chunkName) =>
+        path.join(outputDirPath, chunkName)
+      );
+    }
+
     await fs.promises.mkdir(outputDirPath, { recursive: true });
 
     const command = `ffmpeg -i ${filePath} -f segment -segment_time ${CHUNK_LENGTH_SECONDS} -c copy ${outputDirPath}/chunk%03d${fileExt}`;
@@ -53,6 +69,13 @@ class DownloaderService {
   }
 
   public async transcribeChunks(files: string[], outputPath: string) {
+    const exists = await fileExists(outputPath);
+    if (exists) {
+      console.log("Transcription already exists, skipping");
+      const contents = await readFile(outputPath);
+      return contents.toString();
+    }
+
     let fullText = "";
     for (const file of files) {
       console.log("Transcribing", file);

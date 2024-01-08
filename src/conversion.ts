@@ -9,6 +9,7 @@ async function convertAudioToText(filePath: string) {
 
   const exists = await fileExists(outputPath);
   if (exists) {
+    console.log(`Transcription ${outputPath} already exists, skipping`);
     const fileContent = await readFile(outputPath, "utf8");
     return fileContent;
   }

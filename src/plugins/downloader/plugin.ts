@@ -5,7 +5,7 @@ import { Downloader } from "./downloader";
 
 export class DownloaderPlugin implements Plugin {
   extractUrls(userInput: string): string[] {
-    const urlRegex = /https:\/\/[^\s]+/g;
+    const urlRegex = /https:\/\/[^\s]+/gim;
     const matches = userInput.match(urlRegex) || [];
     console.log({ matches });
     return matches;
@@ -18,6 +18,7 @@ export class DownloaderPlugin implements Plugin {
     }
     let transcript = "";
     for (const url of urls) {
+      console.log("Downloading", url);
       const downloadDir = ".knowhow/downloads/";
       const fileInfo = await Downloader.download(url, downloadDir);
       const filePath = `${downloadDir}${fileInfo.id}.${fileInfo.ext}`;
