@@ -132,9 +132,6 @@ export async function askGpt<E extends GptQuestionEmbedding>(
             console.log(JSON.stringify(answer.metadata, null, 2));
           });
           break;
-        case "clear":
-          Developer.clear();
-          break;
         case "agent":
           agent = !agent;
           break;

@@ -78,26 +78,3 @@ export function addInternalTools(fns: { [fnName: string]: Function }) {
 
   return fns;
 }
-
-// New tool to perform Google search using Puppeteer
-/*
- *export async function searchGoogleWithPuppeteer(query: string): Promise<Array<{ href: string; text: string }>> {
- *  const browser = await puppeteer.launch();
- *  const page = await browser.newPage();
- *
- *  await page.goto('https://google.com');
- *  await page.type('input[name=q]', query);
- *  await page.keyboard.press('Enter');
- *
- *  await page.waitForSelector('div#search');
- *
- *  const searchResults = await page.evaluate(() => {
- *    const anchors = Array.from(document.querySelectorAll('div#search .g .rc .r a'));
- *    return anchors.map(anchor => ({ href: anchor.href, text: anchor.textContent || '' }));
- *  });
- *
- *  await browser.close();
- *
- *  return searchResults;
- *};
- */
