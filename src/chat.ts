@@ -1,5 +1,6 @@
 import { ChatCompletionMessageParam } from "openai/resources/chat";
 import Ora from "ora";
+import editor from "@inquirer/editor";
 import { openai } from "./ai";
 import { cosineSimilarity } from "./utils";
 import { EmbeddingBase, GptQuestionEmbedding, Embeddable } from "./types";
@@ -7,6 +8,7 @@ import { Marked } from "./utils";
 import { ask } from "./utils";
 import { Plugins } from "./plugins/plugins";
 import { queryEmbedding } from "./embeddings";
+import { Developer } from "./agents/codebase/codebase";
 
 let DEBUGGER = false;
 
@@ -105,8 +107,15 @@ export async function askGpt<E extends GptQuestionEmbedding>(
   embeddings: Array<Embeddable<E>>,
   plugins: Array<string> = []
 ) {
+  let agent = false;
+  let multiLine = false;
+
   console.log("Commands: search, exit");
-  let input = await ask(`Ask ${aiName} AI?: `);
+  const getInput = (question: string) => {
+    return multiLine ? editor({ message: question }) : ask(question);
+  };
+
+  let input = await getInput(`Ask ${aiName} AI?: `);
   let answer: E | undefined;
   let results = "";
   while (input !== "exit") {
@@ -115,19 +124,26 @@ export async function askGpt<E extends GptQuestionEmbedding>(
         case "debugger":
           DEBUGGER = !DEBUGGER;
           break;
+        case "multi":
+          multiLine = !multiLine;
+          break;
         case "search":
           await askEmbedding(embeddings, "searching", (question, answer) => {
             console.log(JSON.stringify(answer.metadata, null, 2));
           });
           break;
-
+        case "agent":
+          agent = !agent;
+          break;
         default:
           console.log("Thinking...");
           const pluginText = await Plugins.callMany(plugins, input);
           const fullPrompt = `${input} \n ${pluginText}`;
-          //const spinner = Ora().start("Thinking ...");
-          results = await queryGpt4(fullPrompt);
-          //spinner.succeed();
+          if (agent) {
+            results = await Developer.call(fullPrompt);
+          } else {
+            results = await queryGpt4(fullPrompt);
+          }
           console.log("\n\n");
           console.log(Marked.parse(results));
           break;
@@ -135,7 +151,7 @@ export async function askGpt<E extends GptQuestionEmbedding>(
     } catch (e) {
       console.log(e);
     } finally {
-      input = await ask(`Ask ${aiName} AI?: `);
+      input = await getInput(`Ask ${aiName} AI?: `);
     }
   }
 }

@@ -21,6 +21,10 @@ class PluginService {
     notion: new NotionPlugin(),
   } as Record<string, Plugin>;
 
+  listPlugins() {
+    return Object.keys(this.plugins);
+  }
+
   isPlugin(name: string) {
     return name in this.plugins;
   }
@@ -32,6 +36,10 @@ class PluginService {
   async callMany(plugins: string[], user_input?: string) {
     const calls = plugins.map((p) => this.plugins[p].call(user_input));
     return (await Promise.all(calls)).join("\n\n");
+  }
+
+  async call(kind: string, user_input?: string) {
+    return this.plugins[kind].call(user_input);
   }
 
   async embed(kind: string, user_input: string) {

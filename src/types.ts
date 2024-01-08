@@ -19,6 +19,7 @@ export type Config = {
     kind?: string;
     uploadMode?: boolean;
     chunkSize?: number;
+    minLength?: number;
   }>;
 
   embedJsonSources: Array<{
