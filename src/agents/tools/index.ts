@@ -10,6 +10,10 @@ export async function searchFiles(keyword: string): Promise<string> {
   return Plugins.call("embeddings", keyword);
 }
 
+export async function callPlugin(pluginName: string, userInput: string) {
+  return Plugins.call(pluginName, userInput);
+}
+
 // Tool to read a file
 export function readFile(filePath: string): string {
   return fs.readFileSync(filePath, "utf8");
@@ -45,7 +49,7 @@ const execAsync = util.promisify(exec);
 export const execCommand = async (command: string): Promise<string> => {
   const { stdout, stderr } = await execAsync(command);
   if (stderr) {
-    throw new Error(stderr);
+    return stderr;
   }
   return stdout;
 };

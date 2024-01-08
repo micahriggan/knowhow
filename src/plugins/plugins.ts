@@ -21,6 +21,10 @@ class PluginService {
     notion: new NotionPlugin(),
   } as Record<string, Plugin>;
 
+  listPlugins() {
+    return Object.keys(this.plugins);
+  }
+
   isPlugin(name: string) {
     return name in this.plugins;
   }

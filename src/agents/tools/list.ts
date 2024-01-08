@@ -1,5 +1,7 @@
 import { ChatCompletionTool } from "openai/resources/chat";
+import { Plugins } from "../../plugins/plugins";
 
+const pluginNames = Plugins.listPlugins().join(", ");
 export const Tools = [
   {
     type: "function",
@@ -169,6 +171,31 @@ export const Tools = [
         type: "string",
         description:
           "The final answer string that will be displayed to the user",
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "callPlugin",
+      description: `Call a specified plugin with given input. Plugins provide additional context from supported URLs or words. Currently available plugins: ${pluginNames}`,
+      parameters: {
+        type: "object",
+        properties: {
+          pluginName: {
+            type: "string",
+            description: "The name of the plugin to be called",
+          },
+          userInput: {
+            type: "string",
+            description: "The input to pass to the plugin",
+          },
+        },
+        required: ["pluginName", "userInput"],
+      },
+      returns: {
+        type: "string",
+        description: "The result of the plugin call",
       },
     },
   },
