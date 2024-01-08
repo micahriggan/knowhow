@@ -34,14 +34,14 @@ export class CodebaseAgent {
       {
         role: "system",
         content:
-          "Codebase Agent. You use the tools to read and write code, to help the developer implement features faster. Call final answer once you have finished implementing what is requested. As an agent you will receive multiple rounds of input until you call final answer.",
+          "Codebase Agent. You use the tools to read and write code, to help the developer implement features faster. Call final answer once you have finished implementing what is requested. As an agent you will receive multiple rounds of input until you call final answer. You are not able to request feedback from the user, so proceed with your plans and the developer will contact you afterwards if they need more help.",
       },
 
       { role: "user", content: user_input },
     ] as Array<ChatCompletionMessageParam>;
   }
 
-  async useTool(toolCall: ChatCompletionMessageToolCall) {
+  async getToolMessages(toolCall: ChatCompletionMessageToolCall) {
     const functionName = toolCall.function.name;
     const functionToCall = availableFunctions[functionName];
     const functionArgs = JSON.parse(toolCall.function.arguments);
@@ -53,6 +53,23 @@ export class CodebaseAgent {
     );
 
     const functionResponse = await functionToCall(...positionalArgs);
+
+    if (functionName === "multi_tool_use.parallel") {
+      const args = positionalArgs[0] as {
+        recipient_name: string;
+        parameters: any;
+      }[][];
+
+      return args[0].map((call, index) => {
+        return {
+          tool_call_id: toolCall.id + "_" + index,
+          role: "tool",
+          name: call.recipient_name.split(".").pop(),
+          content: functionResponse[index] || "Done",
+        };
+      });
+    }
+
     const toolMessage = {
       tool_call_id: toolCall.id,
       role: "tool",
@@ -60,7 +77,7 @@ export class CodebaseAgent {
       content: functionResponse || "Done",
     };
 
-    return toolMessage;
+    return [toolMessage];
   }
 
   async call(
@@ -85,12 +102,15 @@ export class CodebaseAgent {
       messages.push(responseMessage);
 
       for (const toolCall of toolCalls) {
-        const toolMessage = await this.useTool(toolCall);
+        const toolMessages = await this.getToolMessages(toolCall);
         // Add the tool responses to the thread
-        messages.push(toolMessage as ChatCompletionToolMessageParam);
+        messages.push(
+          ...(toolMessages as Array<ChatCompletionToolMessageParam>)
+        );
 
-        if (toolMessage.name === "finalAnswer") {
-          return toolMessage.content;
+        const finalMessage = toolMessages.find((m) => m.name === "finalAnswer");
+        if (finalMessage) {
+          return finalMessage.content;
         }
       }
 

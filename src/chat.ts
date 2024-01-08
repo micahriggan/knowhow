@@ -137,6 +137,7 @@ export async function askGpt<E extends GptQuestionEmbedding>(
           break;
         default:
           console.log("Thinking...");
+          console.log(input);
           const pluginText = await Plugins.callMany(plugins, input);
           const fullPrompt = `${input} \n ${pluginText}`;
           if (agent) {

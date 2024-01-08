@@ -1,6 +1,7 @@
 import gitignoreToGlob from "gitignore-to-glob";
 import { promisify } from "util";
 import * as util from "util";
+import { exec } from "child_process";
 import * as fs from "fs";
 import { marked } from "marked";
 import { markedTerminal } from "marked-terminal";
@@ -11,6 +12,7 @@ export const fileExists = promisify(fs.exists);
 export const readFile = promisify(fs.readFile);
 export const writeFile = promisify(fs.writeFile);
 export const mkdir = promisify(fs.mkdir);
+export const execAsync = util.promisify(exec);
 export const fileStat = promisify(fs.stat);
 
 const readline = require("readline").createInterface({

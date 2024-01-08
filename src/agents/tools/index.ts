@@ -1,9 +1,8 @@
 import * as fs from "fs";
 import * as util from "util";
-import { exec } from "child_process";
 import { applyPatch } from "diff";
 import { Plugins } from "../../plugins/plugins";
-//import puppeteer from 'puppeteer';
+import { execAsync } from "../../utils";
 
 // Tool to search for files related to the user's goal
 export async function searchFiles(keyword: string): Promise<string> {
@@ -16,7 +15,11 @@ export async function callPlugin(pluginName: string, userInput: string) {
 
 // Tool to read a file
 export function readFile(filePath: string): string {
-  return fs.readFileSync(filePath, "utf8");
+  try {
+    return fs.readFileSync(filePath, "utf8");
+  } catch (e) {
+    return e.message;
+  }
 }
 
 // Tool to scan a file from line A to line B
@@ -32,8 +35,12 @@ export function scanFile(
 
 // Tool to write the full contents of a file
 export function writeFile(filePath: string, content: string): string {
-  fs.writeFileSync(filePath, content);
-  return `File ${filePath} written`;
+  try {
+    fs.writeFileSync(filePath, content);
+    return `File ${filePath} written`;
+  } catch (e) {
+    return e.message;
+  }
 }
 
 // Tool to apply a patch file to a file
@@ -45,7 +52,6 @@ export function applyPatchFile(filePath: string, patch: string): string {
 }
 
 // Tool to execute a command in the system's command line interface
-const execAsync = util.promisify(exec);
 export const execCommand = async (command: string): Promise<string> => {
   const { stdout, stderr } = await execAsync(command);
   if (stderr) {
