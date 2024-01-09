@@ -46,11 +46,13 @@ export class VimPlugin implements Plugin {
       return { filePath, content: "DIRECTORY" };
     }
     if (stat.size > 32000) {
-      console.error(`File ${filePath} is too large with size ${stat.size}`);
+      console.error(
+        `VIM PLUGIN: File ${filePath} is too large with size ${stat.size}`
+      );
       return { filePath, content: "FILE TOO LARGE" };
     }
 
-    console.log(`Reading file ${filePath}`);
+    console.log(`VIM PLUGIN: Reading file ${filePath}`);
     const content = await readFile(filePath, "utf8");
     return { filePath, content };
   }

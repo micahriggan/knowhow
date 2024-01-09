@@ -20,7 +20,7 @@ class PluginService {
     linear: new LinearPlugin(),
     jira: new JiraPlugin(),
     notion: new NotionPlugin(),
-    download: new DownloaderPlugin()
+    download: new DownloaderPlugin(),
   } as Record<string, Plugin>;
 
   listPlugins() {

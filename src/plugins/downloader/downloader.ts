@@ -41,11 +41,11 @@ class DownloaderService {
     const fileName = parsed.name;
     const fileExt = parsed.ext;
     console.log({ fileName, fileExt });
-
     console.log("Chunking file", filePath);
 
     // create a temp directory
     const outputDirPath = path.join(outputDir, `${fileName}/chunks`);
+    await fs.promises.mkdir(outputDirPath, { recursive: true });
     const existingChunks = await fs.promises.readdir(outputDirPath);
 
     if (existingChunks.length > 0) {
@@ -55,16 +55,11 @@ class DownloaderService {
       );
     }
 
-    await fs.promises.mkdir(outputDirPath, { recursive: true });
-
     const command = `ffmpeg -i ${filePath} -f segment -segment_time ${CHUNK_LENGTH_SECONDS} -c copy ${outputDirPath}/chunk%03d${fileExt}`;
-
     await execAsync(command);
 
     const chunkNames = await fs.promises.readdir(outputDirPath);
-
     console.log("Chunked into", chunkNames.length, "chunks");
-
     return chunkNames.map((chunkName) => path.join(outputDirPath, chunkName));
   }
 
