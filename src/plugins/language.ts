@@ -6,10 +6,10 @@ import { GitHubPlugin } from "./github";
 import { AsanaPlugin } from "./asana";
 import { JiraPlugin } from "./jira";
 import { LinearPlugin } from "./linear";
-import { Plugins } from "./plugins";
+import { PluginService } from "./plugins";
 
 export class LanguagePlugin implements Plugin {
-  constructor() {}
+  constructor(private pluginService: PluginService) {}
 
   async embed(userPrompt: string) {
     return [];
@@ -59,7 +59,7 @@ export class LanguagePlugin implements Plugin {
       .map((s) => s.data);
     contexts.push(...textContexts);
 
-    const plugins = Plugins.listPlugins();
+    const plugins = this.pluginService.listPlugins();
     for (const plugin of plugins) {
       if (config.plugins.includes(plugin)) {
         const matchingSources = sources.filter((s) => s.kind === plugin);
@@ -72,7 +72,7 @@ export class LanguagePlugin implements Plugin {
           .flat()
           .join("\n");
         console.log("LANGUAGE PLUGIN: Calling plugin", plugin, data);
-        const pluginContext = await Plugins.call(plugin, data);
+        const pluginContext = await this.pluginService.call(plugin, data);
 
         contexts.push(...pluginContext);
       }
@@ -90,4 +90,4 @@ export class LanguagePlugin implements Plugin {
 }
 
 // Since this uses other plugins, it needs to be registered
-Plugins.registerPlugin("language", new LanguagePlugin());
+//Plugins.registerPlugin("language", new LanguagePlugin());

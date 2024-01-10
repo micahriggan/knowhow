@@ -7,7 +7,6 @@ export class DownloaderPlugin implements Plugin {
   extractUrls(userInput: string): string[] {
     const urlRegex = /https:\/\/[^\s]+/gim;
     const matches = userInput.match(urlRegex) || [];
-    console.log({ matches });
     return matches;
   }
 

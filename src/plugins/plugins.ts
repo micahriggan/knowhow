@@ -10,7 +10,7 @@ import { JiraPlugin } from "./jira";
 import { NotionPlugin } from "./notion";
 import { DownloaderPlugin } from "./downloader/plugin";
 
-class PluginService {
+export class PluginService {
   plugins = {
     embeddings: new EmbeddingPlugin(),
     vim: new VimPlugin(),
@@ -20,6 +20,7 @@ class PluginService {
     jira: new JiraPlugin(),
     notion: new NotionPlugin(),
     download: new DownloaderPlugin(),
+    language: new LanguagePlugin(this),
   } as Record<string, Plugin>;
 
   listPlugins() {
