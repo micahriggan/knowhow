@@ -123,7 +123,8 @@ export const Tools = [
     type: "function",
     function: {
       name: "execCommand",
-      description: "Execute a command in the system's command line interface",
+      description:
+        "Execute a command in the system's command line interface. Use this to run tests and things in the terminal",
       parameters: {
         type: "object",
         properties: {
@@ -155,7 +156,8 @@ export const Tools = [
     type: "function",
     function: {
       name: "finalAnswer",
-      description: "Finalize the AI's task and return the answer to the user",
+      description:
+        "Finalize the AI's task and return the answer to the user. You are required to call this at the end to send the response to the user",
       parameters: {
         type: "object",
         properties: {

@@ -2,6 +2,7 @@ jest.mock("fs");
 jest.mock("../src/plugins/plugins");
 
 import * as fs from "fs";
+import { exec } from "child_process";
 
 import {
   searchFiles,
@@ -9,6 +10,7 @@ import {
   scanFile,
   writeFile,
   applyPatchFile,
+  execCommand,
 } from "../src/agents/tools";
 import { Plugins } from "../src/plugins/plugins";
 
@@ -94,10 +96,28 @@ test("applyPatchFile should apply a patch to a file", () => {
 
   // Verify fs.readFileSync was called with the correct file path
   expect(fs.readFileSync).toHaveBeenCalledWith(filePath, "utf8");
-  // Verify fs.writeFileSync was called with the correct arguments
+  // Verify fs.writeFileSync was called with the corrected content
   expect(fs.writeFileSync).toHaveBeenCalledWith(filePath, patchedContent);
   // Verify the function returns a success message
   expect(result).toBe("Patch applied");
+});
+
+test("execCommand should execute a system command and return its output", async () => {
+  const command = 'echo "Hello World"';
+  const expectedOutput = "Hello World\n";
+
+  // Use the execCommand and expect it to return the correct result
+  const result = await execCommand(command);
+  expect(result).toEqual(expectedOutput);
+});
+
+test("execCommand should return an error message if the command fails", async () => {
+  const command = "exit 1";
+  const expectedOutput = "Command failed: exit 1\n";
+
+  // Use the execCommand and expect it to return the correct result
+  const result = await execCommand(command);
+  expect(result).toEqual(expectedOutput);
 });
 
 test("it should run a test", () => {

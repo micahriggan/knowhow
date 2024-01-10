@@ -14,7 +14,6 @@ class PluginService {
   plugins = {
     embeddings: new EmbeddingPlugin(),
     vim: new VimPlugin(),
-    language: new LanguagePlugin(),
     github: new GitHubPlugin(),
     asana: new AsanaPlugin(),
     linear: new LinearPlugin(),

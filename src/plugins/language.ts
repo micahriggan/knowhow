@@ -78,7 +78,7 @@ export class LanguagePlugin implements Plugin {
       }
     }
 
-    if (!matchingTerms) {
+    if (!matchingTerms || !matchingTerms.length) {
       return "LANGUAGE PLUGIN: No matching terms found";
     }
 
@@ -88,3 +88,6 @@ export class LanguagePlugin implements Plugin {
     )}`;
   }
 }
+
+// Since this uses other plugins, it needs to be registered
+Plugins.registerPlugin("language", new LanguagePlugin());
