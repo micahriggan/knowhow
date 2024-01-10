@@ -6,6 +6,7 @@ import { GitHubPlugin } from "./github";
 import { AsanaPlugin } from "./asana";
 import { JiraPlugin } from "./jira";
 import { LinearPlugin } from "./linear";
+import { Plugins } from "./plugins";
 
 export class LanguagePlugin implements Plugin {
   constructor() {}
@@ -22,6 +23,9 @@ export class LanguagePlugin implements Plugin {
 
     // Find all matching terms in the userPrompt
     const matchingTerms = terms.filter((term) => userPrompt.includes(term));
+    if (matchingTerms.length > 0) {
+      console.log("LANGUAGE PLUGIN: Found matching terms", matchingTerms);
+    }
 
     const sources = matchingTerms.flatMap(
       (term) => languageConfig[term].sources
@@ -40,9 +44,9 @@ export class LanguagePlugin implements Plugin {
       filesToLoad.map(async (filePath) => {
         const exists = await fileExists(filePath);
         if (!exists) {
-          throw new Error(`File ${filePath} does not exist`);
+          return { filePath, content: `File ${filePath} does not exist` };
         }
-        let content = await readFile(filePath, "utf8").toString();
+        let content = (await readFile(filePath, "utf8")).toString();
         return { filePath, content };
       })
     );
@@ -55,59 +59,26 @@ export class LanguagePlugin implements Plugin {
       .map((s) => s.data);
     contexts.push(...textContexts);
 
-    if (config.plugins.includes("github")) {
-      const githubPlugin = new GitHubPlugin();
-      const githubUrls = sources
-        .filter((s) => s.kind === "github")
-        .map((s) => s.data)
-        .flat()
-        .join("\n");
+    const plugins = Plugins.listPlugins();
+    for (const plugin of plugins) {
+      if (config.plugins.includes(plugin)) {
+        const matchingSources = sources.filter((s) => s.kind === plugin);
+        if (matchingSources.length === 0) {
+          continue;
+        }
 
-      const urls = githubPlugin.extractUrls(githubUrls);
-      const diffs = urls ? await githubPlugin.getParsedDiffs(urls) : [];
-      contexts.push(...diffs);
+        const data = matchingSources
+          .map((s) => s.data)
+          .flat()
+          .join("\n");
+        console.log("LANGUAGE PLUGIN: Calling plugin", plugin, data);
+        const pluginContext = await Plugins.call(plugin, data);
+
+        contexts.push(...pluginContext);
+      }
     }
 
-    if (config.plugins.includes("asana")) {
-      const asanaPlugin = new AsanaPlugin();
-      const asanaUrls = sources
-        .filter((s) => s.kind === "asana")
-        .map((s) => s.data)
-        .flat()
-        .join("\n");
-
-      const urls = asanaPlugin.extractUrls(asanaUrls);
-      const tasks = urls ? await asanaPlugin.getTasksFromUrls(urls) : [];
-      contexts.push(...tasks);
-    }
-
-    if (config.plugins.includes("jira")) {
-      const jiraPlugin = new JiraPlugin();
-      const jiraUrls = sources
-        .filter((s) => s.kind === "jira")
-        .map((s) => s.data)
-        .flat()
-        .join("\n");
-
-      const urls = jiraPlugin.extractUrls(jiraUrls);
-      const tasks = urls ? await jiraPlugin.getTasksFromUrls(urls) : [];
-      contexts.push(...tasks);
-    }
-
-    if (config.plugins.includes("linear")) {
-      const linearPlugin = new LinearPlugin();
-      const linearUrls = sources
-        .filter((s) => s.kind === "linear")
-        .map((s) => s.data)
-        .flat()
-        .join("\n");
-
-      const urls = linearPlugin.extractUrls(linearUrls);
-      const tasks = urls ? await linearPlugin.getTasksFromUrls(urls) : [];
-      contexts.push(...tasks);
-    }
-
-    if (!matchingTerms) {
+    if (!matchingTerms || !matchingTerms.length) {
       return "LANGUAGE PLUGIN: No matching terms found";
     }
 
@@ -117,3 +88,6 @@ export class LanguagePlugin implements Plugin {
     )}`;
   }
 }
+
+// Since this uses other plugins, it needs to be registered
+Plugins.registerPlugin("language", new LanguagePlugin());

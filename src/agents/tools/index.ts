@@ -53,11 +53,16 @@ export function applyPatchFile(filePath: string, patch: string): string {
 
 // Tool to execute a command in the system's command line interface
 export const execCommand = async (command: string): Promise<string> => {
-  const { stdout, stderr } = await execAsync(command);
-  if (stderr) {
-    return stderr;
+  try {
+    console.log("execCommand:", command);
+    const { stdout, stderr } = await execAsync(command);
+    if (stderr) {
+      return stderr;
+    }
+    return stdout;
+  } catch (e) {
+    return e.message;
   }
-  return stdout;
 };
 
 // Finalize the AI's task and return the answer to the user

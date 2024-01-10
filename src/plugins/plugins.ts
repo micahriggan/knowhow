@@ -14,13 +14,12 @@ class PluginService {
   plugins = {
     embeddings: new EmbeddingPlugin(),
     vim: new VimPlugin(),
-    language: new LanguagePlugin(),
     github: new GitHubPlugin(),
     asana: new AsanaPlugin(),
     linear: new LinearPlugin(),
     jira: new JiraPlugin(),
     notion: new NotionPlugin(),
-    download: new DownloaderPlugin()
+    download: new DownloaderPlugin(),
   } as Record<string, Plugin>;
 
   listPlugins() {
