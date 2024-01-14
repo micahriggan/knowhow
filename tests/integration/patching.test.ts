@@ -1,16 +1,16 @@
-import { Developer } from "../src/agents/codebase/codebase";
-import { readFile, writeFile } from "../src/utils";
+import { Developer } from "../../src/agents/codebase/codebase";
+import { readFile, writeFile } from "../../src/utils";
 import { createPatch, applyPatch } from "diff";
-import { scanFile, applyPatchFile } from "../src/agents/tools";
+import { scanFile, applyPatchFile } from "../../src/agents/tools";
 
-const inputPath = "tests/patching/input.txt";
-const outputPath = "tests/patching/output.txt";
-const patchPath = "tests/patching/patch.txt";
+const inputPath = "tests/integration/patching/input.txt";
+const outputPath = "tests/integration/patching/output.txt";
+const patchPath = "tests/integration/patching/patch.txt";
 
-const brokenPatch = `Index: tests/patching/input.txt
+const brokenPatch = `Index: tests/integration/patching/input.txt
 ===================================================================
---- tests/patching/input.txt
-+++ tests/patching/input.txt
+--- tests/integration/patching/input.txt
++++ tests/integration/patching/input.txt
 @@ -116,9 +116,9 @@
          // Add the tool responses to the thread
          messages.push(
@@ -102,8 +102,8 @@ describe("Developer", () => {
     );
   });
 
-  test.only("should be able to update the unseen file", async () => {
-    const unseenPath = "tests/patching/unseen.txt";
+  test("should be able to update the unseen file", async () => {
+    const unseenPath = "tests/integration/patching/unseen.txt";
     const originalText = (await readFile(unseenPath)).toString();
     await Developer.call(
       `Update the file in ${unseenPath} change the file additions and deletions count from 200 to 300. Do not modify anything else. Treat this file as a typescript file.`
