@@ -14,10 +14,12 @@ import {
   finalAnswer,
   addInternalTools,
   callPlugin,
+  testPatch,
 } from "../tools";
 import { Tools } from "../tools/list";
 
 const availableFunctions = addInternalTools({
+  testPatch,
   applyPatchFile,
   callPlugin,
   execCommand,
@@ -115,7 +117,6 @@ export class CodebaseAgent {
         messages.push(
           ...(toolMessages as Array<ChatCompletionToolMessageParam>)
         );
-
         const finalMessage = toolMessages.find((m) => m.name === "finalAnswer");
         if (finalMessage) {
           return finalMessage.content;

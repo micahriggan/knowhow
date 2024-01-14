@@ -17,11 +17,15 @@ export class DownloaderPlugin implements Plugin {
     }
     let transcript = "";
     for (const url of urls) {
-      console.log("Downloading", url);
-      const downloadDir = ".knowhow/downloads/";
-      const fileInfo = await Downloader.download(url, downloadDir);
-      const filePath = `${downloadDir}${fileInfo.id}.${fileInfo.ext}`;
-      transcript += await convertToText(filePath);
+      try {
+        console.log("Downloading", url);
+        const downloadDir = ".knowhow/downloads/";
+        const fileInfo = await Downloader.download(url, downloadDir);
+        const filePath = `${downloadDir}${fileInfo.id}.${fileInfo.ext}`;
+        transcript += await convertToText(filePath);
+      } catch (e) {
+        console.log("Error downloading", url);
+      }
     }
     return "DOWNLOADER PLUGIN: " + transcript;
   }

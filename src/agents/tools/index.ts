@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as util from "util";
-import { applyPatch } from "diff";
+import { applyPatch, createPatch, parsedPatch } from "diff";
 import { Plugins } from "../../plugins/plugins";
 import { execAsync } from "../../utils";
 
@@ -16,7 +16,10 @@ export async function callPlugin(pluginName: string, userInput: string) {
 // Tool to read a file
 export function readFile(filePath: string): string {
   try {
-    return fs.readFileSync(filePath, "utf8");
+    const text = fs.readFileSync(filePath, "utf8");
+    return JSON.stringify(
+      text.split("\n").map((line, index) => [index + 1, line])
+    );
   } catch (e) {
     return e.message;
   }
@@ -30,7 +33,11 @@ export function scanFile(
 ): string {
   const fileContent = fs.readFileSync(filePath, "utf8");
   const lines = fileContent.split("\n");
-  return lines.slice(startLine, endLine + 1).join("\n");
+  const start = Math.max(0, startLine - 5);
+  const end = Math.min(lines.length, endLine + 5);
+  return JSON.stringify(
+    lines.map((line, index) => [index + 1, line]).slice(start, end)
+  );
 }
 
 // Tool to write the full contents of a file
@@ -45,10 +52,27 @@ export function writeFile(filePath: string, content: string): string {
 
 // Tool to apply a patch file to a file
 export function applyPatchFile(filePath: string, patch: string): string {
-  const originalContent = fs.readFileSync(filePath, "utf8");
-  const updatedContent = applyPatch(originalContent, patch);
-  fs.writeFileSync(filePath, updatedContent);
-  return "Patch applied";
+  try {
+    const originalContent = fs.readFileSync(filePath, "utf8");
+
+    let updatedContent = applyPatch(originalContent, patch);
+    console.log("Applying patch:");
+    console.log(patch);
+    console.log("Patched content:", updatedContent);
+
+    if (!patch.endsWith("\n") && !updatedContent) {
+      patch += "\n";
+      updatedContent = applyPatch(originalContent, patch);
+    }
+
+    if (updatedContent) {
+      fs.writeFileSync(filePath, updatedContent);
+    }
+    return `Patch Applied: New output:\n${updatedContent}`;
+  } catch (e) {
+    console.error("Error applying patch:", e);
+    return e.message;
+  }
 }
 
 // Tool to execute a command in the system's command line interface

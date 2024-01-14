@@ -1,0 +1,15 @@
+Index: tests/patching/input.txt
+===================================================================
+--- tests/patching/input.txt
++++ tests/patching/input.txt
+@@ -116,9 +116,9 @@
+         // Add the tool responses to the thread
+         messages.push(
+           ...(toolMessages as Array<ChatCompletionToolMessageParam>)
+         );
+-        const finalMessage = toolMessages.find((m) => m.name === "finalAnswer");
++        const finalMessage = toolMessages.find((m) => m.name === "FinalAnswer");
+         if (finalMessage) {
+           return finalMessage.content;
+         }
+       }

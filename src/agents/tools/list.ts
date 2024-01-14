@@ -2,6 +2,22 @@ import { ChatCompletionTool } from "openai/resources/chat";
 import { Plugins } from "../../plugins/plugins";
 
 const pluginNames = Plugins.listPlugins().join(", ");
+const patchExample = ` Index: tests/patching/input.txt
+===================================================================
+--- tests/patching/input.txt
++++ tests/patching/input.txt
+@@ -116,9 +116,9 @@
+         // Add the tool responses to the thread
+         messages.push(
+           ...(toolMessages as Array<ChatCompletionToolMessageParam>)
+         );
+-        const finalMessage = toolMessages.find((m) => m.name === "finalAnswer");
++        const finalMessage = toolMessages.find((m) => m.name === "FinalAnswer");
+         if (finalMessage) {
+           return finalMessage.content;
+         }
+       }\n`;
+
 export const Tools = [
   {
     type: "function",
@@ -101,8 +117,7 @@ export const Tools = [
     type: "function",
     function: {
       name: "applyPatchFile",
-      description:
-        "Apply a patch file to a file. Use this to modify files without specifying full file contents",
+      description: `Apply a patch file to a file. Use this to modify files without specifying full file contents. This uses the diff npm package.`,
       parameters: {
         type: "object",
         properties: {
