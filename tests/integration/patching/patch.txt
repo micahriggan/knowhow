@@ -1,7 +1,7 @@
-Index: tests/patching/input.txt
+Index: tests/integration/patching/input.txt
 ===================================================================
---- tests/patching/input.txt
-+++ tests/patching/input.txt
+--- tests/integration/patching/input.txt
++++ tests/integration/patching/input.txt
 @@ -116,9 +116,9 @@
          // Add the tool responses to the thread
          messages.push(

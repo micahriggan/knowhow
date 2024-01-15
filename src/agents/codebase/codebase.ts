@@ -14,6 +14,7 @@ import {
   finalAnswer,
   addInternalTools,
   callPlugin,
+  visionTool,
 } from "../tools";
 import { Tools } from "../tools/list";
 
@@ -25,6 +26,7 @@ const availableFunctions = addInternalTools({
   readFile,
   scanFile,
   searchFiles,
+  visionTool,
   writeFile,
 });
 

@@ -18,13 +18,13 @@ export class DownloaderPlugin implements Plugin {
     let transcript = "";
     for (const url of urls) {
       try {
-        console.log("Downloading", url);
+        console.log("DOWNLOADER PLUGIN: attempting", url);
         const downloadDir = ".knowhow/downloads/";
         const fileInfo = await Downloader.download(url, downloadDir);
         const filePath = `${downloadDir}${fileInfo.id}.${fileInfo.ext}`;
         transcript += await convertToText(filePath);
       } catch (e) {
-        console.log("Error downloading", url);
+        console.log("DOWNLOADER PLUGIN: cannot download", url);
       }
     }
     return "DOWNLOADER PLUGIN: " + transcript;

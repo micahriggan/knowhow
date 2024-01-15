@@ -97,3 +97,26 @@ export async function createAssistant(assistant: Assistant) {
   console.log(`Assistant created successfully. ID: ${created.id}`);
   return created;
 }
+
+export async function askGptVision(imageUrl: string, question: string) {
+  const response = await openai.chat.completions.create({
+    model: "gpt-4-vision-preview",
+    max_tokens: 2500,
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: question },
+          {
+            type: "image_url",
+            image_url: {
+              url: imageUrl,
+            },
+          },
+        ],
+      },
+    ],
+  });
+
+  return response.choices[0].message.content;
+}

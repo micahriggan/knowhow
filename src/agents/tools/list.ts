@@ -216,4 +216,30 @@ export const Tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "visionTool",
+      description: "Ask the vision API a question about an image url",
+      parameters: {
+        type: "object",
+        properties: {
+          imageUrl: {
+            type: "string",
+            description: "The url of the image to load",
+          },
+          question: {
+            type: "string",
+            description: "The prompt related to the image",
+          },
+        },
+        required: ["imageUrl", "question"],
+      },
+      returns: {
+        type: "string",
+        description:
+          "The results of the vision API call as an answer to the prompt question",
+      },
+    },
+  },
 ] as Array<ChatCompletionTool>;

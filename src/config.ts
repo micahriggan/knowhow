@@ -27,6 +27,7 @@ export async function init() {
       "jira",
       "linear",
       "download",
+      "figma"
     ],
     sources: [
       {

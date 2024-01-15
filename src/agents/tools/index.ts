@@ -3,6 +3,7 @@ import * as util from "util";
 import { applyPatch, createPatch, parsedPatch } from "diff";
 import { Plugins } from "../../plugins/plugins";
 import { execAsync } from "../../utils";
+import { openai, askGptVision } from "../../ai";
 
 // Tool to search for files related to the user's goal
 export async function searchFiles(keyword: string): Promise<string> {
@@ -68,7 +69,7 @@ export function applyPatchFile(filePath: string, patch: string): string {
     if (updatedContent) {
       fs.writeFileSync(filePath, updatedContent);
     }
-    return `Patch Applied: New output:\n${updatedContent}`;
+    return `Patch Applied:\n${updatedContent}`;
   } catch (e) {
     console.error("Error applying patch:", e);
     return e.message;
@@ -112,4 +113,8 @@ export function addInternalTools(fns: { [fnName: string]: Function }) {
   fns["multi_tool_use.parallel"] = callParallel;
 
   return fns;
+}
+
+export async function visionTool(imageUrl: string, question: string) {
+  return askGptVision(imageUrl, question);
 }
