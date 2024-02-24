@@ -4,6 +4,7 @@ import { applyPatch, createPatch, parsedPatch } from "diff";
 import { Plugins } from "../../plugins/plugins";
 import { execAsync } from "../../utils";
 import { openai, askGptVision } from "../../ai";
+import { FileBlock } from "./types/fileblock";
 
 // Tool to search for files related to the user's goal
 export async function searchFiles(keyword: string): Promise<string> {
@@ -24,6 +25,47 @@ export function readFile(filePath: string): string {
   } catch (e) {
     return e.message;
   }
+}
+
+export function readFileAsBlocks(filePath: string): Array<FileBlock> {
+  const text = fs.readFileSync(filePath, "utf8");
+  const lines = text.split("\n");
+  let blocks = [] as Array<FileBlock>;
+
+  const blockSize = 5;
+  let index = 0;
+  while (lines.length > 0) {
+    const block = lines.splice(0, blockSize).join("\n");
+    blocks.push({
+      blockNumber: index++,
+      content: block,
+      startLine: index * blockSize,
+    });
+  }
+
+  return blocks;
+}
+
+export async function readBlocksFromFile(
+  filePath: string,
+  blockNumbers: number[]
+) {
+  const fileBlocks = await readFileAsBlocks(filePath);
+  return fileBlocks.filter((block) => blockNumbers.includes(block.blockNumber));
+}
+
+export async function writeBlocksToFile(
+  fileBlocks: Array<FileBlock>,
+  filePath: string
+) {
+  const originalContent = await readFileAsBlocks(filePath);
+
+  for (const block of fileBlocks) {
+    originalContent[block.blockNumber].content = block.content;
+  }
+
+  const newContent = originalContent.map((b) => b.content).join("\n");
+  fs.writeFileSync(filePath, newContent);
 }
 
 // Tool to scan a file from line A to line B

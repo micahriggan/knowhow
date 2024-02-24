@@ -2,22 +2,6 @@ import { ChatCompletionTool } from "openai/resources/chat";
 import { Plugins } from "../../plugins/plugins";
 
 const pluginNames = Plugins.listPlugins().join(", ");
-const patchExample = ` Index: tests/patching/input.txt
-===================================================================
---- tests/patching/input.txt
-+++ tests/patching/input.txt
-@@ -116,9 +116,9 @@
-         // Add the tool responses to the thread
-         messages.push(
-           ...(toolMessages as Array<ChatCompletionToolMessageParam>)
-         );
--        const finalMessage = toolMessages.find((m) => m.name === "finalAnswer");
-+        const finalMessage = toolMessages.find((m) => m.name === "FinalAnswer");
-         if (finalMessage) {
-           return finalMessage.content;
-         }
-       }\n`;
-
 export const Tools = [
   {
     type: "function",
@@ -30,7 +14,7 @@ export const Tools = [
           keyword: {
             type: "string",
             description:
-              "The keyword or phrase to search for via embedding search",
+              "The code, keyword or phrase to search for via embedding search",
           },
         },
         required: ["keyword"],
@@ -38,100 +22,6 @@ export const Tools = [
       returns: {
         type: "string",
         description: "A string containing a JSON of all the matched files",
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "readFile",
-      description: "Read the contents of a file",
-      parameters: {
-        type: "object",
-        properties: {
-          filePath: {
-            type: "string",
-            description: "The path to the file to be read",
-          },
-        },
-        required: ["filePath"],
-      },
-      returns: {
-        type: "string",
-        description: "The contents of the file as a string",
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "scanFile",
-      description: "Scan a file from a specified start line to an end line",
-      parameters: {
-        type: "object",
-        properties: {
-          filePath: {
-            type: "string",
-            description: "The path to the file to be scanned",
-          },
-          startLine: {
-            type: "number",
-            description: "The line number to start scanning from",
-          },
-          endLine: {
-            type: "number",
-            description: "The line number to stop scanning at",
-          },
-        },
-        required: ["filePath", "startLine", "endLine"],
-      },
-      returns: {
-        type: "string",
-        description:
-          "The contents of the specified range of lines from the file",
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "writeFile",
-      description:
-        "Write the FULL contents of a file. Do not use this for partial file edits. Instead, use applyPatchFile.",
-      parameters: {
-        type: "object",
-        properties: {
-          filePath: {
-            type: "string",
-            description: "The path to the file to be written to",
-          },
-          content: {
-            type: "string",
-            description: "The content to write to the file",
-          },
-        },
-        required: ["filePath", "content"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "applyPatchFile",
-      description: `Apply a patch file to a file. Use this to modify files without specifying full file contents. This uses the diff npm package. Example patch file:\n${patchExample}`,
-      parameters: {
-        type: "object",
-        properties: {
-          filePath: {
-            type: "string",
-            description: "The path to the file to be patched",
-          },
-          patch: {
-            type: "string",
-            description: "The patch to apply",
-          },
-        },
-        required: ["filePath", "patch"],
       },
     },
   },
@@ -240,6 +130,99 @@ export const Tools = [
         type: "string",
         description:
           "The results of the vision API call as an answer to the prompt question",
+      },
+    },
+  },
+
+  {
+    type: "function",
+    function: {
+      name: "readFileAsBlocks",
+      description:
+        "Read the contents of a file and return them as an array of blocks",
+      parameters: {
+        type: "object",
+        properties: {
+          filePath: {
+            type: "string",
+            description: "The path to the file to be read",
+          },
+        },
+        required: ["filePath"],
+      },
+      returns: {
+        type: "array",
+        description:
+          "An array of file blocks, where each block contains a portion of the file's content",
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "readBlocksFromFile",
+      description:
+        "Read specific blocks from a file based on block numbers. Blocks are numbered blocks of text, containing a few lines of content",
+      parameters: {
+        type: "object",
+        properties: {
+          filePath: {
+            type: "string",
+            description:
+              "The path to the file from which blocks are to be read",
+          },
+          blockNumbers: {
+            type: "array",
+            items: {
+              type: "number",
+            },
+            description: "An array of block numbers to be read from the file",
+          },
+        },
+        required: ["filePath", "blockNumbers"],
+      },
+      returns: {
+        type: "array",
+        description:
+          "An array of file blocks corresponding to the specified block numbers",
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "writeBlocksToFile",
+      description:
+        "Write an array of file blocks back to the file, updating the specified blocks",
+      parameters: {
+        type: "object",
+        properties: {
+          fileBlocks: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                blockNumber: {
+                  type: "number",
+                  description:
+                    "The block number that identifies the position of the block in the file",
+                },
+                content: {
+                  type: "string",
+                  description:
+                    "The content to be written in the block. Content may be larger than the block size, new blocks will be created as needed",
+                },
+              },
+              required: ["blockNumber", "content"],
+            },
+            description: "An array of file blocks to be written to the file",
+          },
+          filePath: {
+            type: "string",
+            description: "The path to the file to be written to",
+          },
+        },
+        required: ["fileBlocks", "filePath"],
       },
     },
   },
