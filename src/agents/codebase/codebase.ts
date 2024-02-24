@@ -15,6 +15,9 @@ import {
   addInternalTools,
   callPlugin,
   visionTool,
+  readFileAsBlocks,
+  readBlocksFromFile,
+  writeBlocksToFile,
 } from "../tools";
 import { Tools } from "../tools/list";
 
@@ -23,11 +26,11 @@ const availableFunctions = addInternalTools({
   callPlugin,
   execCommand,
   finalAnswer,
-  readFile,
-  scanFile,
   searchFiles,
   visionTool,
-  writeFile,
+  readFileAsBlocks,
+  readBlocksFromFile,
+  writeBlocksToFile,
 });
 
 export class CodebaseAgent {
@@ -49,6 +52,13 @@ export class CodebaseAgent {
     const functionArgs = JSON.parse(toolCall.function.arguments);
     const positionalArgs = Object.values(functionArgs);
 
+    const toJsonIfObject = (arg: any) => {
+      if (typeof arg === "object") {
+        return JSON.stringify(arg);
+      }
+      return arg;
+    };
+
     console.log(
       `Calling function ${functionName} with args:`,
       JSON.stringify(positionalArgs, null, 2)
@@ -67,7 +77,7 @@ export class CodebaseAgent {
           tool_call_id: toolCall.id + "_" + index,
           role: "tool",
           name: call.recipient_name.split(".").pop(),
-          content: functionResponse[index] || "Done",
+          content: toJsonIfObject(functionResponse[index]) || "Done",
         };
       });
     }
@@ -76,7 +86,7 @@ export class CodebaseAgent {
       tool_call_id: toolCall.id,
       role: "tool",
       name: functionName,
-      content: functionResponse || "Done",
+      content: toJsonIfObject(functionResponse) || "Done",
     };
 
     return [toolMessage];

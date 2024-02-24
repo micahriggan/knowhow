@@ -32,10 +32,15 @@ export function readFileAsBlocks(filePath: string): Array<FileBlock> {
   const lines = text.split("\n");
   let blocks = [] as Array<FileBlock>;
 
+  const blockSize = 5;
   let index = 0;
   while (lines.length > 0) {
-    const block = lines.splice(0, 5).join("\n");
-    blocks.push({ blockNumber: index++, content: block });
+    const block = lines.splice(0, blockSize).join("\n");
+    blocks.push({
+      blockNumber: index++,
+      content: block,
+      startLine: index * blockSize,
+    });
   }
 
   return blocks;
