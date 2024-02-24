@@ -102,6 +102,18 @@ The user has asked:
   return response.choices[0].message.content;
 }
 
+export async function getInput(
+  question: string,
+  multiLine = false,
+  options = []
+): Promise<string> {
+  const value: string = await (multiLine
+    ? editor({ message: question })
+    : ask(question, options));
+
+  return value.trim();
+}
+
 export async function askGpt<E extends GptQuestionEmbedding>(
   aiName: string,
   embeddings: Array<Embeddable<E>>,
@@ -111,11 +123,10 @@ export async function askGpt<E extends GptQuestionEmbedding>(
   let multiLine = false;
 
   console.log("Commands: search, exit");
-  const getInput = (question: string) => {
-    return multiLine ? editor({ message: question }) : ask(question);
-  };
 
-  let input = await getInput(`Ask ${aiName} AI?: `);
+  const commands = ["agent", "debugger", "exit", "multi", "search"];
+  let input = await getInput(`Ask ${aiName} AI?: `, multiLine, commands);
+
   let answer: E | undefined;
   let results = "";
   while (input !== "exit") {
@@ -135,6 +146,8 @@ export async function askGpt<E extends GptQuestionEmbedding>(
         case "agent":
           agent = !agent;
           break;
+        case "":
+          break;
         default:
           console.log("Thinking...");
           console.log(input);
@@ -152,7 +165,7 @@ export async function askGpt<E extends GptQuestionEmbedding>(
     } catch (e) {
       console.log(e);
     } finally {
-      input = await getInput(`Ask ${aiName} AI?: `);
+      input = await getInput(`Ask ${aiName} AI?: `, multiLine, commands);
     }
   }
 }
