@@ -30,7 +30,7 @@ export const Tools = [
           keyword: {
             type: "string",
             description:
-              "The keyword or phrase to search for via embedding search",
+              "The code, keyword or phrase to search for via embedding search",
           },
         },
         required: ["keyword"],
