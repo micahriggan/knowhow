@@ -9,17 +9,21 @@ import { ChatOpenAI } from "langchain/chat_models/openai";
 import OpenAI from "openai";
 import { Assistant } from "./types";
 import { convertToText } from "./conversion";
+import { getConfigSync } from "./config";
 
+const config = getConfigSync();
 const OPENAI_KEY = process.env.OPENAI_KEY;
 const chatModel = new ChatOpenAI({
   temperature: 0,
   openAIApiKey: OPENAI_KEY,
-  modelName: "gpt-4",
+  modelName: "gpt-4-1106-preview",
   maxRetries: 2,
 });
 
+console.log("OpenAI Base URL", config.openaiBaseUrl);
 export const openai = new OpenAI({
   apiKey: process.env.OPENAI_KEY,
+  ...(config.openaiBaseUrl && { baseURL: config.openaiBaseUrl }),
 });
 
 export async function summarizeTexts(texts: string[], template: string) {
@@ -34,13 +38,13 @@ export async function summarizeTexts(texts: string[], template: string) {
   });
 
   const textSplitter = new RecursiveCharacterTextSplitter({
-    chunkSize: 1000,
+    chunkSize: 20000,
   });
 
   const docs = await textSplitter.createDocuments(texts);
 
   const result = await summarizationChain.call({
-    input_documents: docs.slice(0, 5),
+    input_documents: docs,
   });
 
   console.log("Summary", result.text);

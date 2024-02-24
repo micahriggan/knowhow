@@ -1,3 +1,4 @@
+import * as fs from "fs";
 import * as path from "path";
 import gitignoreToGlob from "gitignore-to-glob";
 import { Prompts } from "./prompts";
@@ -27,7 +28,7 @@ export async function init() {
       "jira",
       "linear",
       "download",
-      "figma"
+      "figma",
     ],
     sources: [
       {
@@ -111,6 +112,17 @@ async function copyTemplates() {
     const promptName = Object.keys(prompt)[0];
     const promptPath = path.join(".knowhow/prompts", promptName + ".mdx");
     await writeFile(promptPath, prompt[promptName]);
+  }
+}
+
+export function getConfigSync() {
+  try {
+    const config = JSON.parse(
+      fs.readFileSync(".knowhow/knowhow.json", "utf8").toString()
+    );
+    return config as Config;
+  } catch (e) {
+    return {} as Config;
   }
 }
 

@@ -56,14 +56,14 @@ export function applyPatchFile(filePath: string, patch: string): string {
   try {
     const originalContent = fs.readFileSync(filePath, "utf8");
 
-    let updatedContent = applyPatch(originalContent, patch);
+    let updatedContent = applyPatch(originalContent, patch, { fuzzFactor: 1 });
     console.log("Applying patch:");
     console.log(patch);
     console.log("Patched content:", updatedContent);
 
     if (!patch.endsWith("\n") && !updatedContent) {
       patch += "\n";
-      updatedContent = applyPatch(originalContent, patch);
+      updatedContent = applyPatch(originalContent, patch, { fuzzFactor: 1 });
     }
 
     if (updatedContent) {

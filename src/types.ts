@@ -5,6 +5,7 @@ export type Hashes = {
   };
 };
 export type Config = {
+  openaiBaseUrl?: string;
   promptsDir: string;
   sources: Array<{
     input: string;

@@ -55,7 +55,7 @@ class DownloaderService {
       );
     }
 
-    const command = `ffmpeg -i ${filePath} -f segment -segment_time ${CHUNK_LENGTH_SECONDS} -c copy ${outputDirPath}/chunk%03d${fileExt}`;
+    const command = `ffmpeg -i ${filePath} -f segment -segment_time ${CHUNK_LENGTH_SECONDS} -vn -c copy ${outputDirPath}/chunk%03d.mp3`;
     await execAsync(command);
 
     const chunkNames = await fs.promises.readdir(outputDirPath);

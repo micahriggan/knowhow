@@ -96,7 +96,8 @@ export const Tools = [
     type: "function",
     function: {
       name: "writeFile",
-      description: "Write the full contents to a file",
+      description:
+        "Write the FULL contents of a file. Do not use this for partial file edits. Instead, use applyPatchFile.",
       parameters: {
         type: "object",
         properties: {
@@ -117,7 +118,7 @@ export const Tools = [
     type: "function",
     function: {
       name: "applyPatchFile",
-      description: `Apply a patch file to a file. Use this to modify files without specifying full file contents. This uses the diff npm package.`,
+      description: `Apply a patch file to a file. Use this to modify files without specifying full file contents. This uses the diff npm package. Example patch file:\n${patchExample}`,
       parameters: {
         type: "object",
         properties: {

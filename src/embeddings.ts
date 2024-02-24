@@ -88,13 +88,14 @@ export async function embed(
     chunks = await chunkText(text, chunkSize);
   }
 
-  if (chunks.length > 100) {
+  const MAX_CHUNKS = 100;
+  if (chunks.length > MAX_CHUNKS) {
     return [];
   }
 
-  if (chunks.length > 25) {
-    // Only use the first 25 chunks
-    chunks = chunks.slice(0, 25);
+  if (chunks.length <= MAX_CHUNKS) {
+    // Only use the first few chunks
+    chunks = chunks.slice(0, MAX_CHUNKS);
   }
 
   const dontPrune = [];
