@@ -66,75 +66,72 @@ export async function modifyFile(
 ) {
   try {
     const exists = fs.existsSync(filePath);
-    const originalContent = exists ? await readFile(filePath) : [];
+    const contentToUpdate = exists ? await readFile(filePath) : [];
     const edits = {};
+    const before = [...contentToUpdate];
 
     for (const block of fileBlocks) {
-      if (!originalContent[block.blockNumber]) {
-        originalContent[block.blockNumber] = {
+      if (!contentToUpdate[block.blockNumber]) {
+        contentToUpdate[block.blockNumber] = {
           blockNumber: block.blockNumber,
           content: "",
-          startLine: block.blockNumber * 5,
         };
       }
 
-      if (block.blockNumber > 0) {
-        const previousBlock = originalContent[block.blockNumber - 1];
-        if (previousBlock) {
-          edits[previousBlock.blockNumber] = previousBlock;
-        }
-      }
-
-      if (block.blockNumber < originalContent.length - 1) {
-        const nextBlock = originalContent[block.blockNumber + 1];
-        if (nextBlock) {
-          edits[nextBlock.blockNumber] = nextBlock;
-        }
-      }
-      originalContent[block.blockNumber].content = block.content;
-      edits[block.blockNumber] = originalContent[block.blockNumber];
+      contentToUpdate[block.blockNumber].content = block.content;
+      edits[block.blockNumber] = contentToUpdate[block.blockNumber];
     }
 
-    const newContent = originalContent.map((b) => b.content).join("");
+    const newContent = contentToUpdate.map((b) => b.content).join("");
+    const beforeContent = before.map((b) => b.content).join("");
+
     fs.writeFileSync(filePath, newContent);
 
     const newBlocks = await readFile(filePath);
-    console.log(newBlocks);
 
-    return `File ${filePath} modified, use readFile to verify`;
+    console.log("====BEFORE====");
+    console.log(beforeContent);
+    console.log("====AFTER====");
+    console.log(newContent);
+
+    return `
+    Before your changes, the text was:
+    ${beforeContent}
+
+    After your changes the text is:
+    ${newContent}
+
+    Are you sure that was correct? .
+    `;
   } catch (e) {
     return e.message;
   }
 }
 
 // Tool to scan a file from line A to line B
-/*
- *export function scanFile(
- *  filePath: string,
- *  startLine: number,
- *  endLine: number
- *): string {
- *  const fileContent = fs.readFileSync(filePath, "utf8");
- *  const lines = fileContent.split("\n");
- *  const start = Math.max(0, startLine - 5);
- *  const end = Math.min(lines.length, endLine + 5);
- *  return JSON.stringify(
- *    lines.map((line, index) => [index + 1, line]).slice(start, end)
- *  );
- *}
- */
+export function scanFile(
+  filePath: string,
+  startLine: number,
+  endLine: number
+): string {
+  const fileContent = fs.readFileSync(filePath, "utf8");
+  const lines = fileContent.split("\n");
+  const start = Math.max(0, startLine - 5);
+  const end = Math.min(lines.length, endLine + 5);
+  return JSON.stringify(
+    lines.map((line, index) => [index + 1, line]).slice(start, end)
+  );
+}
 
 // Tool to write the full contents of a file
-/*
- *export function writeFile(filePath: string, content: string): string {
- *  try {
- *    fs.writeFileSync(filePath, content);
- *    return `File ${filePath} written`;
- *  } catch (e) {
- *    return e.message;
- *  }
- *}
- */
+export function writeFile(filePath: string, content: string): string {
+  try {
+    fs.writeFileSync(filePath, content);
+    return `File ${filePath} written`;
+  } catch (e) {
+    return e.message;
+  }
+}
 
 // Tool to apply a patch file to a file
 export function applyPatchFile(filePath: string, patch: string): string {

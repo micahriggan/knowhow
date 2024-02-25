@@ -4,6 +4,13 @@ import { Developer } from "../../../src/agents/codebase/codebase";
 import { FlagsService } from "../../../src/flags";
 
 describe("Developer", () => {
+  beforeAll(() => {
+    Developer.disableTool("searchFiles");
+    Developer.disableTool("execCommand");
+    Developer.enableTool("modifyFile");
+    Developer.enableTool("readFile");
+  });
+
   test("should be able to patch a codebase", async () => {
     const inputPath = "tests/integration/patching/input.txt";
     const originalText = (await readFile(inputPath)).toString();
@@ -69,7 +76,7 @@ describe("Developer", () => {
       expect(service.enabled("test")).toEqual(true);
 
       await Developer.call(
-        `Modify the file in ${outputPath} and add a method called hasFlag that takes a string and returns a boolean. It should return true if the flag is defined at all, even if it is false.`
+        `Modify the file in ${outputPath} and add a method called hasFlag that takes a string and returns a boolean. It should return true if the flag is defined at all, even if it is false. This is a unit test, only modify the file I've specified.`
       );
 
       jest.resetModules();

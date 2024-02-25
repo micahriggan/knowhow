@@ -31,12 +31,32 @@ const availableFunctions = addInternalTools({
 });
 
 export class CodebaseAgent {
+  enabledTools = [...Tools];
+
+  disableTool(toolName: string) {
+    this.enabledTools = this.enabledTools.filter(
+      (t) => t.function.name !== toolName
+    );
+  }
+
+  isToolEnabled(toolName: string) {
+    return !!this.enabledTools.find((t) => t.function.name === toolName);
+  }
+
+  enableTool(toolName: string) {
+    if (!this.isToolEnabled(toolName)) {
+      this.enabledTools = this.enabledTools.concat(
+        Tools.filter((t) => t.function.name === toolName)
+      );
+    }
+  }
+
   getInitialMessages(user_input: string) {
     return [
       {
         role: "system",
         content:
-          "Codebase Agent. You use the tools to read and write code, to help the developer implement features faster. Call final answer once you have finished implementing what is requested. As an agent you will receive multiple rounds of input until you call final answer. You are not able to request feedback from the user, so proceed with your plans and the developer will contact you afterwards if they need more help. After modifying files, you will read them to ensure they look correct before calling final answer. You always make the smallest modifications required to files, rather than outputting the entire file.",
+          "Codebase Agent. You use the tools to read and write code, to help the developer implement features faster. Call final answer once you have finished implementing what is requested. As an agent you will receive multiple rounds of input until you call final answer. You are not able to request feedback from the user, so proceed with your plans and the developer will contact you afterwards if they need more help. After modifying files, you will read them to ensure they look correct before calling final answer. You always check your modifications for syntax errors or bugs. You always make the smallest modifications required to files, rather than outputting the entire file. You think step by step about the blocks of code you're modiyfing",
       },
 
       { role: "user", content: user_input },
@@ -117,13 +137,13 @@ export class CodebaseAgent {
     user_input: string,
     _messages?: Array<ChatCompletionMessageParam>
   ) {
-    const model = "gpt-4-1106-preview";
+    const model = "gpt-4-turbo-preview";
     const messages = _messages || this.getInitialMessages(user_input);
 
     const response = await openai.chat.completions.create({
       model,
       messages: messages,
-      tools: Tools,
+      tools: this.enabledTools,
       tool_choice: "auto",
     });
     this.logMessages(response.choices.map((c) => c.message));

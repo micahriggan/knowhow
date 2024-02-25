@@ -11,6 +11,7 @@ import {
   modifyFile,
   applyPatchFile,
   execCommand,
+  writeFile,
 } from "../src/agents/tools";
 import { Plugins } from "../src/plugins/plugins";
 
@@ -79,7 +80,7 @@ test("writeFile should write the full contents to a file", () => {
   // Mock fs.writeFileSync to not actually write to disk
   mockFs.writeFileSync.mockImplementation(() => {});
 
-  const result = modifyFile(filePath, contentToWrite);
+  const result = writeFile(filePath, contentToWrite);
 
   // Verify fs.writeFileSync was called with the correct arguments
   expect(fs.writeFileSync).toHaveBeenCalledWith(filePath, contentToWrite);
