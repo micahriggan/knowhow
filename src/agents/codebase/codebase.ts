@@ -5,19 +5,16 @@ import {
 } from "openai/resources/chat";
 import { openai } from "../../ai";
 import {
-  searchFiles,
-  scanFile,
-  writeFile,
-  applyPatchFile,
-  execCommand,
-  readFile,
-  finalAnswer,
   addInternalTools,
+  applyPatchFile,
   callPlugin,
+  execCommand,
+  finalAnswer,
+  readBlocks,
+  readFile,
+  searchFiles,
   visionTool,
-  readFileAsBlocks,
-  readBlocksFromFile,
-  writeBlocksToFile,
+  modifyFile,
 } from "../tools";
 import { Tools } from "../tools/list";
 
@@ -26,11 +23,11 @@ const availableFunctions = addInternalTools({
   callPlugin,
   execCommand,
   finalAnswer,
+  readBlocks,
+  readFile,
   searchFiles,
   visionTool,
-  readFileAsBlocks,
-  readBlocksFromFile,
-  writeBlocksToFile,
+  modifyFile,
 });
 
 export class CodebaseAgent {
@@ -39,7 +36,7 @@ export class CodebaseAgent {
       {
         role: "system",
         content:
-          "Codebase Agent. You use the tools to read and write code, to help the developer implement features faster. Call final answer once you have finished implementing what is requested. As an agent you will receive multiple rounds of input until you call final answer. You are not able to request feedback from the user, so proceed with your plans and the developer will contact you afterwards if they need more help.",
+          "Codebase Agent. You use the tools to read and write code, to help the developer implement features faster. Call final answer once you have finished implementing what is requested. As an agent you will receive multiple rounds of input until you call final answer. You are not able to request feedback from the user, so proceed with your plans and the developer will contact you afterwards if they need more help. Use modifyFile to make partial edits to files. The edits should be the minimal changes to the existing files to achieve the goal. modifyFile is used to replace text in the numbered blocks. You can modify up to 5 lines per block, and you may send along multiple blocks at a time.",
       },
 
       { role: "user", content: user_input },
@@ -64,6 +61,17 @@ export class CodebaseAgent {
       JSON.stringify(positionalArgs, null, 2)
     );
 
+    if (!functionToCall) {
+      const options = Object.keys(availableFunctions).join(", ");
+      return [
+        {
+          tool_call_id: toolCall.id,
+          role: "tool",
+          name: "error",
+          content: `Function ${functionName} not found, options are ${options}`,
+        },
+      ];
+    }
     const functionResponse = await functionToCall(...positionalArgs);
 
     if (functionName === "multi_tool_use.parallel") {

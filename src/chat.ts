@@ -9,8 +9,18 @@ import { ask } from "./utils";
 import { Plugins } from "./plugins/plugins";
 import { queryEmbedding } from "./embeddings";
 import { Developer } from "./agents/codebase/codebase";
+import { FlagsService } from "./flags";
 
-let DEBUGGER = false;
+enum ChatFlags {
+  agent = "agent",
+  debug = "debug",
+  multi = "multi",
+}
+
+const Flags = new FlagsService(
+  [ChatFlags.agent, ChatFlags.debug, ChatFlags.multi],
+  true
+);
 
 export async function askEmbedding<E>(
   embeddings: Array<Embeddable<E>>,
@@ -76,7 +86,7 @@ The user has asked:
 
   Output Format in Markdown
 `;
-  if (DEBUGGER) {
+  if (Flags.enabled("debugger")) {
     console.log(gptPrompt);
   }
 
@@ -119,32 +129,33 @@ export async function askGpt<E extends GptQuestionEmbedding>(
   embeddings: Array<Embeddable<E>>,
   plugins: Array<string> = []
 ) {
-  let agent = false;
-  let multiLine = false;
-
   console.log("Commands: search, exit");
 
   const commands = ["agent", "debugger", "exit", "multi", "search"];
-  let input = await getInput(`Ask ${aiName} AI?: `, multiLine, commands);
+  let input = await getInput(
+    `Ask ${aiName} AI?: `,
+    Flags.enabled(ChatFlags.multi),
+    commands
+  );
 
   let answer: E | undefined;
   let results = "";
   while (input !== "exit") {
     try {
       switch (input) {
-        case "debugger":
-          DEBUGGER = !DEBUGGER;
+        case ChatFlags.agent:
+          Flags.flip(ChatFlags.agent);
           break;
-        case "multi":
-          multiLine = !multiLine;
+        case ChatFlags.debug:
+          Flags.flip(ChatFlags.debug);
+          break;
+        case ChatFlags.multi:
+          Flags.flip(ChatFlags.multi);
           break;
         case "search":
           await askEmbedding(embeddings, "searching", (question, answer) => {
             console.log(JSON.stringify(answer.metadata, null, 2));
           });
-          break;
-        case "agent":
-          agent = !agent;
           break;
         case "":
           break;
@@ -153,7 +164,7 @@ export async function askGpt<E extends GptQuestionEmbedding>(
           console.log(input);
           const pluginText = await Plugins.callMany(plugins, input);
           const fullPrompt = `${input} \n ${pluginText}`;
-          if (agent) {
+          if (Flags.enabled("agent")) {
             results = await Developer.call(fullPrompt);
           } else {
             results = await queryGpt4(fullPrompt);
@@ -165,7 +176,11 @@ export async function askGpt<E extends GptQuestionEmbedding>(
     } catch (e) {
       console.log(e);
     } finally {
-      input = await getInput(`Ask ${aiName} AI?: `, multiLine, commands);
+      input = await getInput(
+        `Ask ${aiName} AI?: `,
+        Flags.enabled(ChatFlags.multi),
+        commands
+      );
     }
   }
 }

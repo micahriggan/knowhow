@@ -1,5 +1,5 @@
 export interface FileBlock {
   blockNumber: number;
-  startLine: number;
+  startLine?: number;
   content: string;
 }

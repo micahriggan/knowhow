@@ -6,6 +6,7 @@ import { execAsync } from "../../utils";
 import { openai, askGptVision } from "../../ai";
 import { FileBlock } from "./types/fileblock";
 
+const BLOCK_SIZE = 5;
 // Tool to search for files related to the user's goal
 export async function searchFiles(keyword: string): Promise<string> {
   return Plugins.call("embeddings", keyword);
@@ -16,82 +17,128 @@ export async function callPlugin(pluginName: string, userInput: string) {
 }
 
 // Tool to read a file
-export function readFile(filePath: string): string {
+/*
+ *export function readFile(filePath: string): string {
+ *  try {
+ *    const text = fs.readFileSync(filePath, "utf8");
+ *    return JSON.stringify(
+ *      text.split("\n").map((line, index) => [index + 1, line])
+ *    );
+ *  } catch (e) {
+ *    return e.message;
+ *  }
+ *}
+ */
+
+export async function readFile(filePath: string): Promise<Array<FileBlock>> {
   try {
     const text = fs.readFileSync(filePath, "utf8");
-    return JSON.stringify(
-      text.split("\n").map((line, index) => [index + 1, line])
-    );
+    const lines = text.split("\n");
+    let blocks = [] as Array<FileBlock>;
+
+    let index = 0;
+    while (lines.length > 0) {
+      const block = lines.splice(0, BLOCK_SIZE).join("\n");
+      blocks.push({
+        blockNumber: index,
+        content: block,
+        startLine: index * BLOCK_SIZE,
+      });
+      index++;
+    }
+
+    return blocks;
   } catch (e) {
     return e.message;
   }
 }
 
-export function readFileAsBlocks(filePath: string): Array<FileBlock> {
-  const text = fs.readFileSync(filePath, "utf8");
-  const lines = text.split("\n");
-  let blocks = [] as Array<FileBlock>;
-
-  const blockSize = 5;
-  let index = 0;
-  while (lines.length > 0) {
-    const block = lines.splice(0, blockSize).join("\n");
-    blocks.push({
-      blockNumber: index++,
-      content: block,
-      startLine: index * blockSize,
-    });
-  }
-
-  return blocks;
-}
-
-export async function readBlocksFromFile(
-  filePath: string,
-  blockNumbers: number[]
-) {
-  const fileBlocks = await readFileAsBlocks(filePath);
+export async function readBlocks(filePath: string, blockNumbers: number[]) {
+  const fileBlocks = await readFile(filePath);
   return fileBlocks.filter((block) => blockNumbers.includes(block.blockNumber));
 }
 
-export async function writeBlocksToFile(
+export async function modifyFile(
   fileBlocks: Array<FileBlock>,
   filePath: string
 ) {
-  const originalContent = await readFileAsBlocks(filePath);
-
-  for (const block of fileBlocks) {
-    originalContent[block.blockNumber].content = block.content;
-  }
-
-  const newContent = originalContent.map((b) => b.content).join("\n");
-  fs.writeFileSync(filePath, newContent);
-}
-
-// Tool to scan a file from line A to line B
-export function scanFile(
-  filePath: string,
-  startLine: number,
-  endLine: number
-): string {
-  const fileContent = fs.readFileSync(filePath, "utf8");
-  const lines = fileContent.split("\n");
-  const start = Math.max(0, startLine - 5);
-  const end = Math.min(lines.length, endLine + 5);
-  return JSON.stringify(
-    lines.map((line, index) => [index + 1, line]).slice(start, end)
-  );
-}
-
-// Tool to write the full contents of a file
-export function writeFile(filePath: string, content: string): string {
   try {
-    fs.writeFileSync(filePath, content);
-    return `File ${filePath} written`;
+    const exists = fs.existsSync(filePath);
+    const originalContent = exists ? await readFile(filePath) : [];
+    const edits = {};
+
+    for (const block of fileBlocks) {
+      if (block.content.split("\n").length > BLOCK_SIZE) {
+        throw new Error(
+          `Block content cannot exceed ${BLOCK_SIZE} new line characters.`
+        );
+      }
+
+      if (!originalContent[block.blockNumber]) {
+        originalContent[block.blockNumber] = {
+          blockNumber: block.blockNumber,
+          content: "",
+          startLine: block.blockNumber * 5,
+        };
+      }
+
+      if (block.blockNumber > 0) {
+        const previousBlock = originalContent[block.blockNumber - 1];
+        if (previousBlock) {
+          edits[previousBlock.blockNumber] = previousBlock;
+        }
+      }
+
+      if (block.blockNumber < originalContent.length - 1) {
+        const nextBlock = originalContent[block.blockNumber + 1];
+        if (nextBlock) {
+          edits[nextBlock.blockNumber] = nextBlock;
+        }
+      }
+      originalContent[block.blockNumber].content = block.content;
+      edits[block.blockNumber] = originalContent[block.blockNumber];
+    }
+
+    const newContent = originalContent.map((b) => b.content).join("\n");
+    fs.writeFileSync(filePath, newContent);
+
+    const newBlocks = await readFile(filePath);
+    console.log(newBlocks);
+
+    return newBlocks;
   } catch (e) {
     return e.message;
   }
 }
+
+// Tool to scan a file from line A to line B
+/*
+ *export function scanFile(
+ *  filePath: string,
+ *  startLine: number,
+ *  endLine: number
+ *): string {
+ *  const fileContent = fs.readFileSync(filePath, "utf8");
+ *  const lines = fileContent.split("\n");
+ *  const start = Math.max(0, startLine - 5);
+ *  const end = Math.min(lines.length, endLine + 5);
+ *  return JSON.stringify(
+ *    lines.map((line, index) => [index + 1, line]).slice(start, end)
+ *  );
+ *}
+ */
+
+// Tool to write the full contents of a file
+/*
+ *export function writeFile(filePath: string, content: string): string {
+ *  try {
+ *    fs.writeFileSync(filePath, content);
+ *    return `File ${filePath} written`;
+ *  } catch (e) {
+ *    return e.message;
+ *  }
+ *}
+ */
 
 // Tool to apply a patch file to a file
 export function applyPatchFile(filePath: string, patch: string): string {

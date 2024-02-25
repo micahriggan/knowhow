@@ -137,7 +137,7 @@ export const Tools = [
   {
     type: "function",
     function: {
-      name: "readFileAsBlocks",
+      name: "readFile",
       description:
         "Read the contents of a file and return them as an array of blocks",
       parameters: {
@@ -160,7 +160,7 @@ export const Tools = [
   {
     type: "function",
     function: {
-      name: "readBlocksFromFile",
+      name: "readBlocks",
       description:
         "Read specific blocks from a file based on block numbers. Blocks are numbered blocks of text, containing a few lines of content",
       parameters: {
@@ -191,9 +191,9 @@ export const Tools = [
   {
     type: "function",
     function: {
-      name: "writeBlocksToFile",
+      name: "modifyFile",
       description:
-        "Write an array of file blocks back to the file, updating the specified blocks",
+        "Allows the AI to modify partial files by writing blocks. Blocks are numbered chunks of 5 lines of text. If you modify a block, other blocks in the file remain the same. If you want to delete a block you can write empty string to it. Only modify the minimal number of blocks. Do not push entire files into block zero, especially if there is exsiting content in the file, as this will not erase the other content",
       parameters: {
         type: "object",
         properties: {
@@ -210,7 +210,7 @@ export const Tools = [
                 content: {
                   type: "string",
                   description:
-                    "The content to be written in the block. Content may be larger than the block size, new blocks will be created as needed",
+                    "The content in the block will be overwritten with this content. Other blocks will remain unchanged",
                 },
               },
               required: ["blockNumber", "content"],
