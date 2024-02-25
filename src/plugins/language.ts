@@ -46,7 +46,8 @@ export class LanguagePlugin implements Plugin {
         if (!exists) {
           return { filePath, content: `File ${filePath} does not exist` };
         }
-        let content = (await readFile(filePath, "utf8")).toString();
+        const content = (await readFile(filePath, "utf8")).toString();
+        console.log("LANGUAGE PLUGIN: Read file", filePath);
         return { filePath, content };
       })
     );
@@ -83,11 +84,13 @@ export class LanguagePlugin implements Plugin {
     }
 
     // Return the file contents in a format that can be added to the prompt context
-    return `LANGUAGE PLUGIN: The following terms triggered expansions ${matchingTerms} expanded to: ${JSON.stringify(
+    return `LANGUAGE PLUGIN: The user mentioned these terms triggering contextual expansions ${matchingTerms} expanded to: ${JSON.stringify(
       contexts
-    )}`;
+    )}
+    These terms are directly related to what the user is asking about so be sure to contextualize your response to this information.
+    `;
   }
 }
 
 // Since this uses other plugins, it needs to be registered
-//Plugins.registerPlugin("language", new LanguagePlugin());
+// Plugins.registerPlugin("language", new LanguagePlugin());

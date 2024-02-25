@@ -15,6 +15,7 @@ import {
   searchFiles,
   visionTool,
   modifyFile,
+  lintFile,
 } from "../tools";
 import { Tools } from "../tools/list";
 
@@ -28,6 +29,7 @@ const availableFunctions = addInternalTools({
   searchFiles,
   visionTool,
   modifyFile,
+  lintFile,
 });
 
 export class CodebaseAgent {
@@ -51,7 +53,7 @@ export class CodebaseAgent {
     }
   }
 
-  getInitialMessages(user_input: string) {
+  getInitialMessages(userInput: string) {
     return [
       {
         role: "system",
@@ -59,8 +61,8 @@ export class CodebaseAgent {
           "Codebase Agent. You use the tools to read and write code, to help the developer implement features faster. Call final answer once you have finished implementing what is requested. As an agent you will receive multiple rounds of input until you call final answer. You are not able to request feedback from the user, so proceed with your plans and the developer will contact you afterwards if they need more help. After modifying files, you will read them to ensure they look correct before calling final answer. You always check your modifications for syntax errors or bugs. You always make the smallest modifications required to files, rather than outputting the entire file. You think step by step about the blocks of code you're modiyfing",
       },
 
-      { role: "user", content: user_input },
-    ] as Array<ChatCompletionMessageParam>;
+      { role: "user", content: userInput },
+    ] as ChatCompletionMessageParam[];
   }
 
   async getToolMessages(toolCall: ChatCompletionMessageToolCall) {
@@ -125,24 +127,21 @@ export class CodebaseAgent {
     return toolMessages;
   }
 
-  logMessages(messages: Array<ChatCompletionMessageParam>) {
+  logMessages(messages: ChatCompletionMessageParam[]) {
     for (const message of messages) {
-      if (message.role == "assistant") {
+      if (message.role === "assistant") {
         console.log(message.content);
       }
     }
   }
 
-  async call(
-    user_input: string,
-    _messages?: Array<ChatCompletionMessageParam>
-  ) {
+  async call(userInput: string, _messages?: ChatCompletionMessageParam[]) {
     const model = "gpt-4-turbo-preview";
-    const messages = _messages || this.getInitialMessages(user_input);
+    const messages = _messages || this.getInitialMessages(userInput);
 
     const response = await openai.chat.completions.create({
       model,
-      messages: messages,
+      messages,
       tools: this.enabledTools,
       tool_choice: "auto",
     });
@@ -157,9 +156,7 @@ export class CodebaseAgent {
       for (const toolCall of toolCalls) {
         const toolMessages = await this.getToolMessages(toolCall);
         // Add the tool responses to the thread
-        messages.push(
-          ...(toolMessages as Array<ChatCompletionToolMessageParam>)
-        );
+        messages.push(...(toolMessages as ChatCompletionToolMessageParam[]));
 
         const finalMessage = toolMessages.find((m) => m.name === "finalAnswer");
         if (finalMessage) {
@@ -170,14 +167,14 @@ export class CodebaseAgent {
       // Send the tool responses back to the model
       const secondResponse = await openai.chat.completions.create({
         model,
-        messages: messages,
+        messages,
       });
 
       const aiResp = secondResponse.choices.map((c) => c.message);
       this.logMessages(aiResp);
       messages.push(...aiResp);
 
-      return this.call(user_input, messages);
+      return this.call(userInput, messages);
     }
 
     if (responseMessage.content) {

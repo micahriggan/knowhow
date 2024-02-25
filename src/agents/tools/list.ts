@@ -247,4 +247,28 @@ export const Tools = [
       },
     },
   },
+
+  {
+    type: "function",
+    function: {
+      name: "lintFile",
+      description:
+        "Lint a file based on the file extension using predefined linting commands from the configuration.",
+      parameters: {
+        type: "object",
+        properties: {
+          filePath: {
+            type: "string",
+            description: "The path to the file to be linted.",
+          },
+        },
+        required: ["filePath"],
+      },
+      returns: {
+        type: "string",
+        description:
+          "The result of the linting process or an empty string if no lint command is configured for the file extension.",
+      },
+    },
+  },
 ] as ChatCompletionTool[];

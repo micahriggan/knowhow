@@ -112,7 +112,7 @@ export async function lintFile(filePath: string) {
   const config = await getConfig();
   const extension = filePath.split(".").pop();
   let lintResult = "";
-  if (config.lintCommands[extension]) {
+  if (config.lintCommands && config.lintCommands[extension]) {
     let lintCommand = config.lintCommands[extension];
     if (lintCommand.includes("$1")) {
       lintCommand = lintCommand.replace("$1", filePath);
@@ -179,11 +179,15 @@ export const execCommand = async (command: string): Promise<string> => {
   try {
     console.log("execCommand:", command);
     const { stdout, stderr } = await execAsync(command);
+    let output = "";
     if (stderr) {
-      return stderr;
+      output += stderr + "\n";
     }
-    return stdout;
+    output += stdout;
+    console.log(`$ ${command}:\n${output}`);
+    return output;
   } catch (e) {
+    console.log("Error executing command:", e);
     return e.message;
   }
 };
