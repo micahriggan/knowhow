@@ -188,7 +188,7 @@ export const execCommand = async (command: string): Promise<string> => {
     return output;
   } catch (e) {
     console.log("Error executing command:", e);
-    return e.message;
+    return e;
   }
 };
 
