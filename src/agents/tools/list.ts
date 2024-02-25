@@ -193,7 +193,7 @@ export const Tools = [
     function: {
       name: "modifyFile",
       description:
-        "Allows the AI to modify partial files by writing blocks. Blocks are numbered chunks of 5 lines of text. If you modify a block, other blocks in the file remain the same. If you want to delete a block you can write empty string to it. Only modify the minimal number of blocks. Do not push entire files into block zero, especially if there is exsiting content in the file, as this will not erase the other content",
+        "Breaks a file into chunks of X characters. You can modify that block, by completely replacing it with new text. Blocks that are not present in this call will be unchanged. You can assign empty string to a block to delete all the text in that section. If you assign text to a block, the previous text will be erased. If you need to append blocks, then increase the block number, but ensure you pay close attention to syntax, as the previous block may contain closing characters and you will need to delete that character from the previous block and add it to the new block",
       parameters: {
         type: "object",
         properties: {

@@ -2,6 +2,7 @@ import * as fs from "fs";
 import { readFile, writeFile } from "../../../src/utils";
 import { Developer } from "../../../src/agents/codebase/codebase";
 import { FlagsService } from "../../../src/flags";
+
 describe("Developer", () => {
   test("should be able to patch a codebase", async () => {
     const inputPath = "tests/integration/patching/input.txt";
@@ -79,10 +80,9 @@ describe("Developer", () => {
 
       newService.register(["test"]);
       expect(newService.hasFlag("test")).toEqual(true);
+      fs.unlinkSync(outputPath);
     } catch (e) {
       console.log(e);
-    } finally {
-      //fs.unlinkSync(outputPath);
     }
   });
 });

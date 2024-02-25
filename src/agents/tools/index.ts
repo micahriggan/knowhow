@@ -6,7 +6,7 @@ import { execAsync } from "../../utils";
 import { openai, askGptVision } from "../../ai";
 import { FileBlock } from "./types/fileblock";
 
-const BLOCK_SIZE = 5;
+const BLOCK_SIZE = 500;
 // Tool to search for files related to the user's goal
 export async function searchFiles(keyword: string): Promise<string> {
   return Plugins.call("embeddings", keyword);
@@ -33,18 +33,20 @@ export async function callPlugin(pluginName: string, userInput: string) {
 export async function readFile(filePath: string): Promise<Array<FileBlock>> {
   try {
     const text = fs.readFileSync(filePath, "utf8");
-    const lines = text.split("\n");
+    const lines = text.split("");
     let blocks = [] as Array<FileBlock>;
 
     let index = 0;
+    let lineCount = 0;
     while (lines.length > 0) {
-      const block = lines.splice(0, BLOCK_SIZE).join("\n");
+      const block = lines.splice(0, BLOCK_SIZE).join("");
       blocks.push({
         blockNumber: index,
         content: block,
-        startLine: index * BLOCK_SIZE,
+        startLine: lineCount,
       });
       index++;
+      lineCount += block.split("\n").length;
     }
 
     return blocks;
@@ -68,12 +70,6 @@ export async function modifyFile(
     const edits = {};
 
     for (const block of fileBlocks) {
-      if (block.content.split("\n").length > BLOCK_SIZE) {
-        throw new Error(
-          `Block content cannot exceed ${BLOCK_SIZE} new line characters.`
-        );
-      }
-
       if (!originalContent[block.blockNumber]) {
         originalContent[block.blockNumber] = {
           blockNumber: block.blockNumber,
@@ -99,13 +95,13 @@ export async function modifyFile(
       edits[block.blockNumber] = originalContent[block.blockNumber];
     }
 
-    const newContent = originalContent.map((b) => b.content).join("\n");
+    const newContent = originalContent.map((b) => b.content).join("");
     fs.writeFileSync(filePath, newContent);
 
     const newBlocks = await readFile(filePath);
     console.log(newBlocks);
 
-    return newBlocks;
+    return `File ${filePath} modified, use readFile to verify`;
   } catch (e) {
     return e.message;
   }

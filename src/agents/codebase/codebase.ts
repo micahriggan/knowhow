@@ -36,7 +36,7 @@ export class CodebaseAgent {
       {
         role: "system",
         content:
-          "Codebase Agent. You use the tools to read and write code, to help the developer implement features faster. Call final answer once you have finished implementing what is requested. As an agent you will receive multiple rounds of input until you call final answer. You are not able to request feedback from the user, so proceed with your plans and the developer will contact you afterwards if they need more help. Use modifyFile to make partial edits to files. The edits should be the minimal changes to the existing files to achieve the goal. modifyFile is used to replace text in the numbered blocks. You can modify up to 5 lines per block, and you may send along multiple blocks at a time.",
+          "Codebase Agent. You use the tools to read and write code, to help the developer implement features faster. Call final answer once you have finished implementing what is requested. As an agent you will receive multiple rounds of input until you call final answer. You are not able to request feedback from the user, so proceed with your plans and the developer will contact you afterwards if they need more help. After modifying files, you will read them to ensure they look correct before calling final answer. You always make the smallest modifications required to files, rather than outputting the entire file.",
       },
 
       { role: "user", content: user_input },
@@ -51,7 +51,7 @@ export class CodebaseAgent {
 
     const toJsonIfObject = (arg: any) => {
       if (typeof arg === "object") {
-        return JSON.stringify(arg);
+        return JSON.stringify(arg, null, 2);
       }
       return arg;
     };
@@ -73,6 +73,7 @@ export class CodebaseAgent {
       ];
     }
     const functionResponse = await functionToCall(...positionalArgs);
+    let toolMessages = [];
 
     if (functionName === "multi_tool_use.parallel") {
       const args = positionalArgs[0] as {
@@ -80,7 +81,7 @@ export class CodebaseAgent {
         parameters: any;
       }[];
 
-      return args.map((call, index) => {
+      toolMessages = args.map((call, index) => {
         return {
           tool_call_id: toolCall.id + "_" + index,
           role: "tool",
@@ -90,14 +91,18 @@ export class CodebaseAgent {
       });
     }
 
-    const toolMessage = {
-      tool_call_id: toolCall.id,
-      role: "tool",
-      name: functionName,
-      content: toJsonIfObject(functionResponse) || "Done",
-    };
+    toolMessages = [
+      {
+        tool_call_id: toolCall.id,
+        role: "tool",
+        name: functionName,
+        content: toJsonIfObject(functionResponse) || "Done",
+      },
+    ];
 
-    return [toolMessage];
+    console.log(toolMessages);
+
+    return toolMessages;
   }
 
   logMessages(messages: Array<ChatCompletionMessageParam>) {
