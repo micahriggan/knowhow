@@ -67,6 +67,7 @@ export async function modifyFile(fileBlocks: FileBlock[], filePath: string) {
     const contentToUpdate = exists ? await readFile(filePath) : [];
     const edits = {};
     const before = [...contentToUpdate];
+    const beforeContent = before.map((b) => b.content).join("");
 
     for (const block of fileBlocks) {
       if (!contentToUpdate[block.blockNumber]) {
@@ -81,10 +82,7 @@ export async function modifyFile(fileBlocks: FileBlock[], filePath: string) {
     }
 
     const newContent = contentToUpdate.map((b) => b.content).join("");
-    const beforeContent = before.map((b) => b.content).join("");
-
     fs.writeFileSync(filePath, newContent);
-
     const newBlocks = await readFile(filePath);
 
     console.log("====BEFORE====");
@@ -97,11 +95,8 @@ export async function modifyFile(fileBlocks: FileBlock[], filePath: string) {
     const lintResult = await lintFile(filePath);
 
     return `
-    Before your changes, the text was:
-    ${beforeContent}
-
-    After your changes the text is:
-    ${newContent}
+    Your changes generated this diff:
+    ${createPatch(filePath, beforeContent, newContent)}
 
     ${lintResult && "Linting Result"}
     ${lintResult || ""}

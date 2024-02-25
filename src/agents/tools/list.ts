@@ -225,4 +225,26 @@ export const Tools = [
       },
     },
   },
-] as Array<ChatCompletionTool>;
+  {
+    type: "function",
+    function: {
+      name: "applyPatchFile",
+      description:
+        "Apply a patch file to a file. Use this to modify files without specifying full file contents. This uses the diff npm package. Use this only if you are having trouble with modifyFile",
+      parameters: {
+        type: "object",
+        properties: {
+          filePath: {
+            type: "string",
+            description: "The path to the file to be patched",
+          },
+          patch: {
+            type: "string",
+            description: "The patch to apply",
+          },
+        },
+        required: ["filePath", "patch"],
+      },
+    },
+  },
+] as ChatCompletionTool[];
