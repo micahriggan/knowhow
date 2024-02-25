@@ -7,14 +7,16 @@ export type Hashes = {
 export type Config = {
   openaiBaseUrl?: string;
   promptsDir: string;
-  sources: Array<{
+  lintCommands?: { [fileExtension: string]: string };
+
+  sources: {
     input: string;
     output: string;
     prompt: string;
     kind?: string;
-  }>;
+  }[];
 
-  embedSources: Array<{
+  embedSources: {
     input: string;
     output: string;
     prompt?: string;
@@ -22,16 +24,11 @@ export type Config = {
     uploadMode?: boolean;
     chunkSize?: number;
     minLength?: number;
-  }>;
+  }[];
 
-  embedJsonSources: Array<{
-    input: string;
-    output: string;
-    prompt?: string;
-  }>;
-  plugins: Array<string>;
+  plugins: string[];
 
-  assistants: Array<Assistant>;
+  assistants: Assistant[];
 };
 
 export type Assistant = {
@@ -40,8 +37,8 @@ export type Assistant = {
   description?: string;
   instructions: string;
   model: string;
-  tools: Array<{ type: "code_interpreter" | "retrieval" }>;
-  files: Array<string>;
+  tools: { type: "code_interpreter" | "retrieval" }[];
+  files: string[];
 };
 
 export type AssistantConfig = {
@@ -51,7 +48,7 @@ export type AssistantConfig = {
 export interface Embeddable<T = any> {
   id: string;
   text: string;
-  vector: Array<number>;
+  vector: number[];
   metadata: T;
 }
 
@@ -70,12 +67,12 @@ export type DatasourceType = "file" | "url" | "text";
 
 export interface IDatasource {
   kind: string;
-  data: Array<string>;
+  data: string[];
 }
 
 export type Language = {
   [term: string]: {
-    sources: Array<IDatasource>;
+    sources: IDatasource[];
     context?: string;
   };
 };

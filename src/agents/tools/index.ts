@@ -5,6 +5,7 @@ import { Plugins } from "../../plugins/plugins";
 import { execAsync } from "../../utils";
 import { openai, askGptVision } from "../../ai";
 import { FileBlock } from "./types/fileblock";
+import { getConfig } from "../../config";
 
 const BLOCK_SIZE = 500;
 // Tool to search for files related to the user's goal
@@ -30,11 +31,11 @@ export async function callPlugin(pluginName: string, userInput: string) {
  *}
  */
 
-export async function readFile(filePath: string): Promise<Array<FileBlock>> {
+export async function readFile(filePath: string): Promise<FileBlock[]> {
   try {
     const text = fs.readFileSync(filePath, "utf8");
     const lines = text.split("");
-    let blocks = [] as Array<FileBlock>;
+    const blocks = [] as FileBlock[];
 
     let index = 0;
     let lineCount = 0;
@@ -60,10 +61,7 @@ export async function readBlocks(filePath: string, blockNumbers: number[]) {
   return fileBlocks.filter((block) => blockNumbers.includes(block.blockNumber));
 }
 
-export async function modifyFile(
-  fileBlocks: Array<FileBlock>,
-  filePath: string
-) {
+export async function modifyFile(fileBlocks: FileBlock[], filePath: string) {
   try {
     const exists = fs.existsSync(filePath);
     const contentToUpdate = exists ? await readFile(filePath) : [];
@@ -94,6 +92,10 @@ export async function modifyFile(
     console.log("====AFTER====");
     console.log(newContent);
 
+    const config = await getConfig();
+    const extension = filePath.split(".").pop();
+    const lintResult = await lintFile(filePath);
+
     return `
     Before your changes, the text was:
     ${beforeContent}
@@ -101,11 +103,30 @@ export async function modifyFile(
     After your changes the text is:
     ${newContent}
 
+    ${lintResult && "Linting Result"}
+    ${lintResult || ""}
+
     Are you sure that was correct? .
     `;
   } catch (e) {
     return e.message;
   }
+}
+
+export async function lintFile(filePath: string) {
+  const config = await getConfig();
+  const extension = filePath.split(".").pop();
+  let lintResult = "";
+  if (config.lintCommands[extension]) {
+    let lintCommand = config.lintCommands[extension];
+    if (lintCommand.includes("$1")) {
+      lintCommand = lintCommand.replace("$1", filePath);
+    }
+    lintResult = await execCommand(`${lintCommand}`);
+    console.log("Lint Result:", lintResult);
+    return lintResult;
+  }
+  return "";
 }
 
 // Tool to scan a file from line A to line B
@@ -178,9 +199,11 @@ export function finalAnswer(answer: string): string {
 }
 
 // Add new internal tools to the existing suite
-export function addInternalTools(fns: { [fnName: string]: Function }) {
+export function addInternalTools(fns: {
+  [fnName: string]: (...args: any) => any;
+}) {
   const callParallel = (
-    fnsToCall: Array<{ recipient_name: string; parameters: any }>
+    fnsToCall: { recipient_name: string; parameters: any }[]
   ) => {
     const promises = fnsToCall.map((param) => {
       const name = param.recipient_name.split(".").pop();

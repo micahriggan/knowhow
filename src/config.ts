@@ -30,6 +30,10 @@ export async function init() {
       "download",
       "figma",
     ],
+    lintCommands: {
+      js: "eslint",
+      ts: "tslint",
+    },
     sources: [
       {
         input: "src/**/*.mdx",
