@@ -8,6 +8,8 @@
     "test": "jest --detectOpenHandles --forceExit --testTimeout 300000",
     "compile": "tsc",
     "start": "npm run compile && node ts_build/src/index.js",
+    "dataset:diffs:generate": "ts-node src/dataset/diffs/generate.ts",
+    "dataset:diffs:jsonl": "ts-node src/dataset/diffs/jsonl.ts",
     "lint": "tslint"
   },
   "keywords": [],
@@ -48,6 +50,7 @@
     "parse-diff": "^0.11.1",
     "progress-estimator": "^0.3.1",
     "puppeteer": "^19.11.1",
+    "source-map-support": "^0.5.21",
     "typescript": "^4.6.3",
     "youtube-dl-exec": "^2.5.5"
   }

@@ -190,47 +190,9 @@ export const Tools = [
   {
     type: "function",
     function: {
-      name: "modifyFile",
+      name: "patchFile",
       description:
-        "Modifications to a block must include all the pre-existing text from that block, unless you wish to delete the text that is being omitted. Make sure not to delete content that you want to keep. If you modify block 0 and add content, block 1 will remain unchanged. If you wish to write an entire file in block 0, make sure you set the other blocks to empty string. You should expect to interact with multiple blocks in one call to create the correct modifications. Try to make the smallest changes without rewriting the entire file if possible. Pay close attention to the diffs returned to ensure you've modified the file correctly, and double check your work with readFile afterwards. If you are having trouble, use applyPatchFile instead",
-      parameters: {
-        type: "object",
-        properties: {
-          fileBlocks: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                blockNumber: {
-                  type: "number",
-                  description:
-                    "The block number that identifies the position of the block in the file",
-                },
-                content: {
-                  type: "string",
-                  description:
-                    "The content in the block will be overwritten with this content. Other blocks will remain unchanged",
-                },
-              },
-              required: ["blockNumber", "content"],
-            },
-            description: "An array of file blocks to be written to the file",
-          },
-          filePath: {
-            type: "string",
-            description: "The path to the file to be written to",
-          },
-        },
-        required: ["fileBlocks", "filePath"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "applyPatchFile",
-      description:
-        "Apply a patch file to a file. Use this to modify files without specifying full file contents. This uses the diff npm package. Use this only if you are having trouble with modifyFile",
+        "Modify file with patch. Always check your work after applying a patch to ensure the patch did what you expected. Make sure that your patch file is maintaining proper syntax. It is very important that your patch lines match the exact lines in the file you are patching.",
       parameters: {
         type: "object",
         properties: {
@@ -240,7 +202,7 @@ export const Tools = [
           },
           patch: {
             type: "string",
-            description: "The patch to apply",
+            description: "The patch to apply in unified diff format",
           },
         },
         required: ["filePath", "patch"],

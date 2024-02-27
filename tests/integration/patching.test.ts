@@ -1,7 +1,7 @@
 import { Developer } from "../../src/agents/codebase/codebase";
 import { readFile, writeFile } from "../../src/utils";
 import { createPatch, applyPatch } from "diff";
-import { scanFile, applyPatchFile } from "../../src/agents/tools";
+import { scanFile, patchFile } from "../../src/agents/tools";
 
 const inputPath = "tests/integration/patching/input.txt";
 const outputPath = "tests/integration/patching/output.txt";
