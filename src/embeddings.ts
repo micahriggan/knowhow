@@ -12,9 +12,9 @@ import {
 import { summarizeTexts, openai, chunkText } from "./ai";
 import { Plugins } from "./plugins/plugins";
 
-export async function loadEmbedding(path: string) {
-  if (await fileExists(path)) {
-    return JSON.parse(await readFile(path, "utf8")) as Embeddable[];
+export async function loadEmbedding(filePath: string) {
+  if (await fileExists(filePath)) {
+    return JSON.parse(await readFile(filePath, "utf8")) as Embeddable[];
   }
   return [];
 }
@@ -81,7 +81,7 @@ export async function embed(
   chunkSize?: number,
   uploadMode?: boolean,
   minLength?: number
-): Promise<Array<string>> {
+): Promise<string[]> {
   let chunks = [text];
 
   if (chunkSize) {
@@ -102,42 +102,45 @@ export async function embed(
   const updates = new Array<string>();
   for (let index = 0; index < chunks.length; index++) {
     const chunkId = getChunkId(id, index, chunkSize);
-    let chunkText = chunks[index];
+    let textOfChunk = chunks[index];
 
-    const tooShort = minLength && chunkText.length < minLength;
+    const tooShort = minLength && textOfChunk.length < minLength;
     if (tooShort) {
       console.log("Skipping (too short)", chunkId);
       continue;
     }
 
     dontPrune.push(chunkId);
-    if (embeddings.find((e) => e.id === chunkId && e.text === chunkText)) {
+    const alreadyEmbedded = embeddings.find(
+      (e) => e.id === chunkId && e.text === textOfChunk
+    );
+    if (alreadyEmbedded) {
       console.log("Skipping", chunkId);
       continue;
     }
 
     if (prompt) {
-      console.log("Summarizing", chunkText);
-      chunkText = await summarizeTexts([chunkText], prompt);
+      console.log("Summarizing", textOfChunk);
+      textOfChunk = await summarizeTexts([textOfChunk], prompt);
     }
 
     let vector = [];
     if (!uploadMode) {
       console.log("Embedding", chunkId);
-      const queryEmbedding = await openai.embeddings.create({
-        input: chunkText,
+      const openAiEmbedding = await openai.embeddings.create({
+        input: textOfChunk,
         model: "text-embedding-ada-002",
       });
-      vector = queryEmbedding.data[0].embedding;
+      vector = openAiEmbedding.data[0].embedding;
     }
 
     const embeddable: Embeddable = {
       id: chunkId,
-      text: chunkText,
+      text: textOfChunk,
       vector,
       metadata: {
         ...metadata,
-        text: chunkText,
+        ...(prompt && { text: chunkText }),
       },
     };
 
@@ -156,10 +159,12 @@ export async function isEmbeddingFile(inputFile: string) {
     await readFile(inputFile, "utf8")
   ) as Embeddable[];
 
-  return (
+  const isEmbedding =
     Array.isArray(sourceJson) &&
-    sourceJson.every((e) => e.id && e.text && e.metadata)
-  );
+    sourceJson.every((e) => e.id && e.text && e.metadata);
+
+  console.log(`Checking file ${inputFile} for embeddings: ${isEmbedding}`);
+  return isEmbedding;
 }
 
 export async function embedJson(
@@ -174,27 +179,44 @@ export async function embedJson(
   ) as Embeddable[];
 
   const embeddings: Embeddable[] = await loadEmbedding(output);
+  let updates = [];
+  let batch = [];
 
   for (const row of sourceJson) {
     if (embeddings.find((e) => e.id === row.id)) {
       continue;
     }
 
-    await embed(
-      row.id,
-      row.text,
-      row.metadata,
-      embeddings,
-      prompt,
-      chunkSize,
-      uploadMode,
-      source.minLength
+    console.log("Embedding", row.id);
+    batch.push(
+      embed(
+        row.id,
+        row.text,
+        row.metadata,
+        embeddings,
+        prompt,
+        chunkSize,
+        uploadMode,
+        source.minLength
+      )
     );
 
-    const fileString =
-      "[" + embeddings.map((e) => JSON.stringify(e)).join(",") + "]";
-    await writeFile(output, fileString);
+    let embedded = [];
+    if (batch.length > 20) {
+      embedded = (await Promise.all(batch)).flat();
+      batch = [];
+    }
+    updates.push(...embedded);
+
+    if (updates.length > 20) {
+      await saveEmbedding(output, embeddings);
+      updates = [];
+    }
   }
+
+  // save in case we missed some
+  await Promise.all(batch);
+  await saveEmbedding(output, embeddings);
 }
 
 export async function embedKind(
@@ -211,6 +233,7 @@ export async function embedKind(
   }
 
   if (id.endsWith(".json") && (await isEmbeddingFile(id))) {
+    console.log("Embedding JSON", id);
     return embedJson(id, source);
   }
 
@@ -218,9 +241,9 @@ export async function embedKind(
 
   const updates = [];
   for (const row of toEmbed) {
-    const { id, text, metadata } = row;
+    const { id: rowId, text, metadata } = row;
     const embedded = await embed(
-      id,
+      rowId,
       text,
       metadata,
       embeddings,
@@ -254,8 +277,8 @@ export async function handleAllKinds(
   source: Config["embedSources"][0]
 ): Promise<Partial<Embeddable>[]> {
   const { input, kind } = source;
-  let contents = "";
-  let ids = [];
+  const contents = "";
+  const ids = [];
 
   if (Plugins.isPlugin(kind)) {
     return Plugins.embed(kind, input);
@@ -279,7 +302,7 @@ export function pruneEmbedding(
   embeddings: Embeddable[]
 ) {
   const relatedChunks = embeddings.filter((e) => e.id.startsWith(id));
-  for (let chunk of relatedChunks) {
+  for (const chunk of relatedChunks) {
     if (!chunkIds.includes(chunk.id)) {
       console.log("Removing", chunk.id);
       const index = embeddings.findIndex((e) => e.id === chunk.id);
@@ -291,13 +314,13 @@ export function pruneEmbedding(
 
 export async function queryEmbedding<E>(
   query: string,
-  embeddings: Array<Embeddable<E>>
+  embeddings: Embeddable<E>[]
 ) {
-  const queryEmbedding = await openai.embeddings.create({
+  const openAiEmbedding = await openai.embeddings.create({
     input: query,
     model: "text-embedding-ada-002",
   });
-  const queryVector = queryEmbedding.data[0].embedding;
+  const queryVector = openAiEmbedding.data[0].embedding;
   const results = new Array<EmbeddingBase<E>>();
   for (const embedding of embeddings) {
     const similarity = cosineSimilarity(embedding.vector, queryVector);
