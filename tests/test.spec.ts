@@ -9,11 +9,11 @@ import {
   readFile,
   scanFile,
   modifyFile,
-  patchFile,
   execCommand,
   writeFile,
 } from "../src/agents/tools";
 import { Plugins } from "../src/plugins/plugins";
+import { patchFile } from "../src/agents/tools/patch";
 
 const mockFs = jest.mocked(fs);
 

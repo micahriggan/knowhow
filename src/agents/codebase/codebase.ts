@@ -6,7 +6,6 @@ import {
 import { openai } from "../../ai";
 import {
   addInternalTools,
-  patchFile,
   callPlugin,
   execCommand,
   finalAnswer,
@@ -17,6 +16,7 @@ import {
   lintFile,
 } from "../tools";
 import { Tools } from "../tools/list";
+import { patchFile } from "../tools/patch";
 
 const availableFunctions = addInternalTools({
   patchFile,

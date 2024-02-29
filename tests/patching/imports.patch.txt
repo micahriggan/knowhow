@@ -1,0 +1,11 @@
+@@ -5,7 +6,7 @@
+ import React from 'react';
+ import { Col, Row } from 'react-bootstrap';
+
+-import { NameValueRow, NameValueRowWithBottomBorder } from '~/components/NameValueRow';
++import { NameValueRow } from '~/components/NameValueRow';
+ import { BOTTOM_BORDER_CONTAINER_STYLE } from '~/components/NameValueRow/NameValueRowWithBottomBorder';
+ import { NotesPopoverWrapper } from '~/components/Notes';
+ import { TokenAgreementRowAssetUnion, UpdateTokenAgreement, UpdateTokenAgreementVariables } from '~/generated/schema';
+
+
