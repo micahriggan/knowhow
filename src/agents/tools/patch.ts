@@ -161,9 +161,15 @@ export function fixHunkHeader(hunk: Hunk, originalContent: string) {
       firstLineNumberUnderHeader + hunk.firstSubtractionLine
     );
     hunk.headerStart = firstLineNumberUnderHeader;
-    hunk.header = `@@ -${hunk.headerStart + hunk.firstSubtractionLine},${
-      hunk.headerLength
-    } +${hunk.headerStart + hunk.firstAdditionLine},${hunk.headerLength} @@`;
+
+    const removalStart =
+      hunk.subtractions.length > 0
+        ? hunk.headerStart + hunk.firstSubtractionLine
+        : 0;
+    const additionStart =
+      hunk.additions.length > 0 ? hunk.headerStart + hunk.firstAdditionLine : 0;
+
+    hunk.header = `@@ -${removalStart},${hunk.headerLength} +${additionStart},${hunk.headerLength} @@`;
     console.log(hunk);
   }
   return hunk;
@@ -210,6 +216,9 @@ export async function patchFile(
 ): Promise<string> {
   const compareErrors = [];
   try {
+    if (!fs.existsSync(filePath)) {
+      fs.writeFileSync(filePath, "");
+    }
     const originalContent = fs.readFileSync(filePath, "utf8");
     patch = fixPatch(originalContent, patch);
 
