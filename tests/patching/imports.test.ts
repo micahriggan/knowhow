@@ -13,8 +13,8 @@ describe("fixPatch", () => {
     console.log(hunks);
     expect(hunks.length).toBe(1);
 
-    expect(hunks[0].firstAdditionLine).toBe(3);
-    expect(hunks[0].firstSubtractionLine).toBe(3);
+    expect(hunks[0].firstAdditionLineIndex).toBe(3);
+    expect(hunks[0].firstSubtractionLineIndex).toBe(3);
 
     const fixedPatch = await fixPatch(originalContent, patch);
     console.log(fixedPatch);

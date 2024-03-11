@@ -35,8 +35,8 @@ export interface Hunk {
   header: string;
   headerStart: number;
   headerLength: number;
-  firstAdditionLine: number;
-  firstSubtractionLine: number;
+  firstAdditionLineIndex: number;
+  firstSubtractionLineIndex: number;
   lines: string[];
   subtractions: string[];
   additions: string[];
@@ -56,14 +56,14 @@ export function parseHunks(patch: string) {
     const nextHeaderIndex = headerIndexes[i + 1];
     const lines = patchLines.slice(headerIndexes[i] + 1, nextHeaderIndex);
 
-    const firstAdditionLine = Math.min(
+    const firstAdditionLineIndex = Math.min(
       lines
         .filter((l) => !l.trim().startsWith("-"))
         .findIndex((l) => l.trim().startsWith("+")),
       0
     );
 
-    const firstSubtractionLine = Math.min(
+    const firstSubtractionLineIndex = Math.min(
       lines
         .filter((l) => !l.trim().startsWith("+"))
         .findIndex((l) => l.trim().startsWith("-")),
@@ -81,8 +81,8 @@ export function parseHunks(patch: string) {
       header,
       headerStart: Math.abs(Number(start)),
       headerLength: Number(length),
-      firstAdditionLine,
-      firstSubtractionLine,
+      firstAdditionLineIndex,
+      firstSubtractionLineIndex,
       lines,
       additions,
       subtractions,
@@ -102,6 +102,10 @@ export function hunksToPatch(hunks: Hunk[]) {
 }
 
 export function findFirstLineNumber(hunk: Hunk, originalContent: string) {
+  if (!originalContent) {
+    return 1;
+  }
+
   let offset = 0;
   let patchContent = hunk.lines[offset];
 
@@ -111,7 +115,9 @@ export function findFirstLineNumber(hunk: Hunk, originalContent: string) {
   while (altLineNumbers.length !== 1 && offset < hunk.lines.length - 1) {
     offset++;
     patchContent = hunk.lines[offset];
-    altLineNumbers = findAllLineNumbers(originalContent, patchContent);
+    if (patchContent) {
+      altLineNumbers = findAllLineNumbers(originalContent, patchContent);
+    }
   }
 
   console.log("found unique line", patchContent, "on index", offset);
@@ -170,16 +176,16 @@ export function fixHunkHeader(hunk: Hunk, originalContent: string) {
       "changing hunk header start from ",
       hunk.headerStart,
       "to",
-      firstLineNumberUnderHeader + hunk.firstSubtractionLine
+      firstLineNumberUnderHeader + hunk.firstSubtractionLineIndex
     );
     hunk.headerStart = firstLineNumberUnderHeader;
 
     const removalStart =
       hunk.subtractions.length > 0
-        ? hunk.headerStart + hunk.firstSubtractionLine
+        ? hunk.headerStart + hunk.firstSubtractionLineIndex
         : 0;
     const additionStart =
-      hunk.additions.length > 0 ? hunk.headerStart + hunk.firstAdditionLine : 0;
+      hunk.additions.length > 0 ? hunk.headerStart + hunk.firstAdditionLineIndex : 0;
 
     const removalCount = hunk.subtractions.length + hunk.contextLines.length;
     const additionCount = hunk.additions.length + hunk.contextLines.length;
