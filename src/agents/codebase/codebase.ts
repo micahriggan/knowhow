@@ -67,7 +67,6 @@ export class CodebaseAgent {
     const functionName = toolCall.function.name;
     const functionToCall = availableFunctions[functionName];
     const functionArgs = JSON.parse(toolCall.function.arguments);
-    const positionalArgs = Object.values(functionArgs);
 
     const toJsonIfObject = (arg: any) => {
       if (typeof arg === "object") {
@@ -75,6 +74,10 @@ export class CodebaseAgent {
       }
       return arg;
     };
+
+    const toolDefinition = Tools.find((t) => t.function.name === functionName);
+    const properties = toolDefinition?.function?.parameters?.properties || {};
+    const positionalArgs = Object.keys(properties).map((p) => functionArgs[p]);
 
     console.log(
       `Calling function ${functionName} with args:`,

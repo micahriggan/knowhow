@@ -40,6 +40,7 @@ export interface Hunk {
   lines: string[];
   subtractions: string[];
   additions: string[];
+  contextLines: string[];
 }
 
 export function parseHunks(patch: string) {
@@ -55,13 +56,23 @@ export function parseHunks(patch: string) {
     const nextHeaderIndex = headerIndexes[i + 1];
     const lines = patchLines.slice(headerIndexes[i] + 1, nextHeaderIndex);
 
-    const firstAdditionLine = lines
-      .filter((l) => !l.trim().startsWith("-"))
-      .findIndex((l) => l.trim().startsWith("+"));
+    const firstAdditionLine = Math.min(
+      lines
+        .filter((l) => !l.trim().startsWith("-"))
+        .findIndex((l) => l.trim().startsWith("+")),
+      0
+    );
 
-    const firstSubtractionLine = lines
-      .filter((l) => !l.trim().startsWith("+"))
-      .findIndex((l) => l.trim().startsWith("-"));
+    const firstSubtractionLine = Math.min(
+      lines
+        .filter((l) => !l.trim().startsWith("+"))
+        .findIndex((l) => l.trim().startsWith("-")),
+      0
+    );
+
+    const contextLines = lines.filter(
+      (l) => !l.trim().startsWith("+") && !l.trim().startsWith("-")
+    );
 
     const additions = lines.filter((l) => l.trim().startsWith("+"));
 
@@ -75,6 +86,7 @@ export function parseHunks(patch: string) {
       lines,
       additions,
       subtractions,
+      contextLines,
     });
   }
 
@@ -169,7 +181,9 @@ export function fixHunkHeader(hunk: Hunk, originalContent: string) {
     const additionStart =
       hunk.additions.length > 0 ? hunk.headerStart + hunk.firstAdditionLine : 0;
 
-    hunk.header = `@@ -${removalStart},${hunk.headerLength} +${additionStart},${hunk.headerLength} @@`;
+    const removalCount = hunk.subtractions.length + hunk.contextLines.length;
+    const additionCount = hunk.additions.length + hunk.contextLines.length;
+    hunk.header = `@@ -${removalStart},${removalCount} +${additionStart},${additionCount} @@`;
     console.log(hunk);
   }
   return hunk;
