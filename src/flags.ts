@@ -2,12 +2,12 @@ export class FlagsService {
   flags = {};
   log = false;
 
-  constructor(flags: Array<string> = [], log = false) {
+  constructor(flags: string[] = [], log = false) {
     this.register(flags);
     this.log = log;
   }
 
-  register(flags: Array<string>) {
+  register(flags: string[]) {
     flags.forEach((flag) => {
       this.flags[flag] = false;
     });
@@ -30,7 +30,7 @@ export class FlagsService {
     this.log = false;
   }
 
-  enabled(flag: string) {
+  enabled(flag: string): boolean {
     return this.flags[flag];
   }
 }

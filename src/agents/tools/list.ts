@@ -192,7 +192,7 @@ export const Tools = [
     function: {
       name: "patchFile",
       description:
-        "Modify file with patch. Always check your work after applying a patch to ensure the patch did what you expected. Think step by step while constructing the patch, of which lines your will add and remove. Make sure that your patch is maintaining proper syntax. Do not modify lines unrelated to the goal.",
+        "Modify file with patch. Always check your work after applying a patch to ensure the patch did what you expected. Think step by step while constructing the patch, of which lines your will add and remove. Make sure that your patch is maintaining proper syntax. Do not modify lines unrelated to the goal. Patches should contain at least 3 lines of context before and after changes, which should match source exactly",
       parameters: {
         type: "object",
         properties: {

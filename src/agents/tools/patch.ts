@@ -56,14 +56,14 @@ export function parseHunks(patch: string) {
     const nextHeaderIndex = headerIndexes[i + 1];
     const lines = patchLines.slice(headerIndexes[i] + 1, nextHeaderIndex);
 
-    const firstAdditionLineIndex = Math.min(
+    const firstAdditionLineIndex = Math.max(
       lines
         .filter((l) => !l.trim().startsWith("-"))
         .findIndex((l) => l.trim().startsWith("+")),
       0
     );
 
-    const firstSubtractionLineIndex = Math.min(
+    const firstSubtractionLineIndex = Math.max(
       lines
         .filter((l) => !l.trim().startsWith("+"))
         .findIndex((l) => l.trim().startsWith("-")),
@@ -106,6 +106,7 @@ export function findFirstLineNumber(hunk: Hunk, originalContent: string) {
     return 1;
   }
 
+  let index = 0;
   let offset = 0;
   let patchContent = hunk.lines[offset];
 
@@ -113,14 +114,25 @@ export function findFirstLineNumber(hunk: Hunk, originalContent: string) {
   // Find the next unique line number, and then use that to find the real line number
   // unique means altLineNumbers is 1
   while (altLineNumbers.length !== 1 && offset < hunk.lines.length - 1) {
-    offset++;
-    patchContent = hunk.lines[offset];
+    index++;
+    patchContent = hunk.lines[index];
     if (patchContent) {
       altLineNumbers = findAllLineNumbers(originalContent, patchContent);
+      if (patchContent.startsWith("-") || patchContent.startsWith(" ")) {
+        // the only time we want to increment offset is when a line is in the source file, IE subtraction or context
+        offset++;
+      }
     }
   }
 
-  console.log("found unique line", patchContent, "on index", offset);
+  console.log(
+    "found unique line",
+    patchContent,
+    "at index",
+    index,
+    "with offset",
+    offset
+  );
   console.log("found line numbers for unique line", altLineNumbers);
 
   const firstLineNumberUnderHeader =
@@ -176,7 +188,7 @@ export function fixHunkHeader(hunk: Hunk, originalContent: string) {
       "changing hunk header start from ",
       hunk.headerStart,
       "to",
-      firstLineNumberUnderHeader + hunk.firstSubtractionLineIndex
+      firstLineNumberUnderHeader
     );
     hunk.headerStart = firstLineNumberUnderHeader;
 
@@ -185,7 +197,9 @@ export function fixHunkHeader(hunk: Hunk, originalContent: string) {
         ? hunk.headerStart + hunk.firstSubtractionLineIndex
         : 0;
     const additionStart =
-      hunk.additions.length > 0 ? hunk.headerStart + hunk.firstAdditionLineIndex : 0;
+      hunk.additions.length > 0
+        ? hunk.headerStart + hunk.firstAdditionLineIndex
+        : 0;
 
     const removalCount = hunk.subtractions.length + hunk.contextLines.length;
     const additionCount = hunk.additions.length + hunk.contextLines.length;
@@ -227,6 +241,10 @@ export function fixPatch(originalContent: string, patch: string) {
   );
 
   return hunksToPatch(fixedHunks);
+}
+
+function compareLine(lineNumber, line, operation, patchContent) {
+  return line.trim() === patchContent.trim();
 }
 
 // Tool to apply a patch file to a file
