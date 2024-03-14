@@ -113,7 +113,7 @@ export function findFirstLineNumber(hunk: Hunk, originalContent: string) {
   let altLineNumbers = findAllLineNumbers(originalContent, patchContent);
   // Find the next unique line number, and then use that to find the real line number
   // unique means altLineNumbers is 1
-  while (altLineNumbers.length !== 1 && offset < hunk.lines.length - 1) {
+  while (altLineNumbers.length !== 1 && index < hunk.lines.length - 1) {
     index++;
     patchContent = hunk.lines[index];
     if (patchContent) {
