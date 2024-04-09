@@ -190,47 +190,9 @@ export const Tools = [
   {
     type: "function",
     function: {
-      name: "modifyFile",
+      name: "patchFile",
       description:
-        "Breaks a file into chunks of X characters. You can modify that block, by completely replacing it with new text. Make modifications step by step by thinking about the blocks that are being replaced. DO NOT EXCLUDE ANY TEXT FROM A BLOCK UNLESS YOU WANT TO DELETE IT. MODIFICATIONS WILL ERASE EXISTING TEXT IF YOU DONT INCLUDE IT IN YOUR UPDATE AS WELL. Only blocks with number as specified in this call will be modified. You can assign empty string to a block to delete all the text in that section. If you assign text to a block, the previous text will be erased. If you need to append blocks, then increase the block number, but ensure you pay close attention to syntax, as the previous block may contain closing characters and you will need to delete that character from the previous block and add it to the new block. Also pay close attention to the existing methods, as you may accidentally replace methods with new methods.",
-      parameters: {
-        type: "object",
-        properties: {
-          fileBlocks: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                blockNumber: {
-                  type: "number",
-                  description:
-                    "The block number that identifies the position of the block in the file",
-                },
-                content: {
-                  type: "string",
-                  description:
-                    "The content in the block will be overwritten with this content. Other blocks will remain unchanged",
-                },
-              },
-              required: ["blockNumber", "content"],
-            },
-            description: "An array of file blocks to be written to the file",
-          },
-          filePath: {
-            type: "string",
-            description: "The path to the file to be written to",
-          },
-        },
-        required: ["fileBlocks", "filePath"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "applyPatchFile",
-      description:
-        "Apply a patch file to a file. Use this to modify files without specifying full file contents. This uses the diff npm package. Use this only if you are having trouble with modifyFile",
+        "Modify file with patch. Always check your work after applying a patch to ensure the patch did what you expected. Think step by step while constructing the patch, of which lines your will add and remove. Make sure that your patch is maintaining proper syntax. Do not modify lines unrelated to the goal. Patches should contain at least 3 lines of context before and after changes, which should match source exactly",
       parameters: {
         type: "object",
         properties: {
@@ -240,7 +202,7 @@ export const Tools = [
           },
           patch: {
             type: "string",
-            description: "The patch to apply",
+            description: "The patch to apply in unified diff format",
           },
         },
         required: ["filePath", "patch"],

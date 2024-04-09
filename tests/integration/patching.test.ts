@@ -1,7 +1,8 @@
 import { Developer } from "../../src/agents/codebase/codebase";
 import { readFile, writeFile } from "../../src/utils";
 import { createPatch, applyPatch } from "diff";
-import { scanFile, applyPatchFile } from "../../src/agents/tools";
+import { scanFile } from "../../src/agents/tools";
+import { patchFile } from "../../src/agents/tools/patch";
 
 const inputPath = "tests/integration/patching/input.txt";
 const outputPath = "tests/integration/patching/output.txt";
@@ -64,7 +65,7 @@ describe("Developer", () => {
     const patch = createPatch(inputPath, oldString, newString);
     await writeFile(patchPath, patch);
 
-    //const actualPatch = (await readFile(patchPath)).toString();
+    // const actualPatch = (await readFile(patchPath)).toString();
 
     console.log(patch);
 

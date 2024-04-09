@@ -6,7 +6,6 @@ import {
 import { openai } from "../../ai";
 import {
   addInternalTools,
-  applyPatchFile,
   callPlugin,
   execCommand,
   finalAnswer,
@@ -14,13 +13,13 @@ import {
   readFile,
   searchFiles,
   visionTool,
-  modifyFile,
   lintFile,
 } from "../tools";
 import { Tools } from "../tools/list";
+import { patchFile } from "../tools/patch";
 
 const availableFunctions = addInternalTools({
-  applyPatchFile,
+  patchFile,
   callPlugin,
   execCommand,
   finalAnswer,
@@ -28,7 +27,6 @@ const availableFunctions = addInternalTools({
   readFile,
   searchFiles,
   visionTool,
-  modifyFile,
   lintFile,
 });
 
@@ -69,7 +67,6 @@ export class CodebaseAgent {
     const functionName = toolCall.function.name;
     const functionToCall = availableFunctions[functionName];
     const functionArgs = JSON.parse(toolCall.function.arguments);
-    const positionalArgs = Object.values(functionArgs);
 
     const toJsonIfObject = (arg: any) => {
       if (typeof arg === "object") {
@@ -77,6 +74,10 @@ export class CodebaseAgent {
       }
       return arg;
     };
+
+    const toolDefinition = Tools.find((t) => t.function.name === functionName);
+    const properties = toolDefinition?.function?.parameters?.properties || {};
+    const positionalArgs = Object.keys(properties).map((p) => functionArgs[p]);
 
     console.log(
       `Calling function ${functionName} with args:`,

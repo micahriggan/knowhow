@@ -9,11 +9,11 @@ import {
   readFile,
   scanFile,
   modifyFile,
-  applyPatchFile,
   execCommand,
   writeFile,
 } from "../src/agents/tools";
 import { Plugins } from "../src/plugins/plugins";
+import { patchFile } from "../src/agents/tools/patch";
 
 const mockFs = jest.mocked(fs);
 
@@ -88,7 +88,7 @@ test("writeFile should write the full contents to a file", () => {
   expect(result).toBe(`File ${filePath} written`);
 });
 
-test("applyPatchFile should apply a patch to a file", () => {
+test("applyPatchFile should apply a patch to a file", async () => {
   const filePath = "testPatch.txt";
   const originalContent = "Original content\n";
   const patchedContent = "Patched content\n";
@@ -99,7 +99,7 @@ test("applyPatchFile should apply a patch to a file", () => {
   // Mock fs.writeFileSync to not actually write to disk
   mockFs.writeFileSync.mockImplementation(() => {});
 
-  const result = applyPatchFile(filePath, patch);
+  const result = await patchFile(filePath, patch);
 
   // Verify fs.readFileSync was called with the correct file path
   expect(fs.readFileSync).toHaveBeenCalledWith(filePath, "utf8");

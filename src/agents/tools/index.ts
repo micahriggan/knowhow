@@ -149,31 +149,6 @@ export function writeFile(filePath: string, content: string): string {
   }
 }
 
-// Tool to apply a patch file to a file
-export function applyPatchFile(filePath: string, patch: string): string {
-  try {
-    const originalContent = fs.readFileSync(filePath, "utf8");
-
-    let updatedContent = applyPatch(originalContent, patch, { fuzzFactor: 1 });
-    console.log("Applying patch:");
-    console.log(patch);
-    console.log("Patched content:", updatedContent);
-
-    if (!patch.endsWith("\n") && !updatedContent) {
-      patch += "\n";
-      updatedContent = applyPatch(originalContent, patch, { fuzzFactor: 1 });
-    }
-
-    if (updatedContent) {
-      fs.writeFileSync(filePath, updatedContent);
-    }
-    return `Patch Applied:\n${updatedContent}`;
-  } catch (e) {
-    console.error("Error applying patch:", e);
-    return e.message;
-  }
-}
-
 // Tool to execute a command in the system's command line interface
 export const execCommand = async (command: string): Promise<string> => {
   try {
@@ -187,8 +162,10 @@ export const execCommand = async (command: string): Promise<string> => {
     console.log(`$ ${command}:\n${output}`);
     return output;
   } catch (e) {
-    console.log("Error executing command:", e);
-    return e.message;
+    const { stdout, stderr } = e;
+    console.log({ msg: "catch statement", stderr, stdout });
+    console.log("Error executing command:", JSON.stringify(e, null, 2));
+    return e;
   }
 };
 
