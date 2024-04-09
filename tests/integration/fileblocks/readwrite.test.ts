@@ -28,4 +28,24 @@ describe("Developer", () => {
 
     expect(updatedText).toBe(originalText.replaceAll("200", "300"));
   });
+
+  test.only("should be able to erase parts of the file", async () => {
+    const filePath = "tests/integration/fileblocks/erase.txt";
+    const originalText = (await readFile(filePath)).toString();
+    await Developer.call(
+      `Update the file in ${filePath}. Delete all the lines in the file except the ones that are all B`
+    );
+
+    const updatedText = (await readFile(filePath)).toString();
+    console.log(updatedText);
+    await writeFile(filePath, originalText);
+
+    const allBs = originalText
+      .split("\n")
+      .filter((line) => line.split("").every((chr) => chr === "B"))
+      .join("\n");
+
+    console.log({ allBs });
+    expect(updatedText).toBe(allBs);
+  });
 });

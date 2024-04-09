@@ -64,8 +64,10 @@ export async function writeBlocksToFile(
     originalContent[block.blockNumber].content = block.content;
   }
 
-  const newContent = originalContent.map((b) => b.content).join("\n");
+  const newContent = originalContent.map((b) => b.content).join("");
   fs.writeFileSync(filePath, newContent);
+
+  return readFileAsBlocks(filePath);
 }
 
 // Tool to scan a file from line A to line B
