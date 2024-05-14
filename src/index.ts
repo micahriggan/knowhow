@@ -119,6 +119,7 @@ export async function uploadOpenAi() {
 export async function generate() {
   const config = await getConfig();
   for (const source of config.sources) {
+    console.log("Generating", source.input, "to", source.output);
     await handleAllKindsGeneration(source);
   }
 }
@@ -138,6 +139,7 @@ async function handleAllKindsGeneration(source: Config["sources"][0]) {
 async function handleFileKindGeneration(source: Config["sources"][0]) {
   const prompt = await loadPrompt(source.prompt);
   const files = glob.sync(source.input);
+  console.log("Analyzing files: ", files);
 
   if (source.output.endsWith("/")) {
     await handleMultiOutputGeneration(
