@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import { readFile, writeFile } from "../../../src/utils";
 import { Developer } from "../../../src/agents/codebase/codebase";
-import { FlagsService } from "../../../src/flags";
+import { FlagsService } from "../../../src/services/flags";
 
 describe("Developer", () => {
   beforeAll(() => {
@@ -65,10 +65,10 @@ describe("Developer", () => {
       `Modify the file in ${outputPath} for these instructions.: ${promptText}`
     );
 
-    let fileContent = (await readFile(outputPath)).toString();
+    const fileContent = (await readFile(outputPath)).toString();
     console.log(fileContent);
     jest.resetModules();
-    let service: FlagsService = require("./outputs/flags.js").Flags;
+    const service: FlagsService = require("./outputs/flags.js").Flags;
     try {
       service.register(["test"]);
       expect(service.enabled("test")).toEqual(false);

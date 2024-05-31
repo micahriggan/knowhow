@@ -29,7 +29,7 @@ export class OpenAIAgent implements IAgent {
     });
 
     const threadId = response.thread_id;
-    const runId = response.object;
+    const runId = response.id;
 
     console.log(response);
 
@@ -39,13 +39,25 @@ export class OpenAIAgent implements IAgent {
       console.log("Waiting for assistant...");
       const runs = await openai.beta.threads.runs.retrieve(threadId, runId);
       status = runs.status;
-      await wait(500);
+      await wait(1000);
     }
 
     const assistantReply = await openai.beta.threads.messages.list(threadId);
 
-    console.log({ assistantReply });
+    const data = assistantReply.data;
+    const textMessages = data
+      .filter((d) => d.content[0].type === "text")
+      .map((d) => d.content[0].type === "text" && d.content[0].text.value);
 
-    return assistantReply[0].content;
+    for (let i = 0; i < textMessages.length; i++) {
+      // skip the last text message since it's our prompt
+      if (i !== textMessages.length - 1) {
+        console.log("Assistant:", textMessages[i]);
+      }
+    }
+
+    return data?.[0]?.content?.[0].type === "text"
+      ? data[0].content[0].text.value
+      : "";
   }
 }

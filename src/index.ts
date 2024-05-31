@@ -89,6 +89,10 @@ export async function uploadOpenAi() {
   const ignorePattern = await getIgnorePattern();
   const assistantsConfig = await getAssistantsConfig();
   for (const assistant of config.assistants) {
+    if(!assistant.model) {
+      // Skip non openai assistants
+      continue;
+    }
     if (!assistant.id) {
       const fileIds = [];
       for (const globPath of assistant.files) {
@@ -110,8 +114,8 @@ export async function uploadOpenAi() {
       const createdAssistant = await createAssistant(toCreate);
       assistant.id = createdAssistant.id;
       await updateConfig(config);
-    }
 
+    }
     console.log(`Assistant ${assistant.id} is ready`);
   }
 }
