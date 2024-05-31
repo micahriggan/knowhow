@@ -16,14 +16,14 @@ export class FlagsService {
   enable(flag: string) {
     this.flags[flag] = true;
     if (this.log) {
-      console.log(`${flag} is now enabled`);
+      console.log(`${flag} is now enabled \n`);
     }
   }
 
   disable(flag: string) {
     this.flags[flag] = false;
     if (this.log) {
-      console.log(`${flag} is now disabled`);
+      console.log(`${flag} is now disabled \n`);
     }
   }
 

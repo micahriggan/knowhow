@@ -139,8 +139,8 @@ export async function askGpt<E extends GptQuestionEmbedding>(
   const commands = ["agent", "agents", "debugger", "exit", "multi", "search"];
   const promptText = () =>
     Flags.enabled(ChatFlags.agent)
-      ? `Ask ${aiName} ${activeAgent.name}: `
-      : `Ask ${aiName}: `;
+      ? `\nAsk ${aiName} ${activeAgent.name}: `
+      : `\nAsk ${aiName}: `;
 
   let input = await getInput(
     promptText(),
