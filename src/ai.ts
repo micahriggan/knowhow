@@ -54,7 +54,7 @@ export async function summarizeTexts(texts: string[], template: string) {
 export async function chunkText(text: string, chunkSize?: number) {
   chunkSize = chunkSize || text.length;
   const textSplitter = new RecursiveCharacterTextSplitter({
-    chunkSize: chunkSize,
+    chunkSize,
   });
 
   const docs = await textSplitter.createDocuments([text]);
