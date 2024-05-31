@@ -13,6 +13,20 @@ export class FlagsService {
     });
   }
 
+  enable(flag: string) {
+    this.flags[flag] = true;
+    if (this.log) {
+      console.log(`${flag} is now enabled`);
+    }
+  }
+
+  disable(flag: string) {
+    this.flags[flag] = false;
+    if (this.log) {
+      console.log(`${flag} is now disabled`);
+    }
+  }
+
   flip(flag: string) {
     this.flags[flag] = !this.flags[flag];
     if (this.log) {

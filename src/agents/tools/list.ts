@@ -7,7 +7,8 @@ export const Tools = [
     type: "function",
     function: {
       name: "searchFiles",
-      description: "Search for files related to the user's goal",
+      description:
+        "Search for files related to the user's goal. Searches embeddings. Use alongside textSearch",
       parameters: {
         type: "object",
         properties: {
@@ -192,7 +193,7 @@ export const Tools = [
     function: {
       name: "patchFile",
       description:
-        "Modify file with patch. Always check your work after applying a patch to ensure the patch did what you expected. Think step by step while constructing the patch, of which lines your will add and remove. Make sure that your patch is maintaining proper syntax. Do not modify lines unrelated to the goal. Patches should contain at least 3 lines of context before and after changes, which should match source exactly",
+        "Modify file with patch. Can also create new files. Always check your work after applying a patch to ensure the patch did what you expected. Think step by step while constructing the patch, of which lines your will add and remove. Make sure that your patch is maintaining proper syntax. Do not modify lines unrelated to the goal. Patches should contain at least 3 lines of context before and after changes, which should match source exactly",
       parameters: {
         type: "object",
         properties: {
@@ -230,6 +231,27 @@ export const Tools = [
         type: "string",
         description:
           "The result of the linting process or an empty string if no lint command is configured for the file extension.",
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "textSearch",
+      description: "Search text across files",
+      parameters: {
+        type: "object",
+        properties: {
+          searchTerm: {
+            type: "string",
+            description: "The text string to search for across files",
+          },
+        },
+        required: ["searchTerm"],
+      },
+      returns: {
+        type: "string",
+        description: "The result of the text search, including any matches",
       },
     },
   },

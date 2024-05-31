@@ -6,6 +6,7 @@ import { execAsync } from "../../utils";
 import { openai, askGptVision } from "../../ai";
 import { FileBlock } from "./types/fileblock";
 import { getConfig } from "../../config";
+import { getConfiguredEmbeddings } from "../../embeddings";
 
 const BLOCK_SIZE = 500;
 // Tool to search for files related to the user's goal
@@ -32,28 +33,24 @@ export async function callPlugin(pluginName: string, userInput: string) {
  */
 
 export async function readFile(filePath: string): Promise<FileBlock[]> {
-  try {
-    const text = fs.readFileSync(filePath, "utf8");
-    const lines = text.split("");
-    const blocks = [] as FileBlock[];
+  const text = fs.readFileSync(filePath, "utf8");
+  const lines = text.split("");
+  const blocks = [] as FileBlock[];
 
-    let index = 0;
-    let lineCount = 0;
-    while (lines.length > 0) {
-      const block = lines.splice(0, BLOCK_SIZE).join("");
-      blocks.push({
-        blockNumber: index,
-        content: block,
-        startLine: lineCount,
-      });
-      index++;
-      lineCount += block.split("\n").length;
-    }
-
-    return blocks;
-  } catch (e) {
-    return e.message;
+  let index = 0;
+  let lineCount = 0;
+  while (lines.length > 0) {
+    const block = lines.splice(0, BLOCK_SIZE).join("");
+    blocks.push({
+      blockNumber: index,
+      content: block,
+      startLine: lineCount,
+    });
+    index++;
+    lineCount += block.split("\n").length;
   }
+
+  return blocks;
 }
 
 export async function readBlocks(filePath: string, blockNumbers: number[]) {
@@ -194,6 +191,24 @@ export function addInternalTools(fns: {
   fns["multi_tool_use.parallel"] = callParallel;
 
   return fns;
+}
+
+export async function textSearch(searchTerm) {
+  try {
+    const command = `ag ${searchTerm}`;
+    const { stdout } = await execAsync(command);
+    return stdout; // Return the results of using ag
+  } catch (err) {
+    console.log(
+      "Falling back to embeddings text search since ag was not available"
+    );
+    const searchTermLower = searchTerm.toLowerCase();
+    const embeddings = await getConfiguredEmbeddings();
+    const results = embeddings.filter((embedding) =>
+      embedding.text.toLowerCase().includes(searchTermLower)
+    );
+    return results;
+  }
 }
 
 export async function visionTool(imageUrl: string, question: string) {

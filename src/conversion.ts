@@ -1,3 +1,4 @@
+import pdf from "pdf-parse";
 import * as fs from "fs";
 import * as path from "path";
 import { readFile, fileExists } from "./utils";
@@ -19,6 +20,12 @@ async function convertAudioToText(filePath: string) {
   return transcription;
 }
 
+async function convertPdfToText(filePath: string) {
+  const existingPdfBytes = fs.readFileSync(filePath);
+  const data = await pdf(existingPdfBytes);
+  return data.text;
+}
+
 export async function convertToText(filePath: string) {
   const extension = filePath.split(".").pop();
   const fileContent = await readFile(filePath, "utf8");
@@ -32,6 +39,8 @@ export async function convertToText(filePath: string) {
     case "wav":
     case "webm":
       return convertAudioToText(filePath);
+    case "pdf":
+      return convertPdfToText(filePath);
     default:
       return fileContent;
   }

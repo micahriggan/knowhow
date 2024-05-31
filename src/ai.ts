@@ -20,7 +20,6 @@ const chatModel = new ChatOpenAI({
   maxRetries: 2,
 });
 
-console.log("OpenAI Base URL", config.openaiBaseUrl);
 export const openai = new OpenAI({
   apiKey: process.env.OPENAI_KEY,
   ...(config.openaiBaseUrl && { baseURL: config.openaiBaseUrl }),

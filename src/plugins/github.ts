@@ -72,6 +72,8 @@ export class GitHubPlugin implements Plugin {
       const markdownDiffs = responses
         .map((diff) => `\`\`\`diff\n${JSON.stringify(diff)}\n\`\`\``)
         .join("\n\n");
+
+      console.log(markdownDiffs);
       return `GITHUB PLUGIN: ${urls} loaded:\n\n${markdownDiffs}`;
     }
 

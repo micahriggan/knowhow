@@ -8,11 +8,15 @@ import { Marked } from "./utils";
 import { ask } from "./utils";
 import { Plugins } from "./plugins/plugins";
 import { queryEmbedding } from "./embeddings";
-import { Developer } from "./agents/codebase/codebase";
+import { agentService } from "./services/AgentService";
 import { FlagsService } from "./flags";
+import { IAgent } from "./agents/base/base";
+import { Researcher } from "./agents/researcher/researcher";
+import { Developer } from "./agents/codebase/codebase";
 
 enum ChatFlags {
   agent = "agent",
+  agents = "agents",
   debug = "debug",
   multi = "multi",
 }
@@ -23,7 +27,7 @@ const Flags = new FlagsService(
 );
 
 export async function askEmbedding<E>(
-  embeddings: Array<Embeddable<E>>,
+  embeddings: Embeddable<E>[],
   promptText: string,
   handleAnswer?: (question: string, answer: EmbeddingBase<any>) => void
 ) {
@@ -52,7 +56,7 @@ export async function askEmbedding<E>(
 // https://arxiv.org/abs/2212.10496
 export async function queryEmbeddingHyde<E extends EmbeddingBase>(
   query: string,
-  embeddings: Array<E>
+  embeddings: E[]
 ) {
   const generatePrompt = `
 Given this question
@@ -97,7 +101,7 @@ The user has asked:
         "Helpful Codebase assistant. Answer users questions using the embedding data that is provided with the user's question. You have limited access to the codebase based off of how similar the codebase is to the user's question. You may reference file paths by using the IDs present in the embedding data, but be sure to remove the chunk from the end of the filepaths.",
     },
     { role: "user", content: gptPrompt },
-  ] as Array<ChatCompletionMessageParam>;
+  ] as ChatCompletionMessageParam[];
 
   const response = await openai.chat.completions.create({
     messages: thread,
@@ -126,23 +130,38 @@ export async function getInput(
 
 export async function askGpt<E extends GptQuestionEmbedding>(
   aiName: string,
-  embeddings: Array<Embeddable<E>>,
-  plugins: Array<string> = []
+  embeddings: Embeddable<E>[],
+  plugins: string[] = []
 ) {
   console.log("Commands: search, exit");
 
-  const commands = ["agent", "debugger", "exit", "multi", "search"];
+  let activeAgent: IAgent = Developer;
+  const commands = ["agent", "agents", "debugger", "exit", "multi", "search"];
+  const promptText = () =>
+    Flags.enabled(ChatFlags.agent)
+      ? `Ask ${aiName} ${activeAgent.name}: `
+      : `Ask ${aiName}: `;
+
   let input = await getInput(
-    `Ask ${aiName} AI?: `,
+    promptText(),
     Flags.enabled(ChatFlags.multi),
     commands
   );
 
-  let answer: E | undefined;
   let results = "";
   while (input !== "exit") {
     try {
       switch (input) {
+        case ChatFlags.agents:
+          Flags.enable(ChatFlags.agent);
+          const agents = agentService.listAgents();
+          console.log(agents);
+          const selected = await ask(
+            "Which agent would you like to use: ",
+            agents
+          );
+          activeAgent = agentService.getAgent(selected);
+          break;
         case ChatFlags.agent:
           Flags.flip(ChatFlags.agent);
           break;
@@ -153,8 +172,8 @@ export async function askGpt<E extends GptQuestionEmbedding>(
           Flags.flip(ChatFlags.multi);
           break;
         case "search":
-          await askEmbedding(embeddings, "searching", (question, answer) => {
-            console.log(JSON.stringify(answer.metadata, null, 2));
+          await askEmbedding(embeddings, "searching", (question, _answer) => {
+            console.log(JSON.stringify(_answer.metadata, null, 2));
           });
           break;
         case "":
@@ -165,7 +184,7 @@ export async function askGpt<E extends GptQuestionEmbedding>(
           const pluginText = await Plugins.callMany(plugins, input);
           const fullPrompt = `${input} \n ${pluginText}`;
           if (Flags.enabled("agent")) {
-            results = await Developer.call(fullPrompt);
+            results = await activeAgent.call(fullPrompt);
           } else {
             results = await queryGpt4(fullPrompt);
           }
@@ -177,7 +196,7 @@ export async function askGpt<E extends GptQuestionEmbedding>(
       console.log(e);
     } finally {
       input = await getInput(
-        `Ask ${aiName} AI?: `,
+        promptText(),
         Flags.enabled(ChatFlags.multi),
         commands
       );

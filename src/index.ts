@@ -71,14 +71,14 @@ export async function upload() {
     };
 
     console.log("Uploading", source.output, "to", embedding_name);
-    let config = {
+    const config = {
       method: "post",
       url: "https://sqi4o2vea57u2fdazbqqsvycwi0zjsyt.lambda-url.us-west-2.on.aws/agents/embeddings",
       headers: {
         "Content-Type": "application/json",
         "x-api-key": process.env.AGENT_API_KEY,
       },
-      data: data,
+      data,
     };
     await axios.request(config);
   }
@@ -158,7 +158,7 @@ async function handleFileKindGeneration(source: Config["sources"][0]) {
   }
 }
 export async function handleMultiOutputGeneration(
-  files: Array<string>,
+  files: string[],
   prompt: string,
   output: string,
   kind?: string
@@ -203,7 +203,7 @@ export async function handleMultiOutputGeneration(
 }
 
 export async function handleSingleOutputGeneration(
-  files: Array<string>,
+  files: string[],
   prompt: string,
   outputFile: string,
   kind: string

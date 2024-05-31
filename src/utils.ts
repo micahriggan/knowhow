@@ -14,15 +14,20 @@ export const writeFile = promisify(fs.writeFile);
 export const mkdir = promisify(fs.mkdir);
 export const execAsync = util.promisify(exec);
 export const fileStat = promisify(fs.stat);
+export const wait = promisify(setTimeout);
 
-export const ask = async (question: string, options: Array<string> = []) => {
+export const askHistory = [];
+
+export const ask = async (question: string, options: string[] = []) => {
   const readline = require("readline").createInterface({
     input: process.stdin,
     output: process.stdout,
+    history: askHistory,
     completer: (line) => {
       const hits = options.filter((c) => c.startsWith(line));
       return [hits.length ? hits : options, line];
     },
+    terminal: true,
   });
 
   const _ask = util.promisify(readline.question).bind(readline);
