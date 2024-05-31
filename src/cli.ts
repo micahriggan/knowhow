@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { generate, embed, upload, uploadOpenAi, chat } from "./index";
 import { init } from "./config";
+import { download } from ".";
 
 const command = process.argv[2];
 
@@ -18,6 +19,9 @@ async function main() {
     case "upload":
       await upload();
       break;
+    case "download":
+      await download();
+      break;
     case "upload:openai":
       await uploadOpenAi();
       break;
@@ -31,7 +35,7 @@ async function main() {
   }
 }
 
-if (require.main == module) {
+if (require.main === module) {
   main()
     .catch((e) => {
       console.error(e);

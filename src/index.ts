@@ -244,3 +244,30 @@ export async function chat() {
   const embeddings = await getConfiguredEmbeddings();
   await askGpt("knowhow", embeddings, config.plugins);
 }
+
+export async function download() {
+  const config = await getConfig();
+
+  for (const source of config.embedSources) {
+    const bucketName = source.s3Bucket;
+
+    if (!bucketName) {
+      console.log("Skipping", source.output, "because no bucket is configured");
+      continue;
+    }
+    const [embeddingName] = path.basename(source.output).split(".");
+    const s3Key = `${embeddingName}.json`;
+    const destinationPath = source.output;
+
+    console.log(
+      "Downloading",
+      s3Key,
+      "from",
+      bucketName,
+      "to",
+      destinationPath
+    );
+
+    await AwsS3.downloadFile(bucketName, s3Key, destinationPath);
+  }
+}
