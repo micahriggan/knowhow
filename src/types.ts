@@ -22,6 +22,7 @@ export type Config = {
     prompt?: string;
     kind?: string;
     uploadMode?: boolean;
+    s3Bucket?: string;
     chunkSize?: number;
     minLength?: number;
   }[];

@@ -142,7 +142,7 @@ export abstract class BaseAgent implements IAgent {
   }
 
   async call(userInput: string, _messages?: ChatCompletionMessageParam[]) {
-    const model = "gpt-4-turbo-preview";
+    const model = "gpt-4o";
     const messages = _messages || this.getInitialMessages(userInput);
 
     const response = await openai.chat.completions.create({

@@ -59,7 +59,7 @@ export async function init() {
         name: "Codebase Helper",
         description: "Helps you code",
         instructions: "Codebase helper, use files and tools to help us code",
-        model: "gpt-4-1106-preview",
+        model: "gpt-4o",
         tools: [{ type: "code_interpreter" }],
         files: [".knowhow/docs/**/*.mdx"],
       },

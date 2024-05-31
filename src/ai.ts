@@ -16,7 +16,7 @@ const OPENAI_KEY = process.env.OPENAI_KEY;
 const chatModel = new ChatOpenAI({
   temperature: 0,
   openAIApiKey: OPENAI_KEY,
-  modelName: "gpt-4-1106-preview",
+  modelName: "gpt-4o",
   maxRetries: 2,
 });
 
@@ -103,7 +103,7 @@ export async function createAssistant(assistant: Assistant) {
 
 export async function askGptVision(imageUrl: string, question: string) {
   const response = await openai.chat.completions.create({
-    model: "gpt-4-vision-preview",
+    model: "gpt-4o",
     max_tokens: 2500,
     messages: [
       {

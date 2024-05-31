@@ -40,6 +40,7 @@ import { abort } from "process";
 import { askGpt } from "./chat";
 import { convertToText } from "./conversion";
 import { Plugins } from "./plugins/plugins";
+import { AwsS3 } from "./services/S3";
 
 const OPENAI_KEY = process.env.OPENAI_KEY;
 const embeddingModel = new OpenAIEmbeddings({ openAIApiKey: OPENAI_KEY });
@@ -62,25 +63,30 @@ export async function embed() {
 
 export async function upload() {
   const config = await getConfig();
+
   for (const source of config.embedSources) {
+    const bucketName = source.s3Bucket;
+
+    if (!bucketName) {
+      console.log("Skipping", source.output, "because no bucket is configured");
+      continue;
+    }
     const items = JSON.parse(await readFile(source.output, "utf8"));
-    const [embedding_name] = path.basename(source.output).split(".");
+    const [embeddingName] = path.basename(source.output).split(".");
     const data = {
-      embedding_name,
+      embeddingName,
       items,
     };
 
-    console.log("Uploading", source.output, "to", embedding_name);
-    const config = {
-      method: "post",
-      url: "https://sqi4o2vea57u2fdazbqqsvycwi0zjsyt.lambda-url.us-west-2.on.aws/agents/embeddings",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.AGENT_API_KEY,
-      },
-      data,
-    };
-    await axios.request(config);
+    console.log(
+      "Uploading",
+      source.output,
+      "to",
+      `${bucketName}/${embeddingName}.json`
+    );
+
+    const s3Key = `${embeddingName}.json`;
+    await AwsS3.uploadFile(source.output, bucketName, s3Key);
   }
 }
 
@@ -89,7 +95,7 @@ export async function uploadOpenAi() {
   const ignorePattern = await getIgnorePattern();
   const assistantsConfig = await getAssistantsConfig();
   for (const assistant of config.assistants) {
-    if(!assistant.model) {
+    if (!assistant.model) {
       // Skip non openai assistants
       continue;
     }
@@ -114,7 +120,6 @@ export async function uploadOpenAi() {
       const createdAssistant = await createAssistant(toCreate);
       assistant.id = createdAssistant.id;
       await updateConfig(config);
-
     }
     console.log(`Assistant ${assistant.id} is ready`);
   }

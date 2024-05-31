@@ -106,7 +106,7 @@ The user has asked:
   const response = await openai.chat.completions.create({
     messages: thread,
     max_tokens: 2500,
-    model: "gpt-4-1106-preview",
+    model: "gpt-4o",
     temperature: 0,
     top_p: 1,
     presence_penalty: 0,

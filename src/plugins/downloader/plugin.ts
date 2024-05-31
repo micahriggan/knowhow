@@ -4,6 +4,8 @@ import { convertToText } from "../../conversion";
 import { Downloader } from "./downloader";
 
 export class DownloaderPlugin implements Plugin {
+  skipExt = ["jpg", "jpeg", "png", "gif"];
+
   extractUrls(userInput: string): string[] {
     const urlRegex = /https:\/\/[^\s]+/gim;
     const matches = userInput.match(urlRegex) || [];
@@ -17,6 +19,10 @@ export class DownloaderPlugin implements Plugin {
     }
     let transcript = "";
     for (const url of urls) {
+      if (this.skipExt.includes(url.split(".").pop() || "")) {
+        console.log("DOWNLOADER PLUGIN: skipping", url);
+        continue;
+      }
       try {
         console.log("DOWNLOADER PLUGIN: attempting", url);
         const downloadDir = ".knowhow/downloads/";
@@ -45,7 +51,7 @@ export class DownloaderPlugin implements Plugin {
 
       embeddings.push({
         id: url,
-        text: text,
+        text,
         metadata: {},
       });
     }
