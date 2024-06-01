@@ -193,7 +193,7 @@ export const Tools = [
     function: {
       name: "patchFile",
       description:
-        "Modify file with patch. Can also create new files. Use proper GNU diffutils syntax. Always check your work after applying a patch to ensure the patch did what you expected. Think step by step while constructing the patch, of which lines your will add and remove. Make sure that your patch is maintaining proper syntax. Do not modify lines unrelated to the goal. Patches should contain at least 3 lines of context before and after changes, which should match source exactly",
+        "Modify file with patch. Can also create new files. Use proper GNU diffutils syntax with - in front of removals and + in front of additions. Always check your work after applying a patch to ensure the patch did what you expected. Think step by step while constructing the patch, of which lines your will add and remove. Make sure that your patch is maintaining proper syntax. Do not modify lines unrelated to the goal. Patches should contain at least 3 lines of context before and after changes, which should match source exactly",
       parameters: {
         type: "object",
         properties: {

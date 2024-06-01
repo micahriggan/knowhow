@@ -44,7 +44,7 @@ export async function readFile(filePath: string): Promise<FileBlock[]> {
     blocks.push({
       blockNumber: index,
       content: block,
-      startLine: lineCount,
+      startLine: lineCount + 1,
     });
     index++;
     lineCount += block.split("\n").length;

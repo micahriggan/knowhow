@@ -78,7 +78,7 @@ describe("Developer", () => {
   test("should be able to patch a codebase", async () => {
     const originalText = (await readFile(inputPath)).toString();
     await Developer.call(
-      `Update the file in ${inputPath} change the string "finalAnswer" to "FinalAnswer" on line 120. Do not modify anything else. Treat this file as a typescript file.`
+      `Update the file in ${inputPath} change the string "finalAnswer" to "FinalAnswer", as we are changing the tool name to be FinalAnswer instead of finalAnswer. This should be around line 120. Do not modify anything else. Treat this file as a typescript file. Only try one patch. If it fails stop`
     );
 
     const updatedText = (await readFile(inputPath)).toString();
