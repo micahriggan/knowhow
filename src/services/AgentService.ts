@@ -9,6 +9,36 @@ import { Tools } from "../agents/tools/list";
 class AgentService {
   private agents: Map<string, IAgent> = new Map();
 
+  constructor() {
+    this.registerAgent(Researcher);
+    this.registerAgent(Developer);
+    this.loadAgentsFromConfig();
+
+    const agentNames = this.listAgents().join(", ");
+    Tools.addTool({
+      type: "function",
+      function: {
+        name: "agentCall",
+        description:
+          "Allows an agent to ask another agent a question. Useful for getting help from agents that are configured for specific goals.",
+        parameters: {
+          type: "object",
+          properties: {
+            agentName: {
+              type: "string",
+              description: `The name of the agent to call. Available agents: ${agentNames}`,
+            },
+            query: {
+              type: "string",
+              description: `The query to send to the agent`,
+            },
+          },
+          required: ["agentName", "query"],
+        },
+      },
+    });
+  }
+
   public registerAgent(agent: IAgent): void {
     this.registerAgentByName(agent.name, agent);
   }
@@ -58,31 +88,3 @@ class AgentService {
 }
 
 export const agentService = new AgentService();
-
-agentService.registerAgent(Researcher);
-agentService.registerAgent(Developer);
-agentService.loadAgentsFromConfig();
-
-const agentNames = agentService.listAgents().join(", ");
-Tools.addTool({
-  type: "function",
-  function: {
-    name: "agentCall",
-    description:
-      "Allows an agent to ask another agent a question. Useful for getting help from agents that are configured for specific goals.",
-    parameters: {
-      type: "object",
-      properties: {
-        agentName: {
-          type: "string",
-          description: `The name of the agent to call. Available agents: ${agentNames}`,
-        },
-        query: {
-          type: "string",
-          description: `The query to send to the agent`,
-        },
-      },
-      required: ["agentName", "query"],
-    },
-  },
-});
