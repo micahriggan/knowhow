@@ -4,6 +4,11 @@ import { BaseAgent } from "../base/base";
 export class ResearcherAgent extends BaseAgent {
   name = "Researcher";
 
+  constructor() {
+    super();
+    this.setModel("gpt-4o");
+  }
+
   getInitialMessages(userInput: string) {
     return [
       {

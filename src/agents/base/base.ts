@@ -15,6 +15,7 @@ import {
   visionTool,
   lintFile,
   textSearch,
+  agentCall,
 } from "../tools";
 import { Tools } from "../tools/list";
 import { patchFile } from "../tools/patch";
@@ -30,6 +31,7 @@ const availableFunctions = addInternalTools({
   visionTool,
   lintFile,
   textSearch,
+  agentCall,
 });
 
 export interface IAgent {
@@ -43,23 +45,35 @@ export interface IAgent {
 export abstract class BaseAgent implements IAgent {
   abstract name: string;
 
-  enabledTools = [...Tools];
+  protected gptModelName: string = "gpt-4-turbo-preview";
 
-  disableTool(toolName: string) {
-    this.enabledTools = this.enabledTools.filter(
-      (t) => t.function.name !== toolName
+  getModel(): string {
+    return this.gptModelName;
+  }
+
+  setModel(value: string) {
+    this.gptModelName = value;
+  }
+
+  disabledTools = [];
+
+  getEnabledTools() {
+    return Tools.getTools().filter(
+      (t) => !this.disabledTools.includes(t.function.name)
     );
   }
 
+  disableTool(toolName: string) {
+    this.disabledTools.push(toolName);
+  }
+
   isToolEnabled(toolName: string) {
-    return !!this.enabledTools.find((t) => t.function.name === toolName);
+    return !!this.getEnabledTools().find((t) => t.function.name === toolName);
   }
 
   enableTool(toolName: string) {
     if (!this.isToolEnabled(toolName)) {
-      this.enabledTools = this.enabledTools.concat(
-        Tools.filter((t) => t.function.name === toolName)
-      );
+      this.disabledTools = this.disabledTools.filter((t) => t !== toolName);
     }
   }
 
@@ -77,7 +91,7 @@ export abstract class BaseAgent implements IAgent {
       return arg;
     };
 
-    const toolDefinition = Tools.find((t) => t.function.name === functionName);
+    const toolDefinition = Tools.getTool(functionName);
     const properties = toolDefinition?.function?.parameters?.properties || {};
     const positionalArgs = Object.keys(properties).map((p) => functionArgs[p]);
 
@@ -142,13 +156,13 @@ export abstract class BaseAgent implements IAgent {
   }
 
   async call(userInput: string, _messages?: ChatCompletionMessageParam[]) {
-    const model = "gpt-4-turbo-preview";
+    const model = this.getModel();
     const messages = _messages || this.getInitialMessages(userInput);
 
     const response = await openai.chat.completions.create({
       model,
       messages,
-      tools: this.enabledTools,
+      tools: this.getEnabledTools(),
       tool_choice: "auto",
     });
     this.logMessages(response.choices.map((c) => c.message));

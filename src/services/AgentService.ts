@@ -4,6 +4,7 @@ import { ConfigAgent } from "../agents/ConfigAgent";
 import { Researcher } from "../agents/researcher/researcher";
 import { Developer } from "../agents/codebase/codebase";
 import { getConfigSync } from "../config";
+import { Tools } from "../agents/tools/list";
 
 class AgentService {
   private agents: Map<string, IAgent> = new Map();
@@ -16,7 +17,7 @@ class AgentService {
     this.agents.set(name, agent);
   }
 
-  public getAgent(name: string): IAgent | undefined {
+  public getAgent(name: string): IAgent {
     const agent = this.agents.get(name);
     if (!agent) {
       throw new Error(`Agent ${name} not found`);
@@ -47,16 +48,12 @@ class AgentService {
     }
   }
 
-  public async callAgent(
-    name: string,
-    query: string,
-    chatHistory = []
-  ): Promise<string> {
+  public async callAgent(name: string, query: string): Promise<string> {
     const agent = this.agents.get(name);
     if (!agent) {
       return "Agent not found";
     }
-    return agent.call(query, chatHistory);
+    return agent.call(query);
   }
 }
 
@@ -65,3 +62,27 @@ export const agentService = new AgentService();
 agentService.registerAgent(Researcher);
 agentService.registerAgent(Developer);
 agentService.loadAgentsFromConfig();
+
+const agentNames = agentService.listAgents().join(", ");
+Tools.addTool({
+  type: "function",
+  function: {
+    name: "agentCall",
+    description:
+      "Allows an agent to ask another agent a question. Useful for getting help from agents that are configured for specific goals.",
+    parameters: {
+      type: "object",
+      properties: {
+        agentName: {
+          type: "string",
+          description: `The name of the agent to call. Available agents: ${agentNames}`,
+        },
+        query: {
+          type: "string",
+          description: `The query to send to the agent`,
+        },
+      },
+      required: ["agentName", "query"],
+    },
+  },
+});

@@ -1,8 +1,10 @@
 import { ChatCompletionTool } from "openai/resources/chat";
 import { Plugins } from "../../plugins/plugins";
+import { agentService } from "../../services/AgentService";
 
 const pluginNames = Plugins.listPlugins().join(", ");
-export const Tools = [
+
+const includedTools = [
   {
     type: "function",
     function: {
@@ -193,7 +195,7 @@ export const Tools = [
     function: {
       name: "patchFile",
       description:
-        "Modify file with patch. Can also create new files. Use proper GNU diffutils syntax with - in front of removals and + in front of additions. Always check your work after applying a patch to ensure the patch did what you expected. Think step by step while constructing the patch, of which lines your will add and remove. Make sure that your patch is maintaining proper syntax. Do not modify lines unrelated to the goal. Patches should contain at least 3 lines of context before and after changes, which should match source exactly",
+        "Modify file with patch. Can also create new files. Use proper GNU diffutils syntax with - in front of removals and + in front of additions. Always check your work after applying a patch to ensure the patch did what you expected. Think step by step while constructing the patch, of which lines your will add and remove. Make sure that your patch is maintaining proper syntax. Do not modify lines unrelated to the goal. Patches should contain 3 to 6 lines of context before and after changes, which should match source exactly",
       parameters: {
         type: "object",
         properties: {
@@ -238,7 +240,8 @@ export const Tools = [
     type: "function",
     function: {
       name: "textSearch",
-      description: "Search text across files. Useful for finding exact matches in many files",
+      description:
+        "Search text across files. Useful for finding exact matches in many files",
       parameters: {
         type: "object",
         properties: {
@@ -256,3 +259,21 @@ export const Tools = [
     },
   },
 ] as ChatCompletionTool[];
+
+class ToolsService {
+  tools = includedTools;
+
+  getTools() {
+    return this.tools;
+  }
+
+  getTool(name: string) {
+    return this.tools.find((tool) => tool.function.name === name);
+  }
+
+  addTool(tool: ChatCompletionTool) {
+    this.tools.push(tool);
+  }
+}
+
+export const Tools = new ToolsService();
