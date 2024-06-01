@@ -10,7 +10,7 @@
     "start": "npm run compile && node ts_build/src/index.js",
     "dataset:diffs:generate": "ts-node src/dataset/diffs/generate.ts",
     "dataset:diffs:jsonl": "ts-node src/dataset/diffs/jsonl.ts",
-    "lint": "tslint"
+    "lint": "tslint ./src/**/*.ts"
   },
   "keywords": [],
   "author": "Micah Riggan",
