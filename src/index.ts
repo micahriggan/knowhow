@@ -72,7 +72,7 @@ export async function upload() {
       continue;
     }
     const items = JSON.parse(await readFile(source.output, "utf8"));
-    const [embeddingName] = path.basename(source.output).split(".");
+    const { name: embeddingName } = path.parse(source.output);
     const data = {
       embeddingName,
       items,
@@ -200,8 +200,8 @@ export async function handleMultiOutputGeneration(
     const summary = prompt ? await summarizeFile(file, prompt) : fileContent;
 
     // write the summary to the output file
-    const [fileName, fileExt] = path.basename(file).split(".");
-    const outputFile = path.join(output, fileName + ".mdx");
+    const { name, ext } = path.parse(file);
+    const outputFile = path.join(output, name + ".mdx");
 
     console.log("Writing summary to", outputFile);
     await writeFile(outputFile, summary);
@@ -255,8 +255,8 @@ export async function download() {
       console.log("Skipping", source.output, "because no bucket is configured");
       continue;
     }
-    const [embeddingName] = path.basename(source.output).split(".");
-    const s3Key = `${embeddingName}.json`;
+    const { name } = path.parse(source.output);
+    const s3Key = `${name}.json`;
     const destinationPath = source.output;
 
     console.log(

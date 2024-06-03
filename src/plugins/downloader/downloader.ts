@@ -55,7 +55,7 @@ class DownloaderService {
       );
     }
 
-    const command = `ffmpeg -i ${filePath} -f segment -segment_time ${CHUNK_LENGTH_SECONDS} -vn -c copy ${outputDirPath}/chunk%03d.mp3`;
+    const command = `ffmpeg -i "${filePath}" -f segment -segment_time ${CHUNK_LENGTH_SECONDS} -map 0:a:0 -acodec mp3 -vn "${outputDirPath}/chunk%03d.mp3"`;
     await execAsync(command);
 
     const chunkNames = await fs.promises.readdir(outputDirPath);
@@ -73,11 +73,34 @@ class DownloaderService {
 
     let fullText = "";
     for (const file of files) {
+      const chunkName = path.parse(file).name;
+      const chunkTranscriptPath = path.join(
+        path.dirname(outputPath),
+        `/chunks/${chunkName}.txt`
+      );
+      const exists = await fileExists(chunkTranscriptPath);
+
+      if (exists) {
+        console.log("Chunk transcription already exists, skipping");
+        const contents = await readFile(chunkTranscriptPath);
+        fullText += contents.toString();
+        continue;
+      }
+
       console.log("Transcribing", file);
-      const transcript = await openai.audio.transcriptions.create({
-        file: fs.createReadStream(file),
-        model: "whisper-1",
-      });
+      const transcript = await openai.audio.transcriptions
+        .create({
+          file: fs.createReadStream(file),
+          model: "whisper-1",
+        })
+        .catch((e) => {
+          console.error("Error transcribing", file, e);
+          return { text: "" };
+        });
+
+      await fs.promises.writeFile(chunkTranscriptPath, transcript.text);
+
+      // save chunk transcript to file
       fullText += transcript.text;
     }
 

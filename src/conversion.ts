@@ -28,7 +28,6 @@ async function convertPdfToText(filePath: string) {
 
 export async function convertToText(filePath: string) {
   const extension = filePath.split(".").pop();
-  const fileContent = await readFile(filePath, "utf8");
 
   switch (extension) {
     case "mp3":
@@ -38,10 +37,11 @@ export async function convertToText(filePath: string) {
     case "m4a":
     case "wav":
     case "webm":
+    case "mov":
       return convertAudioToText(filePath);
     case "pdf":
       return convertPdfToText(filePath);
     default:
-      return fileContent;
+      return readFile(filePath, "utf8");
   }
 }
