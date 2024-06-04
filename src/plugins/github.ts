@@ -34,14 +34,14 @@ export class GitHubPlugin implements Plugin {
   }
 
   async getDiff(url: string) {
-    const [owner, repo, _, pull_number] = url.split("/").slice(-4);
+    const [owner, repo, _, pullNumber] = url.split("/").slice(-4);
     console.log(
-      `GITHUB PLUGIN: Loading diff for ${owner}/${repo}#${pull_number}`
+      `GITHUB PLUGIN: Loading diff for ${owner}/${repo}#${pullNumber}`
     );
     const { data: diff } = await this.octokit.rest.pulls.get({
       owner,
       repo,
-      pull_number: parseInt(pull_number),
+      pull_number: parseInt(pullNumber, 10),
       mediaType: {
         format: "diff",
       },
@@ -66,7 +66,7 @@ export class GitHubPlugin implements Plugin {
             file.deletions < 200 &&
             getContent(file).length < 10000
           );
-        })
+        });
         return parsed;
       })
     );

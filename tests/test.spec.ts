@@ -5,7 +5,7 @@ import * as fs from "fs";
 import { exec } from "child_process";
 
 import {
-  searchFiles,
+  embeddingSearch,
   readFile,
   scanFile,
   modifyFile,
@@ -25,7 +25,7 @@ test("searchFiles should call the embeddings plugin with the correct keyword", a
   // Setting up the plugin to return the expected result
   mocked.call.mockResolvedValue(expectedResult);
 
-  const result = await searchFiles(keyword);
+  const result = await embeddingSearch(keyword);
 
   // Verifying that the plugin was called with the correct keyword
   expect(Plugins.call).toHaveBeenCalledWith("embeddings", keyword);

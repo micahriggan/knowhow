@@ -11,7 +11,7 @@ import { agentService } from "../../services/AgentService";
 
 const BLOCK_SIZE = 500;
 // Tool to search for files related to the user's goal
-export async function searchFiles(keyword: string): Promise<string> {
+export async function embeddingSearch(keyword: string): Promise<string> {
   return Plugins.call("embeddings", keyword);
 }
 

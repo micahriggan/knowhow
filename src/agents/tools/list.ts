@@ -8,9 +8,9 @@ const includedTools = [
   {
     type: "function",
     function: {
-      name: "searchFiles",
+      name: "embeddingSearch",
       description:
-        "Semantic Search for files related to the user's goal. Uses embeddings. Use alongside textSearch",
+        "Fuzzy search with cosine similarity for files related to the user's goal. Uses embeddings. Use textSearch for exact matches.",
       parameters: {
         type: "object",
         properties: {
@@ -241,7 +241,7 @@ const includedTools = [
     function: {
       name: "textSearch",
       description:
-        "Search text across files. Useful for finding exact matches in many files",
+        "Exact Search. Search for exact matches of text across files. Use embeddingSearch for fuzzy search.",
       parameters: {
         type: "object",
         properties: {
