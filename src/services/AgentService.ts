@@ -67,7 +67,7 @@ class AgentService {
       if (assistant.model) {
         if (!assistant.id) {
           console.error(
-            `Cannot register ${assistant.name}. Need to upload the assistant to openai first. Call knowhow upload:openai\n`
+            `Cannot register assistant: ${assistant.name}. Need to upload the assistant to openai first. Call knowhow upload:openai\n`
           );
           continue;
         }

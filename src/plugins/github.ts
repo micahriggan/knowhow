@@ -35,7 +35,9 @@ export class GitHubPlugin implements Plugin {
 
   async getDiff(url: string) {
     const [owner, repo, _, pull_number] = url.split("/").slice(-4);
-    console.log(`Loading diff for ${owner}/${repo}#${pull_number}`);
+    console.log(
+      `GITHUB PLUGIN: Loading diff for ${owner}/${repo}#${pull_number}`
+    );
     const { data: diff } = await this.octokit.rest.pulls.get({
       owner,
       repo,
@@ -54,13 +56,24 @@ export class GitHubPlugin implements Plugin {
         const diff = await this.getDiff(url);
         let parsed = parseDiff(diff.toString());
 
-        parsed = parsed.filter((file) => {
-          return file.additions < 200 && file.deletions < 200;
-        });
+        const getContent = (file: typeof parsed[0]) => {
+          return JSON.stringify(file);
+        };
 
+        parsed = parsed.filter((file) => {
+          return (
+            file.additions < 200 &&
+            file.deletions < 200 &&
+            getContent(file).length < 10000
+          );
+        })
         return parsed;
       })
     );
+  }
+
+  formatDiff(diff: any) {
+    return diff;
   }
 
   async call(userPrompt: string): Promise<string> {
