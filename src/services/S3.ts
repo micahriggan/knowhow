@@ -37,7 +37,8 @@ export class S3Service {
     try {
       await this.s3.send(new HeadBucketCommand({ Bucket: bucketName }));
     } catch (error) {
-      if (error.statusCode === 404) {
+      const statusCode = error.$metadata.httpStatusCode;
+      if (statusCode === 404) {
         await this.s3.send(new CreateBucketCommand({ Bucket: bucketName }));
         console.log(`Bucket ${bucketName} created successfully`);
       } else {
