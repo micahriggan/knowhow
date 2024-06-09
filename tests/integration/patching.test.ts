@@ -1,8 +1,8 @@
-import { Developer } from "../../src/agents/codebase/codebase";
 import { readFile, writeFile } from "../../src/utils";
 import { createPatch, applyPatch } from "diff";
 import { scanFile } from "../../src/agents/tools";
 import { patchFile } from "../../src/agents/tools/patch";
+import { agentService } from "../../src/services/AgentService";
 
 const inputPath = "tests/integration/patching/input.txt";
 const outputPath = "tests/integration/patching/output.txt";
@@ -77,7 +77,8 @@ describe("Developer", () => {
 
   test("should be able to patch a codebase", async () => {
     const originalText = (await readFile(inputPath)).toString();
-    await Developer.call(
+    await agentService.callAgent(
+      "Developer",
       `Update the file in ${inputPath} change the string "finalAnswer" to "FinalAnswer", as we are changing the tool name to be FinalAnswer instead of finalAnswer. This should be around line 120. Do not modify anything else. Treat this file as a typescript file. Only try one patch. If it fails stop`
     );
 
@@ -91,7 +92,8 @@ describe("Developer", () => {
 
   it("should be able to patch when given the answer", async () => {
     const originalText = (await readFile(inputPath)).toString();
-    await Developer.call(
+    await agentService.callAgent(
+      "Developer",
       `Update the file in ${inputPath} change the string "finalAnswer" to "FinalAnswer" on line 120. Do not modify anything else. Heres the answer: ${brokenPatch}.`
     );
 
@@ -106,7 +108,8 @@ describe("Developer", () => {
   test("should be able to update the unseen file", async () => {
     const unseenPath = "tests/integration/patching/unseen.txt";
     const originalText = (await readFile(unseenPath)).toString();
-    await Developer.call(
+    await agentService.callAgent(
+      "Developer",
       `Update the file in ${unseenPath} change the file additions and deletions count from 200 to 300. Do not modify anything else. Treat this file as a typescript file.`
     );
 

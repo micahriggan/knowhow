@@ -7,7 +7,6 @@ import { openai, askGptVision } from "../../ai";
 import { FileBlock } from "./types/fileblock";
 import { getConfig } from "../../config";
 import { getConfiguredEmbeddings } from "../../embeddings";
-import { agentService } from "../../services/AgentService";
 
 const BLOCK_SIZE = 500;
 // Tool to search for files related to the user's goal
@@ -216,6 +215,10 @@ export async function visionTool(imageUrl: string, question: string) {
   return askGptVision(imageUrl, question);
 }
 
-export async function agentCall(agentName: string, userInput: string) {
-  return agentService.callAgent(agentName, userInput);
-}
+/*
+ * I want to do this, but circular dependencies are a problem
+ *
+ *export async function agentCall(agentName: string, userInput: string) {
+ *  return agentService.callAgent(agentName, userInput);
+ *}
+ */

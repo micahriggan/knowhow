@@ -15,7 +15,6 @@ import {
   visionTool,
   lintFile,
   textSearch,
-  agentCall,
 } from "../tools";
 import { Tools } from "../tools/list";
 import { patchFile } from "../tools/patch";
@@ -31,7 +30,6 @@ const availableFunctions = addInternalTools({
   visionTool,
   lintFile,
   textSearch,
-  agentCall,
 });
 
 export interface IAgent {
@@ -157,7 +155,11 @@ export abstract class BaseAgent implements IAgent {
 
   async call(userInput: string, _messages?: ChatCompletionMessageParam[]) {
     const model = this.getModel();
-    const messages = _messages || this.getInitialMessages(userInput);
+    let messages = _messages || this.getInitialMessages(userInput);
+
+    const startIndex = 0;
+    const endIndex = messages.length;
+    const compressThreshold = 7;
 
     const response = await openai.chat.completions.create({
       model,
@@ -184,6 +186,10 @@ export abstract class BaseAgent implements IAgent {
         }
       }
 
+      if (messages.length > compressThreshold) {
+        messages = await this.compressMessages(messages, startIndex, endIndex);
+      }
+
       // Send the tool responses back to the model
       const secondResponse = await openai.chat.completions.create({
         model,
@@ -200,5 +206,51 @@ export abstract class BaseAgent implements IAgent {
     if (responseMessage.content) {
       return responseMessage.content;
     }
+  }
+
+  async compressMessages(
+    messages: ChatCompletionMessageParam[],
+    startIndex: number,
+    endIndex: number
+  ) {
+    const toCompress = messages.slice(startIndex, endIndex);
+    const toCompressPrompt = `Summarize what this agent was tasked with, what has been tried so far, and what we're about to do next. This summary will become the agent's only memory of the past, all other messages will be dropped: \n\n${JSON.stringify(
+      toCompress
+    )}`;
+
+    const model = this.getModel();
+
+    const response = await openai.chat.completions.create({
+      model,
+      messages: [
+        {
+          role: "assistant",
+          content: toCompressPrompt,
+        },
+      ],
+    });
+
+    const newMessages = [
+      ...response.choices.map((c) => c.message),
+      ...messages.slice(endIndex),
+    ];
+
+    const oldLength = JSON.stringify(messages).length;
+    const newLength = JSON.stringify(newMessages).length;
+    const compressionRatio = (
+      ((oldLength - newLength) / oldLength) *
+      100
+    ).toFixed(2);
+
+    console.log(
+      "Compressed messages from",
+      oldLength,
+      "to",
+      newLength,
+      compressionRatio + "%",
+      "reduction in size"
+    );
+
+    return newMessages;
   }
 }
