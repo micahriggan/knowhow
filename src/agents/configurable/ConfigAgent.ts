@@ -1,6 +1,6 @@
+import { BaseAgent } from "../base/base";
 import { ChatCompletionMessageParam } from "openai/resources/chat";
-import { BaseAgent } from "./base/base";
-import { Assistant } from "../types";
+import { Assistant } from "../../types";
 
 export class ConfigAgent extends BaseAgent {
   name: string;
