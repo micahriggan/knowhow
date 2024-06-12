@@ -10,9 +10,9 @@ import { Plugins } from "./plugins/plugins";
 import { queryEmbedding } from "./embeddings";
 import { agentService } from "./services/AgentService";
 import { FlagsService } from "./services/flags";
-import { IAgent } from "./agents/base/base";
 import { Researcher } from "./agents/researcher/researcher";
 import { Developer } from "./agents/codebase/codebase";
+import { IAgent } from "./agents/interface";
 
 enum ChatFlags {
   agent = "agent",

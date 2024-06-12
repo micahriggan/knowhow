@@ -1,9 +1,9 @@
 import { ThreadCreateParams } from "openai/resources/beta/threads";
 import { ChatCompletionMessageParam } from "openai/resources/chat";
-import { BaseAgent, IAgent } from "./base/base";
 import { openai } from "../ai";
 import { wait } from "../utils";
 import { Assistant } from "../types";
+import { IAgent } from "./interface";
 
 export class OpenAIAgent implements IAgent {
   name: string;

@@ -258,6 +258,27 @@ const includedTools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "askHuman",
+      description: "Ask a human a question and get a response.",
+      parameters: {
+        type: "object",
+        properties: {
+          question: {
+            type: "string",
+            description: "The question to ask the human. Can be in markdown",
+          },
+        },
+        required: ["question"],
+      },
+      returns: {
+        type: "string",
+        description: "The response from the human.",
+      },
+    },
+  },
 ] as ChatCompletionTool[];
 
 class ToolsService {

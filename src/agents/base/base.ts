@@ -18,6 +18,7 @@ import {
 } from "../tools";
 import { Tools } from "../tools/list";
 import { patchFile } from "../tools/patch";
+import { IAgent } from "../interface";
 
 const availableFunctions = addInternalTools({
   patchFile,
@@ -31,14 +32,6 @@ const availableFunctions = addInternalTools({
   lintFile,
   textSearch,
 });
-
-export interface IAgent {
-  name: string;
-  call: (
-    userInput: string,
-    messages?: ChatCompletionMessageParam[]
-  ) => Promise<string>;
-}
 
 export abstract class BaseAgent implements IAgent {
   abstract name: string;

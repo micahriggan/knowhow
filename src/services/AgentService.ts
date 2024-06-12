@@ -1,10 +1,10 @@
-import { IAgent } from "../agents/base/base";
 import { OpenAIAgent } from "../agents/OpenAIAgent";
 import { ConfigAgent } from "../agents/ConfigAgent";
 import { Researcher } from "../agents/researcher/researcher";
 import { Developer } from "../agents/codebase/codebase";
 import { getConfigSync } from "../config";
 import { Tools } from "../agents/tools/list";
+import { IAgent } from "../agents/interface";
 
 class AgentService {
   private agents: Map<string, IAgent> = new Map();
