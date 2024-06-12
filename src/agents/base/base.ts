@@ -4,19 +4,6 @@ import {
   ChatCompletionMessageToolCall,
 } from "openai/resources/chat";
 import { openai } from "../../ai";
-import {
-  addInternalTools,
-  callPlugin,
-  execCommand,
-  finalAnswer,
-  readBlocks,
-  readFile,
-  embeddingSearch,
-  visionTool,
-  lintFile,
-  textSearch,
-} from "../tools";
-import { patchFile } from "../tools/patch";
 import { IAgent } from "../interface";
 import { Tools } from "../../services/Tools";
 
