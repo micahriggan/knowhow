@@ -38,6 +38,11 @@ export async function embedSource(
   source: Config["embedSources"][0],
   ignorePattern: string[]
 ) {
+  if (!source.input) {
+    console.log("Skpping", source.output, "with blank input property");
+    return;
+  }
+
   console.log("Embedding", source.input, "to", source.output);
   let files = await glob.sync(source.input, { ignore: ignorePattern });
 
