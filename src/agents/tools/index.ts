@@ -14,3 +14,4 @@ export * from "./scanFile";
 export * from "./textSearch";
 export * from "./visionTool";
 export * from "./writeFile";
+export * from "./asana";

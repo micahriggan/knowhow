@@ -28,6 +28,10 @@ export abstract class BaseAgent implements IAgent {
     );
   }
 
+  getEnabledToolNames() {
+    return this.getEnabledTools().map((t) => t.function.name);
+  }
+
   disableTool(toolName: string) {
     this.disabledTools.push(toolName);
   }
@@ -66,13 +70,15 @@ export abstract class BaseAgent implements IAgent {
     );
 
     if (!functionToCall) {
-      const options = Tools.getToolNames().join(", ");
+      const options = this.getEnabledToolNames().join(", ");
+      const error = `Function ${functionName} not found, options are ${options}`;
+      console.log(error);
       return [
         {
           tool_call_id: toolCall.id,
           role: "tool",
           name: "error",
-          content: `Function ${functionName} not found, options are ${options}`,
+          content: error,
         },
       ];
     }

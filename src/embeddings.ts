@@ -286,6 +286,7 @@ export async function handleAllKinds(
   const ids = [];
 
   if (Plugins.isPlugin(kind)) {
+    console.log("Embedding with plugin", kind);
     return Plugins.embed(kind, input);
   }
   switch (kind) {

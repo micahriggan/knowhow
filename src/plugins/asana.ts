@@ -14,24 +14,50 @@ export class AsanaPlugin implements Plugin {
   }
 
   getTaskString(task: any) {
-    return `### Task: ${task.name}\n- Description: ${task.notes}\n- URL: ${task.permalink_url}`;
+    return `### Task: ${task.name}\n- Description: ${task.notes}\n- URL: ${task.permalink_url}\n Completed: ${task.completed}`;
   }
 
   async embed(userPrompt: string): Promise<MinimalEmbedding[]> {
-    const urls = this.extractUrls(userPrompt);
+    const urls = this.extractTaskUrls(userPrompt);
     const tasksData = await this.getTasksFromUrls(urls);
     const tasksDataFiltered = tasksData.filter((task) => task !== null);
 
-    return tasksDataFiltered.map((task) => {
+    const tasksEmbeddings = tasksDataFiltered.map((task) => {
       return {
         id: task.permalink_url,
         text: this.getTaskString(task),
-        metadata: {},
+        metadata: {
+          task: JSON.stringify(task),
+        },
       };
     });
+
+    const projectUrls = this.extractProjectUrls(userPrompt);
+    const projectTasks = await this.getTasksFromProjectUrls(projectUrls);
+    const projectTasksFiltered = projectTasks.filter((t) => t !== null);
+
+    const projectTaskEmbeddings = projectTasksFiltered.map((t) => {
+      return {
+        id: t.permalink_url,
+        text: this.getTaskString(t),
+        metadata: {
+          task: JSON.stringify(t),
+        },
+      };
+    });
+
+    const allTasks = tasksEmbeddings.concat(projectTaskEmbeddings);
+    console.log("Found ", allTasks.length, "tasks");
+    return allTasks;
   }
 
-  extractUrls(userPrompt: string): string[] {
+  extractProjectUrls(userPrompt: string): string[] {
+    const projectUrlRegex = /https:\/\/app\.asana\.com\/0\/(\d+)\/list/g;
+    const matches = userPrompt.match(projectUrlRegex);
+    return matches || [];
+  }
+
+  extractTaskUrls(userPrompt: string): string[] {
     const taskUrlRegex = /https:\/\/app\.asana\.com\/0\/(\d+)\/(\d+)/g;
     const matches = userPrompt.match(taskUrlRegex);
     return matches || [];
@@ -44,6 +70,27 @@ export class AsanaPlugin implements Plugin {
       })
     );
     return tasks;
+  }
+
+  async getTasksFromProjectUrls(urls: string[]) {
+    const tasks = await Promise.all(
+      urls.map((url) => this.getTasksFromProjectUrl(url))
+    );
+    return tasks.flat();
+  }
+
+  async getTasksFromProjectUrl(url: string) {
+    const urlParts = url.split("/");
+    const projectId = urlParts[4];
+    console.log({ projectId });
+    if (!projectId) {
+      return null;
+    }
+    const tasks = await this.asanaClient.tasks.findAll({
+      project: projectId,
+      opt_expand: "notes,assignee,permalink_url,custom_fields,tags,completed",
+    });
+    return tasks.data;
   }
 
   async getTaskFromUrl(url: string) {
@@ -66,7 +113,7 @@ export class AsanaPlugin implements Plugin {
   }
 
   async call(userPrompt: string): Promise<string> {
-    const urls = this.extractUrls(userPrompt);
+    const urls = this.extractTaskUrls(userPrompt);
     const tasksData = await this.getTasksFromUrls(urls);
     const tasksDataFiltered = tasksData.filter((task) => task !== null);
 
