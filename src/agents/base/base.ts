@@ -16,22 +16,9 @@ import {
   lintFile,
   textSearch,
 } from "../tools";
-import { Tools } from "../tools/list";
 import { patchFile } from "../tools/patch";
 import { IAgent } from "../interface";
-
-const availableFunctions = addInternalTools({
-  patchFile,
-  callPlugin,
-  execCommand,
-  finalAnswer,
-  readBlocks,
-  readFile,
-  embeddingSearch,
-  visionTool,
-  lintFile,
-  textSearch,
-});
+import { Tools } from "../../services/Tools";
 
 export abstract class BaseAgent implements IAgent {
   abstract name: string;
@@ -72,7 +59,7 @@ export abstract class BaseAgent implements IAgent {
 
   async getToolMessages(toolCall: ChatCompletionMessageToolCall) {
     const functionName = toolCall.function.name;
-    const functionToCall = availableFunctions[functionName];
+    const functionToCall = Tools.getFunction(functionName);
     const functionArgs = JSON.parse(toolCall.function.arguments);
 
     const toJsonIfObject = (arg: any) => {
@@ -92,7 +79,7 @@ export abstract class BaseAgent implements IAgent {
     );
 
     if (!functionToCall) {
-      const options = Object.keys(availableFunctions).join(", ");
+      const options = Tools.getToolNames().join(", ");
       return [
         {
           tool_call_id: toolCall.id,

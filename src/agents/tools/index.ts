@@ -6,7 +6,6 @@ export * from "./execCommand";
 export * from "./finalAnswer";
 export * from "./index";
 export * from "./lintFile";
-export * from "./list";
 export * from "./modifyFile";
 export * from "./patch";
 export * from "./readBlocks";

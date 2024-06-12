@@ -1,10 +1,9 @@
 import { ChatCompletionTool } from "openai/resources/chat";
 import { Plugins } from "../../plugins/plugins";
-import { agentService } from "../../services/AgentService";
 
 const pluginNames = Plugins.listPlugins().join(", ");
 
-const includedTools = [
+export const includedTools = [
   {
     type: "function",
     function: {
@@ -280,21 +279,3 @@ const includedTools = [
     },
   },
 ] as ChatCompletionTool[];
-
-class ToolsService {
-  tools = includedTools;
-
-  getTools() {
-    return this.tools;
-  }
-
-  getTool(name: string) {
-    return this.tools.find((tool) => tool.function.name === name);
-  }
-
-  addTool(tool: ChatCompletionTool) {
-    this.tools.push(tool);
-  }
-}
-
-export const Tools = new ToolsService();
