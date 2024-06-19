@@ -10,7 +10,6 @@ import { Plugins } from "./plugins/plugins";
 import { queryEmbedding } from "./embeddings";
 import { agentService } from "./services/AgentService";
 import { FlagsService } from "./services/flags";
-import { Researcher } from "./agents/researcher/researcher";
 import { Developer } from "./agents/codebase/codebase";
 import { IAgent } from "./agents/interface";
 
@@ -32,7 +31,8 @@ export async function askEmbedding<E>(
   handleAnswer?: (question: string, answer: EmbeddingBase<any>) => void
 ) {
   console.log("Commands: next, exit");
-  let input = await ask(promptText + ": ");
+  const options = ["next", "exit"];
+  let input = await ask(promptText + ": ", options);
   let answer: EmbeddingBase<any> | undefined;
   let results = new Array<EmbeddingBase>();
   while (input !== "exit") {
@@ -172,7 +172,14 @@ export async function askGpt<E extends GptQuestionEmbedding>(
           break;
         case "search":
           await askEmbedding(embeddings, "searching", (question, _answer) => {
-            console.log(JSON.stringify(_answer.metadata, null, 2));
+            console.log(
+              Marked.parse(
+                "### TEXT \n" +
+                  _answer.text +
+                  "\n### METADATA \n" +
+                  JSON.stringify(_answer.metadata, null, 2)
+              )
+            );
           });
           break;
         case "":

@@ -88,7 +88,7 @@ export const includedTools = [
     type: "function",
     function: {
       name: "callPlugin",
-      description: `Call a specified plugin with given input. Plugins provide additional context from supported URLs or words. Currently available plugins: ${pluginNames}`,
+      description: `Call a specified plugin with given input. Plugins provide additional context from supported URLs or words. This is a read-only operation. Currently available plugins: ${pluginNames}`,
       parameters: {
         type: "object",
         properties: {

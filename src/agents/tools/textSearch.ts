@@ -15,6 +15,7 @@ export async function textSearch(searchTerm) {
     const results = embeddings.filter((embedding) =>
       embedding.text.toLowerCase().includes(searchTermLower)
     );
+    results.forEach((r) => delete r.vector);
     return results;
   }
 }

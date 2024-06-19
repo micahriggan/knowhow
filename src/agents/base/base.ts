@@ -187,7 +187,12 @@ export abstract class BaseAgent implements IAgent {
     endIndex: number
   ) {
     const toCompress = messages.slice(startIndex, endIndex);
-    const toCompressPrompt = `Summarize what this agent was tasked with, what has been tried so far, and what we're about to do next. This summary will become the agent's only memory of the past, all other messages will be dropped: \n\n${JSON.stringify(
+    const toCompressPrompt = `Summarize:
+    1. Initial Request - what this agent was tasked with.
+    2. Progress - what has been tried so far,
+    3. Next Steps - what we're about to do next to continue the user's original request.
+
+      This summary will become the agent's only memory of the past, all other messages will be dropped: \n\n${JSON.stringify(
       toCompress
     )}`;
 
@@ -203,7 +208,10 @@ export abstract class BaseAgent implements IAgent {
       ],
     });
 
+    const systemMesasges = toCompress.filter((m) => m.role === "system");
+
     const newMessages = [
+      ...systemMesasges,
       ...response.choices.map((c) => c.message),
       ...messages.slice(endIndex),
     ];
