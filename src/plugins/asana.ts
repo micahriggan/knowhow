@@ -86,11 +86,18 @@ export class AsanaPlugin implements Plugin {
     if (!projectId) {
       return null;
     }
-    const tasks = await this.asanaClient.tasks.findAll({
+    let tasks = await this.asanaClient.tasks.findAll({
       project: projectId,
       opt_expand: "notes,assignee,permalink_url,custom_fields,tags,completed",
     });
-    return tasks.data;
+    const allData = [];
+
+    do {
+      allData.push(...tasks.data);
+      tasks = await tasks.nextPage();
+    } while (tasks);
+
+    return allData;
   }
 
   async getTaskFromUrl(url: string) {

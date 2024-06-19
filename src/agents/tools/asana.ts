@@ -86,8 +86,17 @@ class AsanaTools {
     if (!workspace) {
       throw new Error("Need to set ENV Variable ASANA Workspace");
     }
-    const projects = await this.client.projects.findAll({ workspace });
-    return projects.data;
+    const allData = [];
+    let projects = await this.client.projects.findAll({
+      workspace,
+      archived: false,
+    });
+    do {
+      allData.push(...projects.data);
+      projects = await projects.nextPage();
+    } while (projects && projects?.data?.length);
+
+    return allData;
   }
 }
 
