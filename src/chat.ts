@@ -7,7 +7,7 @@ import { EmbeddingBase, GptQuestionEmbedding, Embeddable } from "./types";
 import { Marked } from "./utils";
 import { ask } from "./utils";
 import { Plugins } from "./plugins/plugins";
-import { queryEmbedding } from "./embeddings";
+import { queryEmbedding, getConfiguredEmbeddingMap } from "./embeddings";
 import { agentService } from "./services/AgentService";
 import { FlagsService } from "./services/flags";
 import { Developer } from "./agents/codebase/codebase";
@@ -25,28 +25,52 @@ const Flags = new FlagsService(
   true
 );
 
-export async function askEmbedding<E>(
-  embeddings: Embeddable<E>[],
-  promptText: string,
-  handleAnswer?: (question: string, answer: EmbeddingBase<any>) => void
-) {
+export async function askEmbedding<E>(promptText: string) {
   console.log("Commands: next, exit");
   const options = ["next", "exit"];
   let input = await ask(promptText + ": ", options);
   let answer: EmbeddingBase<any> | undefined;
   let results = new Array<EmbeddingBase>();
+  let embedMap = await getConfiguredEmbeddingMap();
+  const files = Object.keys(embedMap);
+
   while (input !== "exit") {
+    const embeddings = Object.values(embedMap).flat();
+
     switch (input) {
       case "next":
         answer = results.shift();
+        break;
+      case "embeddings":
+        console.log(files);
+        break;
+      case "use":
+        console.log(files);
+        const embeddingName = await ask(
+          "Embedding to search: ",
+          ["all", ...files]
+        );
+        if (embeddingName === "all") {
+          embedMap = await getConfiguredEmbeddingMap();
+          break;
+        }
+
+        embedMap = { ...{ [embeddingName]: embedMap[embeddingName] } };
         break;
       default:
         results = await queryEmbedding(input, embeddings);
         answer = results.shift();
         break;
     }
-    if (answer && handleAnswer) {
-      handleAnswer(input, answer);
+    if (answer) {
+      console.log(
+        Marked.parse(
+          "### TEXT \n" +
+            answer.text +
+            "\n### METADATA \n" +
+            JSON.stringify(answer.metadata, null, 2)
+        )
+      );
     }
 
     input = await ask(promptText + ": ");
@@ -171,16 +195,7 @@ export async function askGpt<E extends GptQuestionEmbedding>(
           Flags.flip(ChatFlags.multi);
           break;
         case "search":
-          await askEmbedding(embeddings, "searching", (question, _answer) => {
-            console.log(
-              Marked.parse(
-                "### TEXT \n" +
-                  _answer.text +
-                  "\n### METADATA \n" +
-                  JSON.stringify(_answer.metadata, null, 2)
-              )
-            );
-          });
+          await askEmbedding("searching");
           break;
         case "":
           break;
