@@ -26,8 +26,8 @@ const Flags = new FlagsService(
 );
 
 export async function askEmbedding<E>(promptText: string) {
-  console.log("Commands: next, exit");
-  const options = ["next", "exit"];
+  const options = ["next", "exit", "embeddings", "use"];
+  console.log(`Commands: ${options.join(", ")}`);
   let input = await ask(promptText + ": ", options);
   let answer: EmbeddingBase<any> | undefined;
   let results = new Array<EmbeddingBase>();
@@ -46,10 +46,10 @@ export async function askEmbedding<E>(promptText: string) {
         break;
       case "use":
         console.log(files);
-        const embeddingName = await ask(
-          "Embedding to search: ",
-          ["all", ...files]
-        );
+        const embeddingName = await ask("Embedding to search: ", [
+          "all",
+          ...files,
+        ]);
         if (embeddingName === "all") {
           embedMap = await getConfiguredEmbeddingMap();
           break;
