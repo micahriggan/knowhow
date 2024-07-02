@@ -45,11 +45,9 @@ export async function askEmbedding<E>(promptText: string) {
         console.log(files);
         break;
       case "use":
-        console.log(files);
-        const embeddingName = await ask("Embedding to search: ", [
-          "all",
-          ...files,
-        ]);
+        const searchOptions = ["all", ...files];
+        console.log(searchOptions);
+        const embeddingName = await ask("Embedding to search: ", searchOptions);
         if (embeddingName === "all") {
           embedMap = await getConfiguredEmbeddingMap();
           break;
