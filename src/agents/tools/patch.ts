@@ -2,7 +2,7 @@ import * as fs from "fs";
 import * as util from "util";
 import { applyPatch, createPatch, parsedPatch } from "diff";
 import { Plugins } from "../../plugins/plugins";
-import { execAsync } from "../../utils";
+import { execAsync, writeFile, readFile, fileExists, mkdir } from "../../utils";
 import { lintFile } from ".";
 
 function findAllLineNumbers(fullText: string, searchText: string) {
@@ -247,6 +247,27 @@ function compareLine(lineNumber, line, operation, patchContent) {
   return line.trim() === patchContent.trim();
 }
 
+async function savePatchError(
+  originalPatch: string,
+  fixedPatch: string,
+  fileContent: string
+) {
+  const dirName = ".knowhow/tools/patchFile";
+  const fileName = "errors.json";
+  const filePath = `${dirName}/${fileName}`;
+  if (!(await fileExists(filePath))) {
+    await mkdir(dirName, { recursive: true });
+    await writeFile(filePath, "[]");
+  }
+  const errors = JSON.parse(await readFile(filePath, "utf8"));
+  errors.push({
+    originalPatch,
+    fixedPatch,
+    fileContent,
+  });
+  await writeFile(filePath, JSON.stringify(errors, null, 2));
+}
+
 // Tool to apply a patch file to a file
 export async function patchFile(
   filePath: string,
@@ -273,10 +294,12 @@ export async function patchFile(
       fs.writeFileSync(filePath, updatedContent);
     }
     if (!updatedContent) {
+      await savePatchError(patch, patch, originalContent);
       throw new Error("Patch failed to apply");
     }
 
     const lintResult = await lintFile(filePath);
+
     return `
     Patch has been applied. Use readFile to verify your changest worked.
     ${lintResult && "Linting Result"}
