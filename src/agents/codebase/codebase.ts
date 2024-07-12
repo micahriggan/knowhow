@@ -33,7 +33,7 @@ Index: ./src/agents/base/base.ts
 +      ...systemMesasges,
        ...response.choices.map((c) => c.message),
        ...messages.slice(endIndex),
-     ];
+   ];
 
 `;
 
@@ -42,6 +42,29 @@ Here's an example of a correctly formatted patch:
 ${example}
 
 Be sure to preserve sytanx, delete the correct lines of code, and insert new lines of code in the correct locations.
+
+The user's patch tool needs CORRECT patches that apply cleanly against the current contents of the file!
+Think carefully and make sure you include and mark all lines that need to be removed or changed as \`-\` lines.
+Make sure you mark all new or modified lines with \`+\`.
+Don't leave out any lines or the diff patch won't apply correctly.
+
+Indentation matters in the diffs!
+
+Start a new hunk for each section of the file that needs changes.
+
+Only output hunks that specify changes with \`+\` or \`-\` lines.
+Skip any hunks that are entirely unchanging \` \` lines.
+
+Output hunks in whatever order makes the most sense.
+Hunks don't need to be in any particular order.
+
+Hunks should have a context of 3 lines before and after the change, which match exactly from the source.
+
+When editing a function, method, loop, etc use a hunk to replace the *entire* code block.
+Delete the entire existing version with \`-\` lines and then add a new, updated version with \`+\` lines.
+This will help you generate correct code and correct diffs.
+
+To move code within a file, use 2 hunks: 1 to delete it from its current location, 1 to insert it in the new location.
 `;
 
 export class CodebaseAgent extends BaseAgent {

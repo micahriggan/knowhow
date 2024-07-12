@@ -9,7 +9,12 @@ import { parsePatch, diffLines, applyPatch } from "diff";
 import { CodebaseAgent } from "../../agents/codebase/codebase";
 import dataset from "./dataset.json";
 import { ask, writeFile, mkdir } from "../../utils";
-import { fixPatch, parseHunks } from "../../agents/tools/patch";
+import {
+  fixPatch,
+  parseHunks,
+  categorizeHunks,
+  hunksToPatch,
+} from "../../agents/tools/patch";
 import { md5Hash } from "../../hashes";
 
 class PatchTestAgent extends CodebaseAgent {
@@ -38,12 +43,12 @@ class PatchTestAgent extends CodebaseAgent {
   }
 }
 
-async function generateDataset() {
+async function testDataset() {
   const patchAgent = new PatchTestAgent();
 
   let successCount = 0;
   let attempts = 0;
-  const testHash = "291273b78808d063dd0deb01f4e9ee78";
+  const testHash = "";
 
   const shuffled = dataset
     .map((value) => ({ value, sort: Math.random() }))
@@ -79,9 +84,13 @@ async function generateDataset() {
 
       const originalContent = patchData.before;
       const fixedPatch = fixPatch(patchData.before, patch);
+      const { validHunks, invalidHunks } = categorizeHunks(
+        originalContent,
+        patch
+      );
+      const validPatch = hunksToPatch(validHunks);
 
-      const updatedContent = applyPatch(originalContent, fixedPatch);
-      console.log({ updatedContent });
+      const updatedContent = applyPatch(originalContent, validPatch);
       const success = !!updatedContent;
       await saveToolDiagnosticFiles(patchData, patch, fixedPatch, success);
 
@@ -108,7 +117,20 @@ async function generateDataset() {
         console.log("DID PATCH APPLY?", !!updatedContent);
       }
 
-      return "Patched";
+      if (!success) {
+        // await ask("Proceed?");
+      }
+
+      const invalidPatch = hunksToPatch(invalidHunks);
+      const invalidHunksMessage = invalidHunks.length
+        ? `Patch Partially Applied: \n Invalid Hunks: \n${invalidPatch} `
+        : "";
+
+      const appliedMessage = validHunks.length
+        ? `Valid Hunks Applied: \n${validPatch}`
+        : "";
+
+      return `${invalidHunksMessage} \n ${appliedMessage}`;
     }
 
     patchAgent.tools.setFunction("patchFile", testPatchFile);
@@ -122,8 +144,6 @@ ${patchData.before}
 
       so that it would look like this:
 ${patchData.after}?`);
-
-    // await ask("Proceed?");
 
     /*
      *const toolResponses = await patchAgent.processToolMessages({
@@ -161,5 +181,5 @@ async function saveToolDiagnosticFiles(
 }
 
 if (require.main === module) {
-  generateDataset();
+  testDataset();
 }
