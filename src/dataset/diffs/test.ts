@@ -91,8 +91,14 @@ async function testDataset() {
       const validPatch = hunksToPatch(validHunks);
 
       const updatedContent = applyPatch(originalContent, validPatch);
-      const success = !!updatedContent;
-      await saveToolDiagnosticFiles(patchData, patch, fixedPatch, success);
+      const success = !!updatedContent && validHunks.length;
+      await saveToolDiagnosticFiles(
+        patchData,
+        patch,
+        fixedPatch,
+        validPatch,
+        success
+      );
 
       if (success) {
         successCount++;
@@ -166,6 +172,7 @@ async function saveToolDiagnosticFiles(
   patchData: typeof dataset[0],
   patch: string,
   fixedPatch: string,
+  validPatch: string,
   success
 ) {
   const failureDir = success ? "success" : "fail";
@@ -178,6 +185,7 @@ async function saveToolDiagnosticFiles(
   await writeFile(`${dirName}/actual-patch.diff`, patchData.patch);
   await writeFile(`${dirName}/after.ignore.ts`, patchData.after);
   await writeFile(`${dirName}/ai-fixed-patch.diff`, fixedPatch);
+  await writeFile(`${dirName}/ai-valid-patch.diff`, validPatch);
 }
 
 if (require.main === module) {
