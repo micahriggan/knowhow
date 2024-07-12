@@ -54,3 +54,23 @@ export function cosineSimilarity(A, B) {
     dotp(A, B) / (Math.sqrt(dotp(A, A)) * Math.sqrt(dotp(B, B)));
   return similarity;
 }
+
+const NEWLINE_REPLACE = "__NEWLINE__";
+export function replaceEscapedNewLines(str: string): string {
+  const replacedStr = str.replace(/\\n/g, NEWLINE_REPLACE);
+  return replacedStr;
+}
+
+export function restoreEscapedNewLines(str: string): string {
+  return str.replace(new RegExp(NEWLINE_REPLACE, "g"), "\\n");
+}
+
+export function splitByNewLines(str: string): string[] {
+  const replacedStr = replaceEscapedNewLines(str);
+
+  // Step 2: Split the string by actual new lines
+  const parts = replacedStr.split("\n");
+
+  // Step 3: Restore the escaped new lines in the split parts
+  return parts.map((part) => restoreEscapedNewLines(part));
+}

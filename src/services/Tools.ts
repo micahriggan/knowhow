@@ -2,8 +2,10 @@ import { ChatCompletionTool } from "openai/resources/chat";
 import { includedTools } from "../agents/tools/list";
 import * as allTools from "../agents/tools";
 
-class ToolsService {
+export class ToolsService {
   tools = [...includedTools];
+
+  functions = {};
 
   getTools() {
     return this.tools;
@@ -18,7 +20,11 @@ class ToolsService {
   }
 
   getFunction(name: string) {
-    return allTools.addInternalTools(allTools)[name];
+    return this.functions[name] || allTools.addInternalTools(allTools)[name];
+  }
+
+  setFunction(name: string, func: (...args: any) => any) {
+    this.functions[name] = func;
   }
 
   addTool(tool: ChatCompletionTool) {

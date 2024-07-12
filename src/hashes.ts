@@ -12,8 +12,12 @@ export async function saveHashes(hashes: any) {
   await writeFile(".knowhow/.hashes.json", JSON.stringify(hashes, null, 2));
 }
 
+export async function md5Hash(str: string) {
+  return crypto.createHash("md5").update(str).digest("hex");
+}
+
 export async function checkNoFilesChanged(
-  files: Array<string>,
+  files: string[],
   promptHash: string,
   hashes: any
 ) {

@@ -1,12 +1,19 @@
 import * as fs from "fs";
 import * as util from "util";
-import { applyPatch, createPatch, parsedPatch } from "diff";
+import { applyPatch, createPatch } from "diff";
 import { Plugins } from "../../plugins/plugins";
-import { execAsync, writeFile, readFile, fileExists, mkdir } from "../../utils";
+import {
+  execAsync,
+  writeFile,
+  readFile,
+  fileExists,
+  mkdir,
+  splitByNewLines,
+} from "../../utils";
 import { lintFile } from ".";
 
 function findAllLineNumbers(fullText: string, searchText: string) {
-  const lines = fullText.split("\n");
+  const lines = splitByNewLines(fullText);
 
   const lineNumbers = lines
     .map((line, index) => {
@@ -44,7 +51,7 @@ export interface Hunk {
 }
 
 export function parseHunks(patch: string) {
-  const patchLines = patch.split("\n");
+  const patchLines = splitByNewLines(patch);
   const headerIndexes = patchLines
     .map((l, index) => (l.startsWith("@@") ? index : -1))
     .filter((i) => i !== -1);
@@ -141,8 +148,56 @@ export function findFirstLineNumber(hunk: Hunk, originalContent: string) {
   return firstLineNumberUnderHeader;
 }
 
+export function fixAccidentalDeletions(hunk: Hunk, originalContent: string) {
+  const rebuiltText = hunk.lines
+    .filter((l) => !l.startsWith("+"))
+    .map((l) => l.slice(1));
+
+  const sourceLines = splitByNewLines(originalContent);
+  const relevantSourceLines = sourceLines.slice(
+    hunk.headerStart - 1,
+    hunk.headerStart - 1 + hunk.lines.length - 1
+  );
+
+  const isValid = originalContent.includes(rebuiltText.join("\n"));
+  if (isValid) {
+    return hunk;
+  }
+
+  for (let i = 0; i < rebuiltText.length; i++) {
+    if (rebuiltText[i] === relevantSourceLines[i]) {
+      continue;
+    }
+
+    // the two don't match, check if deletion
+    const found = hunk.subtractions.findIndex(
+      (l) => l.slice(1) === rebuiltText[i]
+    );
+    if (found > -1) {
+      const lineIndex = hunk.lines.findIndex(
+        (l) => l === hunk.subtractions[found]
+      );
+      hunk.subtractions.splice(found, 1);
+
+      hunk.lines.splice(lineIndex, 1);
+
+      rebuiltText.splice(i, 1);
+
+      console.log("repaired  hunk", hunk);
+    }
+  }
+
+  const compare = {
+    rebuiltText,
+    relevantSource: relevantSourceLines,
+  };
+  console.log(compare);
+
+  return hunk;
+}
+
 export function fixHunkContext(hunk: Hunk, originalContent: string) {
-  const originalLines = originalContent.split("\n");
+  const originalLines = splitByNewLines(originalContent);
   const firstSubtraction = hunk.subtractions[0];
 
   const firstLineNumberUnderHeader = findFirstLineNumber(hunk, originalContent);
@@ -152,8 +207,17 @@ export function fixHunkContext(hunk: Hunk, originalContent: string) {
       firstSubtraction
     )[0];
 
+    // If context is not 3 lines, add more lines, unless it's negative
+    const contextStart = Math.max(
+      subtractionActualNumber - firstLineNumberUnderHeader >= 3
+        ? firstLineNumberUnderHeader
+        : subtractionActualNumber - 4,
+      1
+    );
+
+    // Get all source lines from the start to the subtraction line
     const beforeContext = originalLines
-      .slice(firstLineNumberUnderHeader - 1, subtractionActualNumber - 1)
+      .slice(contextStart - 1, subtractionActualNumber - 1)
       .map((l) => ` ${l}`);
 
     const subtractionLineIndex = hunk.lines.indexOf(firstSubtraction);
@@ -192,21 +256,124 @@ export function fixHunkHeader(hunk: Hunk, originalContent: string) {
     );
     hunk.headerStart = firstLineNumberUnderHeader;
 
-    const removalStart =
+    let removalStart =
       hunk.subtractions.length > 0
         ? hunk.headerStart + hunk.firstSubtractionLineIndex
         : 0;
-    const additionStart =
+
+    let additionStart =
       hunk.additions.length > 0
         ? hunk.headerStart + hunk.firstAdditionLineIndex
         : 0;
 
+    if (hunk.subtractions.length <= 1 && hunk.additions.length <= 1) {
+      // If a hunk contains just one line, only its start line number appears.
+      removalStart = hunk.headerStart;
+      additionStart = hunk.headerStart;
+    }
+
     const removalCount = hunk.subtractions.length + hunk.contextLines.length;
     const additionCount = hunk.additions.length + hunk.contextLines.length;
+
     hunk.header = `@@ -${removalStart},${removalCount} +${additionStart},${additionCount} @@`;
     console.log(hunk);
   }
   return hunk;
+}
+
+export function fixHunkDeletionTooShort(hunk: Hunk, originalContent: string) {
+  return hunk;
+  const originalLines = splitByNewLines(originalContent);
+  // Finds deletions where the deletion doesn't include the full line, maybe due to newlines
+
+  for (let i = 0; i < hunk.subtractions.length; i++) {
+    const deletion = hunk.subtractions[i];
+    const deletedText = deletion.slice(1);
+
+    if (originalLines.includes(deletedText)) {
+      // exact match, no fix required
+      continue;
+    }
+
+    console.log({ deletedText });
+    // Fix forwards, where you didn't delete enough
+    const srcSubtractionIndexForwards = originalLines.findIndex((l) =>
+      l.startsWith(deletedText)
+    );
+    const srcSubtractionIndexBackwards = originalLines.findIndex((l) =>
+      l.endsWith(deletedText)
+    );
+
+    console.log({ srcSubtractionIndexForwards, srcSubtractionIndexBackwards });
+
+    if (
+      srcSubtractionIndexForwards === -1 &&
+      srcSubtractionIndexBackwards === -1
+    ) {
+      // we couldn't find the line, so we can't fix it
+      continue;
+    }
+
+    const forwards = srcSubtractionIndexForwards > -1;
+    const actualIndex = Math.max(
+      srcSubtractionIndexForwards,
+      srcSubtractionIndexBackwards
+    );
+    const actualDeletion = originalLines[actualIndex];
+    const lineIndex = hunk.lines.indexOf(deletion);
+
+    hunk.subtractions[i] = `-${actualDeletion}`;
+    hunk.lines[lineIndex] = `-${actualDeletion}`;
+
+    if (forwards) {
+      // The next lines should have been deleted,
+      // and are now contained by the actualDeletion so we should remove them
+      console.log("Fixing forwards");
+      const fixAt = lineIndex + 1;
+      const sourceNextLine = originalLines[srcSubtractionIndexForwards + 1];
+      while (
+        hunk.lines[fixAt] !== sourceNextLine &&
+        hunk.lines[fixAt].startsWith(" ") &&
+        actualDeletion.includes(hunk.lines[fixAt].slice(1))
+      ) {
+        console.log("removing", hunk.lines[fixAt]);
+        hunk.lines.splice(fixAt, 1);
+      }
+    } else {
+      // The previous lines should have been deleted,
+      // and are now contained by the actualDeletion so we should remove them
+      let fixAt = lineIndex - 1;
+      const sourcePreviousLine =
+        originalLines[srcSubtractionIndexBackwards - 1];
+      while (
+        hunk.lines[fixAt] !== sourcePreviousLine &&
+        hunk.lines[fixAt].startsWith(" ") &&
+        actualDeletion.includes(hunk.lines[fixAt].slice(1))
+      ) {
+        console.log("removing", hunk.lines[fixAt]);
+        hunk.lines.splice(fixAt, 1);
+        console.log("LINES", hunk.lines);
+        fixAt--;
+      }
+    }
+  }
+
+  return hunk;
+}
+
+export function hunkIsEmpty(hunk: Hunk) {
+  const noLines = hunk.lines.length === 0;
+  const noChanges =
+    hunk.additions.length === 0 && hunk.subtractions.length === 0;
+
+  const additionTexts = hunk.additions.map((l) => l.slice(1));
+  const subtractionTexts = hunk.subtractions.map((l) => l.slice(1));
+  const additions = additionTexts.join("\n").trim();
+  const subtractions = subtractionTexts.join("\n").trim();
+  const noChangesText = additions === subtractions;
+  const isEmpty = noLines || noChanges || noChangesText;
+
+  return isEmpty;
 }
 
 export function fixPatch(originalContent: string, patch: string) {
@@ -214,9 +381,9 @@ export function fixPatch(originalContent: string, patch: string) {
 
   const hunks = parseHunks(patch);
   console.log(hunks);
-  const patchLines = patch.split("\n");
+  const patchLines = splitByNewLines(patch);
 
-  const originalLines = originalContent.split("\n");
+  const originalLines = splitByNewLines(originalContent);
 
   const isDeletingRealLines = (hunk: Hunk) =>
     hunk.subtractions.every(
@@ -226,21 +393,39 @@ export function fixPatch(originalContent: string, patch: string) {
   const canFindValidLines = (hunk: Hunk) =>
     findFirstLineNumber(hunk, originalContent);
 
+  const isNotEmptyHunk = (hunk: Hunk) => !hunkIsEmpty(hunk);
+
   const validatedHunks = hunks
+    .map((hunk) => fixHunkDeletionTooShort(hunk, originalContent))
     .filter(isDeletingRealLines)
     .filter(canFindValidLines)
+    .filter(isNotEmptyHunk)
     .map((hunk) => {
       fixHunkContext(hunk, originalContent);
       return hunk;
     });
 
-  const newPatch = hunksToPatch(hunks);
+  const newPatch = hunksToPatch(validatedHunks);
 
-  const fixedHunks = parseHunks(newPatch).map((hunk) =>
-    fixHunkHeader(hunk, originalContent)
-  );
+  const fixedHunks = parseHunks(newPatch)
+    .map((hunk) => fixHunkHeader(hunk, originalContent))
+    .map((hunk) => fixAccidentalDeletions(hunk, originalContent));
 
   return hunksToPatch(fixedHunks);
+}
+
+export function categorizeHunks(originalContent: string, patch: string) {
+  const hunks = parseHunks(patch);
+
+  const validHunks = hunks.filter((hunk) =>
+    applyPatch(originalContent, hunksToPatch([hunk]))
+  );
+
+  const invalidHunks = hunks.filter(
+    (hunk) => !applyPatch(originalContent, hunksToPatch([hunk]))
+  );
+
+  return { validHunks, invalidHunks };
 }
 
 function compareLine(lineNumber, line, operation, patchContent) {
@@ -281,7 +466,13 @@ export async function patchFile(
     const originalContent = fs.readFileSync(filePath, "utf8");
     patch = fixPatch(originalContent, patch);
 
-    let updatedContent = applyPatch(originalContent, patch);
+    const { validHunks, invalidHunks } = categorizeHunks(
+      originalContent,
+      patch
+    );
+
+    const validPatch = hunksToPatch(validHunks);
+    let updatedContent = applyPatch(originalContent, validPatch);
     console.log("Applying patch:");
     console.log(patch);
 
@@ -298,10 +489,21 @@ export async function patchFile(
       throw new Error("Patch failed to apply");
     }
 
+    const invalidPatch = hunksToPatch(invalidHunks);
+    const invalidHunksMessage = invalidHunks.length
+      ? `Patch Partially Applied: \n Invalid Hunks: \n${invalidPatch} `
+      : "";
+
+    const appliedMessage = validHunks.length
+      ? `Valid Hunks Applied: \n${validPatch}`
+      : "";
+
     const lintResult = await lintFile(filePath);
 
     return `
-    Patch has been applied. Use readFile to verify your changest worked.
+    ${invalidHunksMessage}
+    ${appliedMessage}
+    Use readFile to verify your changes worked.
     ${lintResult && "Linting Result"}
     ${lintResult || ""}
     `;

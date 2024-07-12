@@ -43,18 +43,10 @@ async function generateDataset() {
         continue;
       }
 
-      // Use GPT to summarize the changes (Placeholder for GPT call. This should be replaced with your implementation)
-      const summary = await summarizeTexts(
-        patch,
-        "Summarize this diff in a way where another AI would come up with a similar diff if they were to try to implement your request on this file \n {text}"
-      );
-
       console.log(filePath);
       console.log(patch);
-      console.log(summary);
 
       dataset.push({
-        userMessage: summary,
         before: previousFileContent,
         after: currentFileContent,
         patch,
@@ -65,7 +57,7 @@ async function generateDataset() {
         JSON.stringify(dataset, null, 2)
       );
 
-      if (dataset.length > 20) {
+      if (dataset.length > 200) {
         break;
       }
     }
