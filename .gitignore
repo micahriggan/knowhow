@@ -24,3 +24,4 @@ src/dist
 ts_build
 .knowhow
 src/dataset/**/*.json*
+src/dataset/**/test_files

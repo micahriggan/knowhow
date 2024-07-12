@@ -1,0 +1,165 @@
+import "source-map-support/register";
+
+import {
+  ChatCompletionMessageParam,
+  ChatCompletionToolMessageParam,
+  ChatCompletionMessageToolCall,
+} from "openai/resources/chat";
+import { parsePatch, diffLines, applyPatch } from "diff";
+import { CodebaseAgent } from "../../agents/codebase/codebase";
+import dataset from "./dataset.json";
+import { ask, writeFile, mkdir } from "../../utils";
+import { fixPatch, parseHunks } from "../../agents/tools/patch";
+import { md5Hash } from "../../hashes";
+
+class PatchTestAgent extends CodebaseAgent {
+  name = "PatchTestAgent";
+
+  getInitialMessages(userInput: string) {
+    const baseMessages = super.getInitialMessages(userInput);
+
+    baseMessages.push({
+      content:
+        "We are testing the patch tool, attempt to use only that tool with the input provided in the user's message.",
+      role: "user",
+    });
+
+    return baseMessages;
+  }
+
+  async processToolMessages(toolCall: ChatCompletionMessageToolCall) {
+    const toolMessages = await super.processToolMessages(toolCall);
+
+    toolMessages.push({
+      name: "finalAnswer",
+      content: "Done",
+    });
+    return toolMessages;
+  }
+}
+
+async function generateDataset() {
+  const patchAgent = new PatchTestAgent();
+
+  let successCount = 0;
+  let attempts = 0;
+  const testHash = "291273b78808d063dd0deb01f4e9ee78";
+
+  const shuffled = dataset
+    .map((value) => ({ value, sort: Math.random() }))
+    .sort((a, b) => a.sort - b.sort)
+    .map(({ value }) => value);
+
+  for (const patchData of shuffled) {
+    const hash = await md5Hash(patchData.patch);
+
+    if (testHash && testHash !== hash) {
+      // We are loooking to test one case
+      continue;
+    }
+
+    const changes = parseHunks(patchData.patch);
+    const totalChanges = changes
+      .map((hunk) => hunk.additions.length + hunk.subtractions.length)
+      .reduce((a, b) => a + b, 0);
+
+    // Only test small changes
+    if (totalChanges > 10) {
+      continue;
+    }
+
+    async function testPatchFile(
+      filePath: string,
+      patch: string
+    ): Promise<string> {
+      // console.log("AI Suggested", filePath, { patch, answer: patchData.patch });
+      //
+      //
+      attempts++;
+
+      const originalContent = patchData.before;
+      const fixedPatch = fixPatch(patchData.before, patch);
+
+      const updatedContent = applyPatch(originalContent, fixedPatch);
+      console.log({ updatedContent });
+      const success = !!updatedContent;
+      await saveToolDiagnosticFiles(patchData, patch, fixedPatch, success);
+
+      if (success) {
+        successCount++;
+      }
+
+      if (
+        updatedContent === patchData.after ||
+        fixedPatch === patchData.patch
+      ) {
+        console.log("SUCCESS");
+        console.log("EXACT MATCH");
+      } else {
+        console.log("AI SUGGESTED");
+        console.log(patch);
+
+        console.log("FIXED PATCH");
+        console.log(fixedPatch);
+
+        console.log("ACTUAL");
+        console.log(patchData.patch);
+
+        console.log("DID PATCH APPLY?", !!updatedContent);
+      }
+
+      return "Patched";
+    }
+
+    patchAgent.tools.setFunction("patchFile", testPatchFile);
+
+    const parsedAnswer = parsePatch(patchData.patch);
+    const fileName = parsedAnswer[0].oldFileName;
+
+    await patchAgent.call(`Can you modify this file:
+file path: ${fileName}
+${patchData.before}
+
+      so that it would look like this:
+${patchData.after}?`);
+
+    // await ask("Proceed?");
+
+    /*
+     *const toolResponses = await patchAgent.processToolMessages({
+     *  id: "test",
+     *  type: "function",
+     *  function: {
+     *    name: "patchFile",
+     *    arguments: JSON.stringify({
+     *      filePath: fileName,
+     *      patch: patchData.patch,
+     *    }),
+     *  },
+     *});
+     */
+    console.log({ successCount, attempts, total: dataset.length });
+  }
+}
+
+async function saveToolDiagnosticFiles(
+  patchData: typeof dataset[0],
+  patch: string,
+  fixedPatch: string,
+  success
+) {
+  const failureDir = success ? "success" : "fail";
+  const patchHash = await md5Hash(patchData.patch);
+  const dirName = `./src/dataset/diffs/test_files/${failureDir}/${patchHash}`;
+  await mkdir(dirName, { recursive: true });
+
+  await writeFile(`${dirName}/before.ignore.ts`, patchData.before);
+  await writeFile(`${dirName}/ai-patch.diff`, patch);
+  await writeFile(`${dirName}/actual-patch.diff`, patchData.patch);
+  await writeFile(`${dirName}/after.ignore.ts`, patchData.after);
+  await writeFile(`${dirName}/ai-fixed-patch.diff`, fixedPatch);
+}
+
+if (require.main === module) {
+  generateDataset();
+}

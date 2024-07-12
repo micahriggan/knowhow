@@ -1,12 +1,19 @@
 import * as fs from "fs";
 import * as util from "util";
-import { applyPatch, createPatch, parsedPatch } from "diff";
+import { applyPatch, createPatch } from "diff";
 import { Plugins } from "../../plugins/plugins";
-import { execAsync, writeFile, readFile, fileExists, mkdir } from "../../utils";
+import {
+  execAsync,
+  writeFile,
+  readFile,
+  fileExists,
+  mkdir,
+  splitByNewLines,
+} from "../../utils";
 import { lintFile } from ".";
 
 function findAllLineNumbers(fullText: string, searchText: string) {
-  const lines = fullText.split("\n");
+  const lines = splitByNewLines(fullText);
 
   const lineNumbers = lines
     .map((line, index) => {
@@ -44,7 +51,7 @@ export interface Hunk {
 }
 
 export function parseHunks(patch: string) {
-  const patchLines = patch.split("\n");
+  const patchLines = splitByNewLines(patch);
   const headerIndexes = patchLines
     .map((l, index) => (l.startsWith("@@") ? index : -1))
     .filter((i) => i !== -1);
@@ -142,7 +149,7 @@ export function findFirstLineNumber(hunk: Hunk, originalContent: string) {
 }
 
 export function fixHunkContext(hunk: Hunk, originalContent: string) {
-  const originalLines = originalContent.split("\n");
+  const originalLines = splitByNewLines(originalContent);
   const firstSubtraction = hunk.subtractions[0];
 
   const firstLineNumberUnderHeader = findFirstLineNumber(hunk, originalContent);
@@ -152,8 +159,17 @@ export function fixHunkContext(hunk: Hunk, originalContent: string) {
       firstSubtraction
     )[0];
 
+    // If context is not 3 lines, add more lines, unless it's negative
+    const contextStart = Math.max(
+      subtractionActualNumber - firstLineNumberUnderHeader >= 3
+        ? firstLineNumberUnderHeader
+        : subtractionActualNumber - 4,
+      1
+    );
+
+    // Get all source lines from the start to the subtraction line
     const beforeContext = originalLines
-      .slice(firstLineNumberUnderHeader - 1, subtractionActualNumber - 1)
+      .slice(contextStart - 1, subtractionActualNumber - 1)
       .map((l) => ` ${l}`);
 
     const subtractionLineIndex = hunk.lines.indexOf(firstSubtraction);
@@ -203,6 +219,7 @@ export function fixHunkHeader(hunk: Hunk, originalContent: string) {
 
     const removalCount = hunk.subtractions.length + hunk.contextLines.length;
     const additionCount = hunk.additions.length + hunk.contextLines.length;
+
     hunk.header = `@@ -${removalStart},${removalCount} +${additionStart},${additionCount} @@`;
     console.log(hunk);
   }
@@ -214,9 +231,9 @@ export function fixPatch(originalContent: string, patch: string) {
 
   const hunks = parseHunks(patch);
   console.log(hunks);
-  const patchLines = patch.split("\n");
+  const patchLines = splitByNewLines(patch);
 
-  const originalLines = originalContent.split("\n");
+  const originalLines = splitByNewLines(originalContent);
 
   const isDeletingRealLines = (hunk: Hunk) =>
     hunk.subtractions.every(
@@ -226,9 +243,14 @@ export function fixPatch(originalContent: string, patch: string) {
   const canFindValidLines = (hunk: Hunk) =>
     findFirstLineNumber(hunk, originalContent);
 
+  const isNotEmptyHunk = (hunk: Hunk) =>
+    hunk.lines.length > 0 &&
+    (hunk.additions.length > 0 || hunk.subtractions.length > 0);
+
   const validatedHunks = hunks
     .filter(isDeletingRealLines)
     .filter(canFindValidLines)
+    .filter(isNotEmptyHunk)
     .map((hunk) => {
       fixHunkContext(hunk, originalContent);
       return hunk;

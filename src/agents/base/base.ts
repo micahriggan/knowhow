@@ -5,12 +5,16 @@ import {
 } from "openai/resources/chat";
 import { openai } from "../../ai";
 import { IAgent } from "../interface";
-import { Tools } from "../../services/Tools";
+import { ToolsService, Tools } from "../../services/Tools";
+import { replaceEscapedNewLines, restoreEscapedNewLines } from "../../utils";
+import { $Command } from "@aws-sdk/client-s3";
 
 export abstract class BaseAgent implements IAgent {
   abstract name: string;
 
   protected gptModelName: string = "gpt-4-turbo-preview";
+
+  constructor(public tools: ToolsService = Tools) {}
 
   getModel(): string {
     return this.gptModelName;
@@ -23,9 +27,9 @@ export abstract class BaseAgent implements IAgent {
   disabledTools = [];
 
   getEnabledTools() {
-    return Tools.getTools().filter(
-      (t) => !this.disabledTools.includes(t.function.name)
-    );
+    return this.tools
+      .getTools()
+      .filter((t) => !this.disabledTools.includes(t.function.name));
   }
 
   getEnabledToolNames() {
@@ -48,9 +52,9 @@ export abstract class BaseAgent implements IAgent {
 
   abstract getInitialMessages(userInput: string): ChatCompletionMessageParam[];
 
-  async getToolMessages(toolCall: ChatCompletionMessageToolCall) {
+  async processToolMessages(toolCall: ChatCompletionMessageToolCall) {
     const functionName = toolCall.function.name;
-    const functionToCall = Tools.getFunction(functionName);
+    const functionToCall = this.tools.getFunction(functionName);
     const functionArgs = JSON.parse(toolCall.function.arguments);
 
     const toJsonIfObject = (arg: any) => {
@@ -60,7 +64,7 @@ export abstract class BaseAgent implements IAgent {
       return arg;
     };
 
-    const toolDefinition = Tools.getTool(functionName);
+    const toolDefinition = this.tools.getTool(functionName);
     const properties = toolDefinition?.function?.parameters?.properties || {};
     const positionalArgs = Object.keys(properties).map((p) => functionArgs[p]);
 
@@ -126,9 +130,38 @@ export abstract class BaseAgent implements IAgent {
     }
   }
 
+  formatInputContent(userInput: string) {
+    return replaceEscapedNewLines(userInput);
+  }
+
+  formatAiResponse(response: string) {
+    return restoreEscapedNewLines(response);
+  }
+
+  formatInputMessages(messages: ChatCompletionMessageParam[]) {
+    return messages.map((m) => ({
+      ...m,
+      content:
+        typeof m.content === "string"
+          ? this.formatInputContent(m.content)
+          : m.content,
+    })) as ChatCompletionMessageParam[];
+  }
+
+  formatOutputMessages(messages: ChatCompletionMessageParam[]) {
+    return messages.map((m) => ({
+      ...m,
+      content:
+        typeof m.content === "string"
+          ? this.formatAiResponse(m.content)
+          : m.content,
+    })) as ChatCompletionMessageParam[];
+  }
+
   async call(userInput: string, _messages?: ChatCompletionMessageParam[]) {
     const model = this.getModel();
     let messages = _messages || this.getInitialMessages(userInput);
+    messages = this.formatInputMessages(messages);
 
     const startIndex = 0;
     const endIndex = messages.length;
@@ -140,7 +173,9 @@ export abstract class BaseAgent implements IAgent {
       tools: this.getEnabledTools(),
       tool_choice: "auto",
     });
+
     this.logMessages(response.choices.map((c) => c.message));
+
     const responseMessage = response.choices[0].message;
 
     const toolCalls = responseMessage.tool_calls;
@@ -149,7 +184,7 @@ export abstract class BaseAgent implements IAgent {
       messages.push(responseMessage);
 
       for (const toolCall of toolCalls) {
-        const toolMessages = await this.getToolMessages(toolCall);
+        const toolMessages = await this.processToolMessages(toolCall);
         // Add the tool responses to the thread
         messages.push(...(toolMessages as ChatCompletionToolMessageParam[]));
 
@@ -193,8 +228,8 @@ export abstract class BaseAgent implements IAgent {
     3. Next Steps - what we're about to do next to continue the user's original request.
 
       This summary will become the agent's only memory of the past, all other messages will be dropped: \n\n${JSON.stringify(
-      toCompress
-    )}`;
+        toCompress
+      )}`;
 
     const model = this.getModel();
 
