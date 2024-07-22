@@ -1,6 +1,6 @@
 import { Octokit } from "@octokit/rest";
 import { Plugin } from "./types";
-import parseDiff from "parse-diff";
+import { parseHunks, hunksToPatch } from "../agents/tools/patch";
 import { MinimalEmbedding } from "../types";
 
 export class GitHubPlugin implements Plugin {
@@ -54,17 +54,13 @@ export class GitHubPlugin implements Plugin {
     return Promise.all(
       urls.map(async (url) => {
         const diff = await this.getDiff(url);
-        let parsed = parseDiff(diff.toString());
+        let parsed = parseHunks(diff.toString());
 
-        const getContent = (file: typeof parsed[0]) => {
-          return JSON.stringify(file);
-        };
-
-        parsed = parsed.filter((file) => {
+        parsed = parsed.filter((hunk) => {
           return (
-            file.additions < 200 &&
-            file.deletions < 200 &&
-            getContent(file).length < 10000
+            hunk.additions.length < 200 &&
+            hunk.subtractions.length < 200 &&
+            hunksToPatch([hunk]).length < 10000
           );
         });
         return parsed;
@@ -82,12 +78,10 @@ export class GitHubPlugin implements Plugin {
     if (urls) {
       const responses = await this.getParsedDiffs(urls);
       // Format the diffs in Markdown
-      const markdownDiffs = responses
-        .map((diff) => `\`\`\`diff\n${JSON.stringify(diff)}\n\`\`\``)
-        .join("\n\n");
+      const diffStrings = responses.map(hunksToPatch);
 
-      console.log(markdownDiffs);
-      return `GITHUB PLUGIN: ${urls} loaded:\n\n${markdownDiffs}`;
+      console.log(diffStrings);
+      return `GITHUB PLUGIN: These ${urls} have automatically been expanded to include the changes:\n\n${diffStrings}`;
     }
 
     return "GITHUB PLUGIN: No pull request URLs detected.";

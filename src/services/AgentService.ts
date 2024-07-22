@@ -4,7 +4,7 @@ import { getConfigSync } from "../config";
 import { IAgent } from "../agents/interface";
 import { OpenAIAgent } from "../agents/configurable/OpenAIAgent";
 import { ConfigAgent } from "../agents/configurable/ConfigAgent";
-import { Tools } from "./Tools";
+// import { Tools } from "./Tools";
 
 class AgentService {
   private agents: Map<string, IAgent> = new Map();
@@ -15,28 +15,30 @@ class AgentService {
     this.loadAgentsFromConfig();
 
     const agentNames = this.listAgents().join(", ");
-    Tools.addTool({
-      type: "function",
-      function: {
-        name: "agentCall",
-        description:
-          "Allows an agent to ask another agent a question. Useful for getting help from agents that are configured for specific goals.",
-        parameters: {
-          type: "object",
-          properties: {
-            agentName: {
-              type: "string",
-              description: `The name of the agent to call. Available agents: ${agentNames}`,
-            },
-            query: {
-              type: "string",
-              description: `The query to send to the agent`,
-            },
-          },
-          required: ["agentName", "query"],
-        },
-      },
-    });
+    /*
+     *Tools.addTool({
+     *  type: "function",
+     *  function: {
+     *    name: "agentCall",
+     *    description:
+     *      "Allows an agent to ask another agent a question. Useful for getting help from agents that are configured for specific goals.",
+     *    parameters: {
+     *      type: "object",
+     *      properties: {
+     *        agentName: {
+     *          type: "string",
+     *          description: `The name of the agent to call. Available agents: ${agentNames}`,
+     *        },
+     *        query: {
+     *          type: "string",
+     *          description: `The query to send to the agent`,
+     *        },
+     *      },
+     *      required: ["agentName", "query"],
+     *    },
+     *  },
+     *});
+     */
   }
 
   public registerAgent(agent: IAgent): void {

@@ -77,3 +77,8 @@ export type Language = {
     context?: string;
   };
 };
+
+export type ChatInteraction = {
+  input: string;
+  output: string;
+}

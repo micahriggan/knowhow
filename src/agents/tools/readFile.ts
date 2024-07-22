@@ -1,5 +1,8 @@
 import * as fs from "fs";
 import { FileBlock } from "./types/fileblock";
+import { fileExists } from "../../utils";
+import { getConfiguredEmbeddings } from "../../embeddings";
+import { fileSearch } from "./fileSearch";
 
 /*
  *export function readFile(filePath: string): string {
@@ -16,6 +19,20 @@ import { FileBlock } from "./types/fileblock";
 
 const BLOCK_SIZE = 500;
 export async function readFile(filePath: string): Promise<FileBlock[]> {
+  const exists = await fileExists(filePath);
+
+  if (!exists) {
+    const fileName = filePath.split("/").pop().split(".")[0];
+    const maybeRelated = await fileSearch(fileName);
+    if (maybeRelated.stdout.length > 0) {
+      throw new Error(
+        `File not found: ${filePath}. Maybe you meant one of these files: ${maybeRelated}`
+      );
+    }
+
+    throw new Error(`File not found: ${filePath}`);
+  }
+
   const text = fs.readFileSync(filePath, "utf8");
   const lines = text.split("");
   const blocks = [] as FileBlock[];

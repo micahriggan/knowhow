@@ -196,6 +196,40 @@ export function fixAccidentalDeletions(hunk: Hunk, originalContent: string) {
   return hunk;
 }
 
+export function fixAllAdditions(hunk: Hunk, originalContent: string) {
+  const originalLines = splitByNewLines(originalContent);
+
+  if (hunk.subtractions.length) {
+    return hunk;
+  }
+
+  const context = hunk.contextLines.map((l) => l.slice(1)).join("\n");
+  const lines = hunk.lines.map((l) => l.slice(1)).join("\n");
+
+  const fileStartsWith = originalContent.trim().endsWith(context.trim());
+  const linesStartWith = lines.trim().startsWith(context.trim());
+
+  console.log("Context\n", context);
+  console.log("OG\n", originalLines.slice(-3).join("\n"));
+  if (fileStartsWith && linesStartWith) {
+    console.log(
+      "File ends with context, adding context to the end of the file"
+    );
+
+    // Special case of all additions adding to end of file
+    // Add 5 lines of context before the first addition
+    console.log("Adding last 5 lines of file as context");
+    const last3LinesOfFile = originalLines.slice(-5);
+    const contextLines = last3LinesOfFile.map((l) => ` ${l}`);
+    hunk.lines = [...contextLines, ...hunk.additions];
+    hunk.contextLines = contextLines;
+
+    console.log("Fixed Addition Hunk", hunk);
+  }
+
+  return hunk;
+}
+
 export function fixHunkContext(hunk: Hunk, originalContent: string) {
   const originalLines = splitByNewLines(originalContent);
   const firstSubtraction = hunk.subtractions[0];
@@ -282,7 +316,6 @@ export function fixHunkHeader(hunk: Hunk, originalContent: string) {
 }
 
 export function fixHunkDeletionTooShort(hunk: Hunk, originalContent: string) {
-  return hunk;
   const originalLines = splitByNewLines(originalContent);
   // Finds deletions where the deletion doesn't include the full line, maybe due to newlines
 
@@ -396,7 +429,7 @@ export function fixPatch(originalContent: string, patch: string) {
   const isNotEmptyHunk = (hunk: Hunk) => !hunkIsEmpty(hunk);
 
   const validatedHunks = hunks
-    .map((hunk) => fixHunkDeletionTooShort(hunk, originalContent))
+    .map((hunk) => fixAllAdditions(hunk, originalContent))
     .filter(isDeletingRealLines)
     .filter(canFindValidLines)
     .filter(isNotEmptyHunk)
@@ -464,45 +497,33 @@ export async function patchFile(
       fs.writeFileSync(filePath, "");
     }
     const originalContent = fs.readFileSync(filePath, "utf8");
-    patch = fixPatch(originalContent, patch);
+    let fixedPatch = fixPatch(originalContent, patch);
 
-    const { validHunks, invalidHunks } = categorizeHunks(
-      originalContent,
-      patch
-    );
+    if (!fixedPatch) {
+      await savePatchError(patch, fixedPatch, originalContent);
+      throw new Error("Patch failed to apply");
+    }
 
-    const validPatch = hunksToPatch(validHunks);
-    let updatedContent = applyPatch(originalContent, validPatch);
+    let updatedContent = applyPatch(originalContent, fixedPatch);
     console.log("Applying patch:");
-    console.log(patch);
+    console.log(fixedPatch);
 
-    if (!patch.endsWith("\n") && !updatedContent) {
-      patch += "\n";
-      updatedContent = applyPatch(originalContent, patch);
+    if (!fixedPatch.endsWith("\n") && !updatedContent) {
+      fixedPatch += "\n";
+      updatedContent = applyPatch(originalContent, fixedPatch);
     }
 
     if (updatedContent) {
       fs.writeFileSync(filePath, updatedContent);
     }
     if (!updatedContent) {
-      await savePatchError(patch, patch, originalContent);
+      await savePatchError(patch, fixedPatch, originalContent);
       throw new Error("Patch failed to apply");
     }
-
-    const invalidPatch = hunksToPatch(invalidHunks);
-    const invalidHunksMessage = invalidHunks.length
-      ? `Patch Partially Applied: \n Invalid Hunks: \n${invalidPatch} `
-      : "";
-
-    const appliedMessage = validHunks.length
-      ? `Valid Hunks Applied: \n${validPatch}`
-      : "";
 
     const lintResult = await lintFile(filePath);
 
     return `
-    ${invalidHunksMessage}
-    ${appliedMessage}
     Use readFile to verify your changes worked.
     ${lintResult && "Linting Result"}
     ${lintResult || ""}

@@ -67,6 +67,8 @@ This will help you generate correct code and correct diffs.
 To move code within a file, use 2 hunks: 1 to delete it from its current location, 1 to insert it in the new location.
 `;
 
+const pluginsReminder = `#PLUGINS REMINDER: Plugins are used to automatically expand user input with more context. The additional context could be from embeddings, files, pull requests, tickets etc. Do not assume the plugin information contains all the information you require to accomplish a task. Be sure to consider tools that you may use to supplement what the plugins initially provided.`;
+
 export class CodebaseAgent extends BaseAgent {
   name = "Developer";
 
@@ -78,6 +80,7 @@ export class CodebaseAgent extends BaseAgent {
         `,
       },
       { role: "user", content: systemReminder },
+      { role: "user", content: pluginsReminder },
       { role: "user", content: userInput },
     ] as ChatCompletionMessageParam[];
   }

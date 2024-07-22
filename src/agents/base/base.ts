@@ -165,7 +165,7 @@ export abstract class BaseAgent implements IAgent {
 
     const startIndex = 0;
     const endIndex = messages.length;
-    const compressThreshold = 7;
+    const compressThreshold = 30000;
 
     const response = await openai.chat.completions.create({
       model,
@@ -194,7 +194,7 @@ export abstract class BaseAgent implements IAgent {
         }
       }
 
-      if (messages.length > compressThreshold) {
+      if (this.getMessagesLength(messages) > compressThreshold) {
         messages = await this.compressMessages(messages, startIndex, endIndex);
       }
 
@@ -214,6 +214,10 @@ export abstract class BaseAgent implements IAgent {
     if (responseMessage.content) {
       return responseMessage.content;
     }
+  }
+
+  getMessagesLength(messages: ChatCompletionMessageParam[]) {
+    return JSON.stringify(messages).split(" ").length;
   }
 
   async compressMessages(
@@ -251,8 +255,8 @@ export abstract class BaseAgent implements IAgent {
       ...messages.slice(endIndex),
     ];
 
-    const oldLength = JSON.stringify(messages).length;
-    const newLength = JSON.stringify(newMessages).length;
+    const oldLength = this.getMessagesLength(messages);
+    const newLength = this.getMessagesLength(newMessages);
     const compressionRatio = (
       ((oldLength - newLength) / oldLength) *
       100

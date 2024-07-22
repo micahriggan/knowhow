@@ -3,7 +3,12 @@ import Ora from "ora";
 import editor from "@inquirer/editor";
 import { openai } from "./ai";
 import { cosineSimilarity } from "./utils";
-import { EmbeddingBase, GptQuestionEmbedding, Embeddable } from "./types";
+import {
+  EmbeddingBase,
+  GptQuestionEmbedding,
+  Embeddable,
+  ChatInteraction,
+} from "./types";
 import { Marked } from "./utils";
 import { ask } from "./utils";
 import { Plugins } from "./plugins/plugins";
@@ -18,6 +23,8 @@ enum ChatFlags {
   agents = "agents",
   debug = "debug",
   multi = "multi",
+  search = "search",
+  clear = "clear",
 }
 
 const Flags = new FlagsService(
@@ -150,13 +157,34 @@ export async function getInput(
   return value.trim();
 }
 
+export async function formatChatInput(
+  input: string,
+  plugins: string[] = [],
+  chatHistory: ChatInteraction[] = []
+) {
+  const pluginText = await Plugins.callMany(plugins, input);
+  const historyMessage = `PREVIOUS CHAT INTERACTIONS: \n ${JSON.stringify(
+    chatHistory
+  )}\n`;
+  const fullPrompt = `${historyMessage} \n ${input} \n ${pluginText}`;
+  return fullPrompt;
+}
+
 export async function askGpt<E extends GptQuestionEmbedding>(
   aiName: string,
   embeddings: Embeddable<E>[],
   plugins: string[] = []
 ) {
   let activeAgent: IAgent = Developer;
-  const commands = ["agent", "agents", "debugger", "exit", "multi", "search"];
+  const commands = [
+    "agent",
+    "agents",
+    "debugger",
+    "exit",
+    "multi",
+    "search",
+    "clear",
+  ];
   console.log("Commands: ", commands.join(", "));
   const promptText = () =>
     Flags.enabled(ChatFlags.agent)
@@ -169,6 +197,7 @@ export async function askGpt<E extends GptQuestionEmbedding>(
     commands
   );
 
+  let chatHistory = new Array<ChatInteraction>();
   let results = "";
   while (input !== "exit") {
     try {
@@ -192,23 +221,32 @@ export async function askGpt<E extends GptQuestionEmbedding>(
         case ChatFlags.multi:
           Flags.flip(ChatFlags.multi);
           break;
-        case "search":
+        case ChatFlags.search:
           await askEmbedding("searching");
+          break;
+        case ChatFlags.clear:
+          chatHistory = [];
           break;
         case "":
           break;
         default:
           console.log("Thinking...");
           console.log(input);
-          const pluginText = await Plugins.callMany(plugins, input);
-          const fullPrompt = `${input} \n ${pluginText}`;
+          const formattedPrompt = await formatChatInput(
+            input,
+            plugins,
+            chatHistory
+          );
+          const interaction = { input, output: "" } as ChatInteraction;
           if (Flags.enabled("agent")) {
-            results = await activeAgent.call(fullPrompt);
+            results = await activeAgent.call(formattedPrompt);
           } else {
-            results = await queryGpt4(fullPrompt);
+            results = await queryGpt4(formattedPrompt);
           }
+          interaction.output = results;
           console.log("\n\n");
           console.log(Marked.parse(results));
+          chatHistory.push(interaction);
           break;
       }
     } catch (e) {
