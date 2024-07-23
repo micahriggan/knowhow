@@ -58,7 +58,7 @@ Knowhow is highly configurable, allowing you to specify source patterns, output 
 # Plugins
 Plugins can be used to load additional context into a chat, or create embeddings from an external data source. Here's some plugins we have built so far:
 - [asana.mdx](./autodoc/plugins/asana.mdx)
-- [downloader](./autodoc/plugins/downloader) - (subdirectory)
+- [downloader](./autodoc/plugins/downloader)
 - [embedding.mdx](./autodoc/plugins/embedding.mdx)
 - [figma.mdx](./autodoc/plugins/figma.mdx)
 - [github.mdx](./autodoc/plugins/github.mdx)
