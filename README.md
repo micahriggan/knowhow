@@ -25,7 +25,7 @@ Knowhow is a tool designed to increase the ease of allowing an AI to interact wi
 
 Knowhow is highly configurable, allowing you to specify source patterns, output directories, and custom prompts for documentation generation. Here's an example configuration snippet:
 
-[./CONFIG.md](See CONFIG.md for more examples)
+[See more Config examples here](./CONFIG.md)
 
     {
       "promptsDir": ".knowhow/prompts",
