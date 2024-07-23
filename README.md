@@ -91,13 +91,13 @@ Tools can be used by agents to do complex interations with other systems, or the
 # CLI Commands
 This command line tool accepts the following inputs (commands):
 
-1. **init**: Initializes the tool. Creates config in `.knowhow`
-3. **embed**: Creates embeddings from the configured `embedSources`.
-7. **chat**: Starts a chat session.
-2. **generate**: Processes the `sources` from config to make AI generated files
-4. **upload**: Uploads embeddings to s3 if configured.
-5. **download**: Downloads embeddings from s3 if configured.
-6. **upload:openai**: beta: upload an assistant to openai alongside files
+1. `init`: Initializes the tool. Creates config in `.knowhow`
+3. `embed`: Creates embeddings from the configured `embedSources`.
+7. `chat`: Starts a chat session.
+2. `generate`: Processes the `sources` from config to make AI generated files
+4. `upload`: Uploads embeddings to s3 if configured.
+5. `download`: Downloads embeddings from s3 if configured.
+6. `upload:openai`: beta: upload an assistant to openai alongside files
 
 # Chat
 Activated via: `knowhow chat`
