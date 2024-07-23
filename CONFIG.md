@@ -111,8 +111,22 @@ I've been using `CMD+SHIFT+5` to record meetings and then using the `sources` bl
     }
   ],
 ```
-
 You can use `knowhow embed` to generate json embeddings from a set of files. If you want to run a prompt on the input, before embedding, you set an optional `prompt` field to match the filename of the prompt stored in your `.knowhow/prompts` directory.
+
+## knowhow embed: asana tasks
+```
+  "embedSources": [
+    {
+      "input": "https://app.asana.com/0/111111111111111/list",
+      "output": ".knowhow/embeddings/asana.json",
+      "s3Bucket": "mybucket",
+      "kind": "asana",
+      "chunkSize": 2000
+    }
+  ],
+```
+Any plugin that implements the embedding function, can generate embeddings if you set the `kind` field to the plugin name. The `s3Bucket` field is optional, and if set, the embeddings will be uploaded to the specified S3 bucket via `knowhow upload`.
+
 
 
 ## Plugins
