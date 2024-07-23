@@ -122,20 +122,20 @@ Agents are able to use tools to accomplish goals. Out of the box knowhow include
 - Researcher Agent
 
 # Environment Variables
-- **Plugins:**
-  - Figma Plugin (`src/plugins/figma.ts`): Uses `process.env.FIGMA_API_KEY`.
-  - GitHub Plugin (`src/plugins/github.ts`): Uses `process.env.GITHUB_TOKEN`.
-  - Notion Plugin (`src/plugins/notion.ts`): Uses `process.env.NOTION_TOKEN`.
-  - Jira Plugin (`src/plugins/jira.ts`): Uses `process.env.JIRA_HOST`, `process.env.JIRA_USER`, `process.env.JIRA_PASSWORD`.
-  - Linear Plugin (`src/plugins/linear.ts`): Uses `process.env.LINEAR_API_KEY`.
-  - Asana Plugin (`src/plugins/asana.ts`): Uses `process.env.ASANA_TOKEN`.
+**Plugins:**
+- Figma Plugin (`src/plugins/figma.ts`): Uses `process.env.FIGMA_API_KEY`.
+- GitHub Plugin (`src/plugins/github.ts`): Uses `process.env.GITHUB_TOKEN`.
+- Notion Plugin (`src/plugins/notion.ts`): Uses `process.env.NOTION_TOKEN`.
+- Jira Plugin (`src/plugins/jira.ts`): Uses `process.env.JIRA_HOST`, `process.env.JIRA_USER`, `process.env.JIRA_PASSWORD`.
+- Linear Plugin (`src/plugins/linear.ts`): Uses `process.env.LINEAR_API_KEY`.
+- Asana Plugin (`src/plugins/asana.ts`): Uses `process.env.ASANA_TOKEN`.
 
-- **Agent Tools:**
-  - GitHub (`src/agents/tools/github/index.ts`): Uses `process.env.GITHUB_TOKEN`.
-  - Asana:
-    - Workspace ID (`src/agents/tools/asana/index.ts`): Uses `process.env.ASANA_WORKSPACE`.
-    - Token (`src/agents/tools/asana/index.ts`): Uses `process.env.ASANA_TOKEN`.
+**Agent Tools:**
+- GitHub (`src/agents/tools/github/index.ts`): Uses `process.env.GITHUB_TOKEN`.
+- Asana:
+  - Workspace ID (`src/agents/tools/asana/index.ts`): Uses `process.env.ASANA_WORKSPACE`.
+  - Token (`src/agents/tools/asana/index.ts`): Uses `process.env.ASANA_TOKEN`.
 
-- **AI Core:**
-  - OPENAI Key (`src/ai.ts` and `src/index.ts`): Uses `process.env.OPENAI_KEY`.
+**AI Core:**
+- OPENAI Key (`src/ai.ts` and `src/index.ts`): Uses `process.env.OPENAI_KEY`.
 
