@@ -16,14 +16,16 @@ Knowhow is a tool designed to increase the ease of allowing an AI to interact wi
 
 ## Getting Started
 
-1. Initialization: Run knowhow init to create the necessary folder structure and configuration files.
-2. Generation: Use knowhow generate to process source files and produce documentation.
-3. Embedding: Execute knowhow embed to create embeddings from the generated documentation.
-4. Chat: Run knowhow chat to start a chat session with additional context provided by the plugins
+1. Initialization: Run `knowhow init` to create the necessary folder structure and configuration files.
+2. Generation: Use `knowhow generate` to process source files and produce documentation.
+3. Embedding: Execute `knowhow embed` to create embeddings from the generated documentation.
+4. Chat: Run `knowhow chat` to start a chat session with additional context provided by the plugins
 
 ## Configuration
 
 Knowhow is highly configurable, allowing you to specify source patterns, output directories, and custom prompts for documentation generation. Here's an example configuration snippet:
+
+[./CONFIG.md](See CONFIG.md for more examples)
 
     {
       "promptsDir": ".knowhow/prompts",
@@ -49,6 +51,41 @@ Knowhow is highly configurable, allowing you to specify source patterns, output 
         }
       ]
     }
+
+
+### Plugins
+Plugins can be used to load additional context into a chat, or create embeddings from an external data source. Here's some plugins we have built so far:
+- [asana.mdx](./autodoc/plugins/asana.mdx)
+- [downloader](./autodoc/plugins/downloader) - (subdirectory)
+- [embedding.mdx](./autodoc/plugins/embedding.mdx)
+- [figma.mdx](./autodoc/plugins/figma.mdx)
+- [github.mdx](./autodoc/plugins/github.mdx)
+- [jira.mdx](./autodoc/plugins/jira.mdx)
+- [language.mdx](./autodoc/plugins/language.mdx)
+- [linear.mdx](./autodoc/plugins/linear.mdx)
+- [notion.mdx](./autodoc/plugins/notion.mdx)
+- [plugins.mdx](./autodoc/plugins/plugins.mdx)
+- [types.mdx](./autodoc/plugins/types.mdx)
+- [vim.mdx](./autodoc/plugins/vim.mdx)
+
+### Tools
+Tools can be used by agents to do complex interations with other systems, or the local system. Here's some tools we have built so far:
+- [Asana Tool Directory](./autodoc/tools/asana)
+- [askHuman Tool](./autodoc/tools/askHuman.mdx)
+- [callPlugin Tool](./autodoc/tools/callPlugin.mdx)
+- [embeddingSearch Tool](./autodoc/tools/embeddingSearch.mdx)
+- [execCommand Tool](./autodoc/tools/execCommand.mdx)
+- [fileSearch Tool](./autodoc/tools/fileSearch.mdx)
+- [finalAnswer Tool](./autodoc/tools/finalAnswer.mdx)
+- [GitHub Tool Directory](./autodoc/tools/github)
+- [lintFile Tool](./autodoc/tools/lintFile.mdx)
+- [patch Tool](./autodoc/tools/patch.mdx)
+- [readBlocks Tool](./autodoc/tools/readBlocks.mdx)
+- [readFile Tool](./autodoc/tools/readFile.mdx)
+- [textSearch Tool](./autodoc/tools/textSearch.mdx)
+- [visionTool Tool](./autodoc/tools/visionTool.mdx)
+- [writeFile Tool](./autodoc/tools/writeFile.mdx)
+
 
 ## Language Plugin
 
@@ -77,32 +114,3 @@ Knowhow has a language file, which allows you to define additional context that 
         ]
       }
     }
-
-### VIM Plugin
-
-The VIM Plugin is an integral part of the Knowhow tool, designed to enhance the user experience by integrating with the VIM text editor. This plugin provides the functionality to detect and interact with files that are currently open in VIM, offering a seamless workflow for developers who prefer using VIM for their coding tasks.
-
-#### Key Features
-
-* File Detection: The plugin can identify all files that are currently being edited in VIM by looking for swap files (.swp) within the project directory.
-* Content Retrieval: It can read the contents of the files that are open in VIM, allowing for real-time interaction and updates within the Knowhow tool.
-* Error Handling: The plugin includes error handling for cases where the file does not exist or is too large to process, ensuring stability and reliability.
-
-#### Usage
-
-To use the VIM Plugin, simply ensure that it is included in the plugins array of your Knowhow configuration. The plugin will automatically detect any VIM swap files and provide the content of the associated files.
-
-#### Example Output
-
-When the VIM Plugin is called, it will output a message detailing the files that are currently open in VIM. Here's an example of what the output might look like:
-
-    Reading file ./README.md
-    Reading file ./src/plugins/github.ts
-    Reading file ./src/plugins/vim.ts
-
-
-
-## Contributing
-
-Contributions to Knowhow are welcome! Whether it's adding new features, improving the chat interface, or refining the language configurations, your input can help make Knowhow an even more robust tool.
-
