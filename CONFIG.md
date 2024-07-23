@@ -185,3 +185,34 @@ You can configure new agents via the config above. This would create a new optio
 ```
 lintCommands are automatically run after an agent successfully patches a file, if the file extension matches. So you can configure the AI to receive feedback from tsc and the linter after modifying a TypeScript file. $1 will be replaced with the filepath that was patched.
 
+
+
+## Language Plugin
+
+Configured in `.knowhow/language.json`
+
+Knowhow has a language file, which allows you to define additional context that is included when you use certain phrases in your messages. For instance, you could load a Pull Request when you say "My PR", or load a file from the codebase when you reference it. Languages have "terms" which then load various sources into context. Sources currently can be files, text, or github links.
+
+## Example Language Definition
+    {
+      "knowhow config": {
+        "sources": [
+          {
+            "kind": "file",
+            "data": [
+              ".knowhow/knowhow.json"
+            ]
+          }
+        ]
+      },
+      "My PR": {
+        "sources": [
+          {
+            "kind": "github",
+            "data": [
+              "https://github.com/tyvm-ai/knowhow/pulls/1"
+            ]
+          }
+        ]
+      }
+    }

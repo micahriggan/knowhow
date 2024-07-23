@@ -17,9 +17,9 @@ Knowhow is a tool designed to increase the ease of allowing an AI to interact wi
 ## Getting Started
 
 1. Initialization: Run `knowhow init` to create the necessary folder structure and configuration files.
-2. Generation: Use `knowhow generate` to process source files and produce documentation.
-3. Embedding: Execute `knowhow embed` to create embeddings from the generated documentation.
-4. Chat: Run `knowhow chat` to start a chat session with additional context provided by the plugins
+2. Embedding: Execute `knowhow embed` to create embeddings from the generated documentation.
+3. Chat: Run `knowhow chat` to start a chat session with additional context provided by the plugins
+4. Generation: Use `knowhow generate` to process source files and produce new files. Can output to one or many files
 
 ## Configuration
 
@@ -53,7 +53,7 @@ Knowhow is highly configurable, allowing you to specify source patterns, output 
     }
 
 
-### Plugins
+# Plugins
 Plugins can be used to load additional context into a chat, or create embeddings from an external data source. Here's some plugins we have built so far:
 - [asana.mdx](./autodoc/plugins/asana.mdx)
 - [downloader](./autodoc/plugins/downloader) - (subdirectory)
@@ -68,7 +68,7 @@ Plugins can be used to load additional context into a chat, or create embeddings
 - [types.mdx](./autodoc/plugins/types.mdx)
 - [vim.mdx](./autodoc/plugins/vim.mdx)
 
-### Tools
+# Tools
 Tools can be used by agents to do complex interations with other systems, or the local system. Here's some tools we have built so far:
 - [Asana Tool Directory](./autodoc/tools/asana)
 - [askHuman Tool](./autodoc/tools/askHuman.mdx)
@@ -87,30 +87,35 @@ Tools can be used by agents to do complex interations with other systems, or the
 - [writeFile Tool](./autodoc/tools/writeFile.mdx)
 
 
-## Language Plugin
 
-Knowhow has a language file, which allows you to define additional context that is included when you use certain phrases in your messages. For instance, you could load a Pull Request when you say "My PR", or load a file from the codebase when you reference it. Languages have "terms" which then load various sources into context. Sources currently can be files, text, or github links.
+# CLI Commands
+This command line tool accepts the following inputs (commands):
 
-## Example Language Definition
-    {
-      "knowhow config": {
-        "sources": [
-          {
-            "kind": "file",
-            "data": [
-              ".knowhow/knowhow.json"
-            ]
-          }
-        ]
-      },
-      "My PR": {
-        "sources": [
-          {
-            "kind": "github",
-            "data": [
-              "https://github.com/tyvm-ai/knowhow/pulls/1"
-            ]
-          }
-        ]
-      }
-    }
+1. **init**: Initializes the tool. Creates config in `.knowhow`
+3. **embed**: Creates embeddings from the configured `embedSources`.
+7. **chat**: Starts a chat session.
+2. **generate**: Processes the `sources` from config to make AI generated files
+4. **upload**: Uploads embeddings to s3 if configured.
+5. **download**: Downloads embeddings from s3 if configured.
+6. **upload:openai**: beta: upload an assistant to openai alongside files
+
+# Chat
+Activated via: `knowhow chat`
+
+This command line tool allows users to provide various inputs to interact with an AI assistant.
+
+The available commands include:
+   - `agent`: Toggle the use of a specific agent.
+   - `agents`: List and select from available agents.
+   - `debug`: Toggle debug mode.
+   - `multi`: Enable or disable multi-line input.
+   - `search`: Search for embeddings.
+   - `clear`: Clear the chat history.
+   - `exit`: Exit the tool.
+
+## Agents
+Activated via: `agent` or `agents` within a knowhow chat session
+
+Agents are able to use tools to accomplish goals. Out of the box knowhow includes:
+- Developer Agent
+- Researcher Agent
