@@ -26,7 +26,7 @@ export async function readFile(filePath: string): Promise<FileBlock[]> {
     const maybeRelated = await fileSearch(fileName);
     if (maybeRelated.stdout.length > 0) {
       throw new Error(
-        `File not found: ${filePath}. Maybe you meant one of these files: ${maybeRelated}`
+        `File not found: ${filePath}. Maybe you meant one of these files: ${maybeRelated.stdout}`
       );
     }
 
@@ -48,6 +48,15 @@ export async function readFile(filePath: string): Promise<FileBlock[]> {
     });
     index++;
     lineCount += block.split("\n").length;
+
+    if (blocks.length > 20 && lines.length > 160000) {
+      blocks.push({
+        blockNumber: index,
+        content: "File trimmed. Too large to display",
+        startLine: lineCount + 1,
+      });
+      break;
+    }
   }
 
   return blocks;

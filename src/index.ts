@@ -152,6 +152,7 @@ async function handleFileKindGeneration(source: Config["sources"][0]) {
 
   if (source.output.endsWith("/")) {
     await handleMultiOutputGeneration(
+      source.input,
       files,
       prompt,
       source.output,
@@ -167,6 +168,7 @@ async function handleFileKindGeneration(source: Config["sources"][0]) {
   }
 }
 export async function handleMultiOutputGeneration(
+  inputPattern: string,
   files: string[],
   prompt: string,
   output: string,
@@ -177,6 +179,10 @@ export async function handleMultiOutputGeneration(
 
   // get the files matching the input pattern
   const hashes = await getHashes();
+
+  const inputPath = inputPattern.includes("**")
+    ? inputPattern.split("**")[0]
+    : "";
 
   for (const file of files) {
     // get the hash of the file
@@ -200,8 +206,16 @@ export async function handleMultiOutputGeneration(
     const summary = prompt ? await summarizeFile(file, prompt) : fileContent;
 
     // write the summary to the output file
-    const { name, ext } = path.parse(file);
-    const outputFile = path.join(output, name + ".mdx");
+    const { name, ext, dir } = path.parse(file);
+    const nestedFolder = inputPath ? (dir + "/").replace(inputPath, "") : "";
+    console.log({ dir, inputPath, nestedFolder });
+    const outputFolder = path.join(output, nestedFolder);
+
+    if (!fs.existsSync(outputFolder)) {
+      fs.mkdirSync(outputFolder, { recursive: true });
+    }
+
+    const outputFile = path.join(outputFolder, name + ".mdx");
 
     console.log("Writing summary to", outputFile);
     await writeFile(outputFile, summary);
