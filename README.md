@@ -60,12 +60,16 @@ Knowhow is highly configurable, allowing you to specify source patterns, output 
       "embedSources": [
         {
           "input": ".knowhow/docs/**/*.mdx",
-          "output": ".knowhow/embeddings",
-          "prompt": "BasicEmbeddingExplainer",
-          "chunkSize": 500
+          "output": ".knowhow/embeddings.json",
+          "chunkSize": 2000
         }
       ]
     }
+
+This config would enable two things.
+- `knowhow generate` would run all the mdx files in the src folder through the BasicCodeDocumenter prompt, and output them to the .knowhow/docs folder
+- `knowhow embed` would then take all the files in the .knowhow/docs folder, and create embeddings for them, outputting them to the .knowhow/embeddings.json file
+    - This would enable the `chat` feature to have knowledge of the contents of the generated documentation
 
 
 # Plugins
