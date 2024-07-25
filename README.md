@@ -16,6 +16,14 @@ Knowhow is a tool designed to increase the ease of allowing an AI to interact wi
 * Language Configuration: Allows defining terms that map to specific folders, files, or data sources, enriching the chat context.
 * Plugins: Supports chat plugins for vim, embedding search, github, and language expansion
 
+## Installation
+```
+git clone git@github.com:tyvm-ai/knowhow.git
+cd knowhow
+npm install
+npm link
+```
+
 ## Getting Started
 
 1. Initialization: Run `knowhow init` to create the necessary folder structure and configuration files.
