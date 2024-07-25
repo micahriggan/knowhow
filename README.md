@@ -26,12 +26,15 @@ npm link
 
 ## Getting Started
 
-1. Initialization: Run `knowhow init` to create the necessary folder structure and configuration files.
-2. Modify the configuration file in `.knowhow/knowhow.json` to suit your needs.
+Knowhow is meant to have a config folder within each folder / project that it's working on. Here are some instructions on how to setup knowhow in a project:
+
+1. `cd` into the project folder you want to use knowhow on.
+2. Initialization: Run `knowhow init` to create the necessary folder structure and configuration files.
+3. Modify the configuration file in `.knowhow/knowhow.json` to suit your needs.
     * See the [config examples](./CONFIG.md)
-3. Embedding: Execute `knowhow embed` to create embeddings from the generated documentation.
-4. Chat: Run `knowhow chat` to start a chat session with additional context provided by the plugins
-5. Generation: Use `knowhow generate` to process source files and produce new files. Can output to one or many files
+4. Embedding: Execute `knowhow embed` to create embeddings from the generated documentation.
+5. Chat: Run `knowhow chat` to start a chat session with additional context provided by the plugins
+6. Generation: Use `knowhow generate` to process source files and produce new files. Can output to one or many files
 
 ## Configuration
 
