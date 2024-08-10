@@ -3,7 +3,7 @@ import { getConfiguredEmbeddings } from "../../embeddings";
 
 export async function textSearch(searchTerm) {
   try {
-    const command = `ag ${searchTerm}`;
+    const command = `ag "${searchTerm}"`;
     const { stdout } = await execAsync(command);
     return stdout; // Return the results of using ag
   } catch (err) {
