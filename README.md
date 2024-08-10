@@ -16,14 +16,25 @@ Knowhow is a tool designed to increase the ease of allowing an AI to interact wi
 * Language Configuration: Allows defining terms that map to specific folders, files, or data sources, enriching the chat context.
 * Plugins: Supports chat plugins for vim, embedding search, github, and language expansion
 
+## Installation
+```
+git clone git@github.com:tyvm-ai/knowhow.git
+cd knowhow
+npm install
+npm link
+```
+
 ## Getting Started
 
-1. Initialization: Run `knowhow init` to create the necessary folder structure and configuration files.
-2. Modify the configuration file in `.knowhow/knowhow.json` to suit your needs.
-  * See the [config examples](./CONFIG.md) for some examples.
-3. Embedding: Execute `knowhow embed` to create embeddings from the generated documentation.
-4. Chat: Run `knowhow chat` to start a chat session with additional context provided by the plugins
-5. Generation: Use `knowhow generate` to process source files and produce new files. Can output to one or many files
+Knowhow is meant to have a config folder within each folder / project that it's working on. Here are some instructions on how to setup knowhow in a project:
+
+1. `cd` into the project folder you want to use knowhow on.
+2. Initialization: Run `knowhow init` to create the necessary folder structure and configuration files.
+3. Modify the configuration file in `.knowhow/knowhow.json` to suit your needs.
+    * See the [config examples](./CONFIG.md)
+4. Embedding: Execute `knowhow embed` to create embeddings from the generated documentation.
+5. Chat: Run `knowhow chat` to start a chat session with additional context provided by the plugins
+6. Generation: Use `knowhow generate` to process source files and produce new files. Can output to one or many files
 
 ## Configuration
 
@@ -49,12 +60,16 @@ Knowhow is highly configurable, allowing you to specify source patterns, output 
       "embedSources": [
         {
           "input": ".knowhow/docs/**/*.mdx",
-          "output": ".knowhow/embeddings",
-          "prompt": "BasicEmbeddingExplainer",
-          "chunkSize": 500
+          "output": ".knowhow/embeddings.json",
+          "chunkSize": 2000
         }
       ]
     }
+
+This config would enable two things.
+- `knowhow generate` would run all the mdx files in the src folder through the BasicCodeDocumenter prompt, and output them to the .knowhow/docs folder
+- `knowhow embed` would then take all the files in the .knowhow/docs folder, and create embeddings for them, outputting them to the .knowhow/embeddings.json file
+    - This would enable the `chat` feature to have knowledge of the contents of the generated documentation
 
 
 # Plugins
