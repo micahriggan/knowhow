@@ -62,7 +62,12 @@ export function replaceEscapedNewLines(str: string): string {
 }
 
 export function restoreEscapedNewLines(str: string): string {
-  return str.replace(new RegExp(NEWLINE_REPLACE, "g"), "\\n");
+  const escaped = [NEWLINE_REPLACE, "<ESCAPE_NEWLINE>"];
+  let replacedStr = str;
+  for (const esc of escaped) {
+    replacedStr = replacedStr.replace(new RegExp(esc, "g"), "\\n");
+  }
+  return replacedStr;
 }
 
 export function splitByNewLines(str: string): string[] {

@@ -4,6 +4,7 @@ import { getConfigSync } from "../config";
 import { IAgent } from "../agents/interface";
 import { OpenAIAgent } from "../agents/configurable/OpenAIAgent";
 import { ConfigAgent } from "../agents/configurable/ConfigAgent";
+import { Vimmer } from "../agents/vim/vim";
 // import { Tools } from "./Tools";
 
 class AgentService {
@@ -12,6 +13,7 @@ class AgentService {
   constructor() {
     this.registerAgent(Researcher);
     this.registerAgent(Developer);
+    this.registerAgent(Vimmer);
     this.loadAgentsFromConfig();
 
     const agentNames = this.listAgents().join(", ");

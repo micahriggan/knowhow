@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { generate, embed, upload, uploadOpenAi, chat } from "./index";
 import { init } from "./config";
-import { download } from ".";
+import { download, purge } from ".";
 
 const command = process.argv[2];
 
@@ -16,6 +16,9 @@ async function main() {
     case "embed":
       await embed();
       break;
+    case "embed:purge":
+      await purge(process.argv[3]);
+      break;
     case "upload":
       await upload();
       break;
@@ -27,6 +30,7 @@ async function main() {
       break;
     case "chat":
       await chat();
+      break;
     default:
       console.log(
         "Unknown command. Please use one of the following: init, generate, embed"

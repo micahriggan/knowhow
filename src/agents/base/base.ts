@@ -50,12 +50,18 @@ export abstract class BaseAgent implements IAgent {
     }
   }
 
-  abstract getInitialMessages(userInput: string): ChatCompletionMessageParam[];
+  abstract getInitialMessages(
+    userInput: string
+  ): Promise<ChatCompletionMessageParam[]>;
 
   async processToolMessages(toolCall: ChatCompletionMessageToolCall) {
     const functionName = toolCall.function.name;
     const functionToCall = this.tools.getFunction(functionName);
-    const functionArgs = JSON.parse(toolCall.function.arguments);
+
+    console.log(toolCall);
+    const functionArgs = JSON.parse(
+      this.formatAiResponse(toolCall.function.arguments)
+    );
 
     const toJsonIfObject = (arg: any) => {
       if (typeof arg === "object") {
@@ -160,7 +166,7 @@ export abstract class BaseAgent implements IAgent {
 
   async call(userInput: string, _messages?: ChatCompletionMessageParam[]) {
     const model = this.getModel();
-    let messages = _messages || this.getInitialMessages(userInput);
+    let messages = _messages || (await this.getInitialMessages(userInput));
     messages = this.formatInputMessages(messages);
 
     const startIndex = 0;

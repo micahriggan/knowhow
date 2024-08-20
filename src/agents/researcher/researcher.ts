@@ -10,7 +10,7 @@ export class ResearcherAgent extends BaseAgent {
     this.disableTool("patchFile");
   }
 
-  getInitialMessages(userInput: string) {
+  async getInitialMessages(userInput: string) {
     return [
       {
         role: "system",

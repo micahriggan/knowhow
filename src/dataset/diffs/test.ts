@@ -20,8 +20,8 @@ import { md5Hash } from "../../hashes";
 class PatchTestAgent extends CodebaseAgent {
   name = "PatchTestAgent";
 
-  getInitialMessages(userInput: string) {
-    const baseMessages = super.getInitialMessages(userInput);
+  async getInitialMessages(userInput: string) {
+    const baseMessages = await super.getInitialMessages(userInput);
 
     baseMessages.push({
       content:

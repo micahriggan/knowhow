@@ -50,6 +50,7 @@
     "marked-terminal": "^6.2.0",
     "morgan": "^1.10.0",
     "node-fetch": "^3.2.3",
+    "node-pty": "^1.0.0",
     "openai": "^4.17.5",
     "ora": "^5.4.1",
     "parse-diff": "^0.11.1",

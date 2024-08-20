@@ -4,6 +4,7 @@ import { Plugins } from "../../plugins/plugins";
 const pluginNames = Plugins.listPlugins().join(", ");
 import * as github from "./github/definitions";
 import * as asana from "./asana/definitions";
+import * as vim from "./vim/definitions";
 
 export const includedTools = [
   {
@@ -303,4 +304,5 @@ export const includedTools = [
   },
   ...asana.definitions,
   ...github.definitions,
+  ...vim.definitions
 ] as ChatCompletionTool[];

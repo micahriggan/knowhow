@@ -25,6 +25,15 @@ export const openai = new OpenAI({
   ...(config.openaiBaseUrl && { baseURL: config.openaiBaseUrl }),
 });
 
+export async function singlePrompt(userPrompt: string) {
+  const extraction = await openai.chat.completions.create({
+    messages: [{ role: "user", content: userPrompt }],
+    model: "gpt-4o",
+  });
+
+  return extraction?.choices?.[0]?.message?.content;
+}
+
 export async function summarizeTexts(texts: string[], template: string) {
   const prompt = new PromptTemplate({
     template,
@@ -53,13 +62,13 @@ export async function summarizeTexts(texts: string[], template: string) {
 
 export async function chunkText(text: string, chunkSize?: number) {
   chunkSize = chunkSize || text.length;
-  const textSplitter = new RecursiveCharacterTextSplitter({
-    chunkSize,
-  });
 
-  const docs = await textSplitter.createDocuments([text]);
+  const docs = [];
+  for (let i = 0; i < text.length; i += chunkSize) {
+    docs.push(text.slice(i, i + chunkSize));
+  }
 
-  return docs.map((d) => d.pageContent);
+  return docs;
 }
 
 export async function summarizeFiles(files: string[], template: string) {

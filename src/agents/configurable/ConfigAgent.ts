@@ -10,10 +10,10 @@ export class ConfigAgent extends BaseAgent {
     this.name = config.name;
   }
 
-  getInitialMessages(userInput: string): ChatCompletionMessageParam[] {
+  async getInitialMessages(userInput: string) {
     return [
       { role: "system", content: this.config.instructions },
       { role: "user", content: userInput },
-    ];
+    ] as ChatCompletionMessageParam[];
   }
 }

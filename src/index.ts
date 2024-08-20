@@ -33,6 +33,7 @@ import {
   loadEmbedding,
   saveEmbedding,
   embedSource,
+  getConfiguredEmbeddingMap,
 } from "./embeddings";
 import { summarizeFile, uploadToOpenAi, createAssistant } from "./ai";
 
@@ -58,6 +59,22 @@ export async function embed() {
 
   for (const source of config.embedSources) {
     await embedSource(source, ignorePattern);
+  }
+}
+
+export async function purge(filePath: string) {
+  const embeddings = await getConfiguredEmbeddingMap();
+  const config = await getConfig();
+  const chunkSizes = config.embedSources.reduce((acc, source) => {
+    acc[source.output] = source.chunkSize;
+    return acc;
+  }, {});
+
+  for (const file of Object.keys(embeddings)) {
+    const pruned = embeddings[file]
+      .filter((e) => !filePath || !e.id.startsWith(filePath))
+      .filter((e) => e.text.length <= chunkSizes[file]);
+    await saveEmbedding(file, pruned);
   }
 }
 
