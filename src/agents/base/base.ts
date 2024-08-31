@@ -8,7 +8,8 @@ import { IAgent } from "../interface";
 import { ToolsService, Tools } from "../../services/Tools";
 import { replaceEscapedNewLines, restoreEscapedNewLines } from "../../utils";
 import { $Command } from "@aws-sdk/client-s3";
-import { Agents } from "../../services/AgentService";
+import { Agents, AgentService } from "../../services/AgentService";
+import { Events, EventService } from "../../services/EventService";
 
 export abstract class BaseAgent implements IAgent {
   abstract name: string;
@@ -16,10 +17,13 @@ export abstract class BaseAgent implements IAgent {
 
   protected gptModelName: string = "gpt-4-turbo-preview";
 
-  constructor(public tools: ToolsService = Tools) {}
+  constructor(
+    public tools: ToolsService = Tools,
+    public events: EventService = Events
+  ) {}
 
   register() {
-    Agents.registerAgent(this);
+    this.events.registerAgent(this);
   }
 
   getModel(): string {

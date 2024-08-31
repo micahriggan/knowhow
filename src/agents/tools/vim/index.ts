@@ -36,12 +36,16 @@ export async function useVim() {
   return "vim process started. you can use sendVimInput tool to open and modify files now. Make sure you've opened a file before sending other keys";
 }
 
+let GLOBAL_DELAY = 2500;
+
 export async function openFileInVim(filename: string) {
   if (!ptyProcess) {
     await useVim();
   }
 
-  return sendVimInput([`<ESC>:e ${filename}\n`], 2500);
+  const output = await sendVimInput([`<ESC>:e ${filename}\n`], 2500);
+  GLOBAL_DELAY = 1000;
+  return output;
 }
 
 export async function saveVimFile(filename: string) {
@@ -49,10 +53,12 @@ export async function saveVimFile(filename: string) {
     await useVim();
   }
 
-  return sendVimInput([`<ESC>:w! ${filename} \n`], 2500);
+  const output = await sendVimInput([`<ESC>:w! ${filename} \n`], 2500);
+  GLOBAL_DELAY = 2500;
+  return output;
 }
 
-export async function sendVimInput(keys: string[], delay = 2500) {
+export async function sendVimInput(keys: string[], delay = GLOBAL_DELAY) {
   if (!ptyProcess) {
     await useVim();
   }
@@ -95,7 +101,7 @@ export async function sendVimInput(keys: string[], delay = 2500) {
   console.log("sending keys", remapped);
   const { update, collect } = snapshotter.collectFutureSnapshots();
   await snapshotter.sendManyKeys(remapped, delay);
-  const snapshots = collect();
+  const snapshots = await collect();
 
   // await closeVim();
 

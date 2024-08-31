@@ -16,7 +16,6 @@ import { queryEmbedding, getConfiguredEmbeddingMap } from "./embeddings";
 import { Agents } from "./services/AgentService";
 import { FlagsService } from "./services/flags";
 import { IAgent } from "./agents/interface";
-import { Developer } from "./agents/developer/developer";
 
 enum ChatFlags {
   agent = "agent",
@@ -175,7 +174,7 @@ export async function askGpt<E extends GptQuestionEmbedding>(
   embeddings: Embeddable<E>[],
   plugins: string[] = []
 ) {
-  let activeAgent: IAgent = Developer;
+  let activeAgent: IAgent = Agents.getAgent("Developer");
   const commands = [
     "agent",
     "agents",

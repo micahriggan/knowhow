@@ -18,7 +18,7 @@ function parseTerminalStream(input) {
   // cleanedString = cleanedString.replace(/\\/g, "");
 
   // Optional: collapse multiple spaces into a single space
-	 cleanedString = cleanedString.replace(/\s+/g, " ");
+  cleanedString = cleanedString.replace(/\s+/g, " ");
 
   return cleanedString;
 }
@@ -111,7 +111,8 @@ export class ProcessSnapshotter {
       lastSnapshot = this.getLastSnapshot();
     };
 
-    const collect = () => {
+    const collect = async () => {
+      await wait(this.snapshotEveryMs);
       const lastTimestamp = lastSnapshot?.timestamp || 0;
       const snapshots = this.snapshotsSince(lastTimestamp);
       update();
