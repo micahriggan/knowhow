@@ -4,6 +4,7 @@ import { Assistant } from "../../types";
 
 export class ConfigAgent extends BaseAgent {
   name: string;
+  description: string;
 
   constructor(private config: Assistant) {
     super();

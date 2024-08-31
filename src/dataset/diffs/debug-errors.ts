@@ -1,7 +1,7 @@
 import "source-map-support/register";
 
 import { parsePatch, diffLines, applyPatch } from "diff";
-import { CodebaseAgent } from "../../agents/codebase/codebase";
+import { PatchingAgent } from "../../agents/patcher/patcher";
 import { ask, writeFile, mkdir, readFile } from "../../utils";
 import { fixPatch, parseHunks } from "../../agents/tools/patch";
 import errors from "./test_files/errors.json";

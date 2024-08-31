@@ -1,11 +1,11 @@
-import { execAsync } from "../../utils";
 import { getConfiguredEmbeddings } from "../../embeddings";
+import { execCommand } from "./execCommand";
 
 export async function textSearch(searchTerm) {
   try {
     const command = `ag "${searchTerm}"`;
-    const { stdout } = await execAsync(command);
-    return stdout; // Return the results of using ag
+    const output = await execCommand(command);
+    return output;
   } catch (err) {
     console.log(
       "Falling back to embeddings text search since ag was not available"

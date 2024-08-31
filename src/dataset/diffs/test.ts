@@ -6,7 +6,7 @@ import {
   ChatCompletionMessageToolCall,
 } from "openai/resources/chat";
 import { parsePatch, diffLines, applyPatch } from "diff";
-import { CodebaseAgent } from "../../agents/codebase/codebase";
+import { PatchingAgent } from "../../agents/patcher/patcher";
 import dataset from "./dataset.json";
 import { ask, writeFile, mkdir } from "../../utils";
 import {
@@ -17,7 +17,7 @@ import {
 } from "../../agents/tools/patch";
 import { md5Hash } from "../../hashes";
 
-class PatchTestAgent extends CodebaseAgent {
+class PatchTestAgent extends PatchingAgent {
   name = "PatchTestAgent";
 
   async getInitialMessages(userInput: string) {

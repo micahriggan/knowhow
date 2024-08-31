@@ -7,6 +7,7 @@ import { IAgent } from "../interface";
 
 export class OpenAIAgent implements IAgent {
   name: string;
+  description: string;
 
   constructor(private config: Assistant) {
     this.name = config.name;

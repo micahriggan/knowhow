@@ -13,10 +13,10 @@ import { Marked } from "./utils";
 import { ask } from "./utils";
 import { Plugins } from "./plugins/plugins";
 import { queryEmbedding, getConfiguredEmbeddingMap } from "./embeddings";
-import { agentService } from "./services/AgentService";
+import { Agents } from "./services/AgentService";
 import { FlagsService } from "./services/flags";
-import { Developer } from "./agents/codebase/codebase";
 import { IAgent } from "./agents/interface";
+import { Developer } from "./agents/developer/developer";
 
 enum ChatFlags {
   agent = "agent",
@@ -204,13 +204,13 @@ export async function askGpt<E extends GptQuestionEmbedding>(
       switch (input) {
         case ChatFlags.agents:
           Flags.enable(ChatFlags.agent);
-          const agents = agentService.listAgents();
+          const agents = Agents.listAgents();
           console.log(agents);
           const selected = await ask(
             "Which agent would you like to use: ",
             agents
           );
-          activeAgent = agentService.getAgent(selected);
+          activeAgent = Agents.getAgent(selected);
           break;
         case ChatFlags.agent:
           Flags.flip(ChatFlags.agent);

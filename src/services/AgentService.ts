@@ -1,46 +1,52 @@
-import { Researcher } from "../agents/researcher/researcher";
-import { Developer } from "../agents/codebase/codebase";
 import { getConfigSync } from "../config";
 import { IAgent } from "../agents/interface";
 import { OpenAIAgent } from "../agents/configurable/OpenAIAgent";
 import { ConfigAgent } from "../agents/configurable/ConfigAgent";
-import { Vimmer } from "../agents/vim/vim";
-// import { Tools } from "./Tools";
+import { Events } from "./EventService";
+import { Tools } from "./Tools";
 
 class AgentService {
   private agents: Map<string, IAgent> = new Map();
 
   constructor() {
-    this.registerAgent(Researcher);
-    this.registerAgent(Developer);
-    this.registerAgent(Vimmer);
+    this.wireUp();
     this.loadAgentsFromConfig();
+  }
 
-    const agentNames = this.listAgents().join(", ");
-    /*
-     *Tools.addTool({
-     *  type: "function",
-     *  function: {
-     *    name: "agentCall",
-     *    description:
-     *      "Allows an agent to ask another agent a question. Useful for getting help from agents that are configured for specific goals.",
-     *    parameters: {
-     *      type: "object",
-     *      properties: {
-     *        agentName: {
-     *          type: "string",
-     *          description: `The name of the agent to call. Available agents: ${agentNames}`,
-     *        },
-     *        query: {
-     *          type: "string",
-     *          description: `The query to send to the agent`,
-     *        },
-     *      },
-     *      required: ["agentName", "query"],
-     *    },
-     *  },
-     *});
-     */
+  public wireUp() {
+    Tools.addTool({
+      type: "function",
+      function: {
+        name: "agentCall",
+        description: `Allows an agent to ask another agent a question. Useful for getting help from agents that are configured for specific goals.
+        ${this.getAgentDescriptions()}`,
+        parameters: {
+          type: "object",
+          properties: {
+            agentName: {
+              type: "string",
+              description: `The name of the agent to call. Available agents: ${this.listAgents()}`,
+            },
+            query: {
+              type: "string",
+              description: `The query to send to the agent`,
+            },
+          },
+          required: ["agentName", "query"],
+        },
+      },
+    });
+    Events.on("agents:register", (data) => {
+      console.log(`Agent registered: ${data.name}`);
+      const { name, agent } = data;
+      this.registerAgentByName(name, agent);
+    });
+
+    Events.on("agents:call", (data) => {
+      console.log(`Agent called: ${data.name}`);
+      const { name, query, resolve, reject } = data;
+      this.callAgent(name, query).then(resolve).catch(reject);
+    });
   }
 
   public registerAgent(agent: IAgent): void {
@@ -54,13 +60,22 @@ class AgentService {
   public getAgent(name: string): IAgent {
     const agent = this.agents.get(name);
     if (!agent) {
-      throw new Error(`Agent ${name} not found`);
+      throw new Error(
+        `Agent ${name} not found. Options are: ${this.listAgents()}`
+      );
     }
     return agent;
   }
 
   public listAgents(): string[] {
     return Array.from(this.agents.keys());
+  }
+
+  public getAgentDescriptions() {
+    return Object.keys(this.agents).map((key) => {
+      const agent = this.getAgent(key);
+      return `name: ${agent.name} \n description: ${agent.description}`;
+    });
   }
 
   public loadAgentsFromConfig() {
@@ -85,10 +100,10 @@ class AgentService {
   public async callAgent(name: string, query: string): Promise<string> {
     const agent = this.agents.get(name);
     if (!agent) {
-      return "Agent not found";
+      return `Agent ${name} not found. Options are: ${this.listAgents()}`;
     }
     return agent.call(query);
   }
 }
 
-export const agentService = new AgentService();
+export const Agents = new AgentService();

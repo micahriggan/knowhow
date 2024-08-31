@@ -12,13 +12,13 @@ function parseTerminalStream(input) {
   let cleanedString = input.replace(ansiEscapeCodePattern, "");
 
   // Remove excess whitespace, carriage returns, and newlines
-  cleanedString = cleanedString.replace(/\\r/g, "").replace(/\\n/g, " ").trim();
+  // cleanedString = cleanedString.replace(/\\r/g, "").replace(/\\n/g, " ").trim();
 
   // Remove any backslashes left from escape sequences
-  cleanedString = cleanedString.replace(/\\/g, "");
+  // cleanedString = cleanedString.replace(/\\/g, "");
 
   // Optional: collapse multiple spaces into a single space
-  cleanedString = cleanedString.replace(/\s+/g, " ");
+	 cleanedString = cleanedString.replace(/\s+/g, " ");
 
   return cleanedString;
 }

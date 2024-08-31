@@ -18,7 +18,7 @@ export const definitions = [
           delay: {
             type: "number",
             description:
-              "Optional delay between sending each input command, defaulting to 3 seconds. Use a longer delay when opening files, and a shorter delay when sending commands to an already loaded buffer.",
+              "Optional delay between sending each input command, defaulting to 3 seconds. You can use shorter delays once the file is open",
           },
         },
         required: ["inputs"],
@@ -35,6 +35,41 @@ export const definitions = [
         type: "object",
         properties: {},
         required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "openFileInVim",
+      description:
+        "Use this to open a file in vim. Ensures the file is opened correctly, so you don't have to use sendVimInput",
+      parameters: {
+        type: "object",
+        properties: {
+          filepath: {
+            type: "string",
+            description: "The filepath to the file to be opened",
+          },
+        },
+        required: ["filepath"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "saveVimFile",
+      description: "Saves the active file in vim",
+      parameters: {
+        type: "object",
+        properties: {
+          filepath: {
+            type: "string",
+            description: "The filepath to the file to be saved",
+          },
+        },
+        required: ["filepath"],
       },
     },
   },

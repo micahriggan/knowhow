@@ -6,7 +6,7 @@ import {
   ChatCompletionMessageToolCall,
 } from "openai/resources/chat";
 import { parsePatch, diffLines, applyPatch } from "diff";
-import { CodebaseAgent } from "../../agents/codebase/codebase";
+import { PatchingAgent } from "../../agents/patcher/patcher";
 import dataset from "./dataset.json";
 import { ask, writeFile, mkdir, readFile } from "../../utils";
 import { fixPatch, parseHunks } from "../../agents/tools/patch";

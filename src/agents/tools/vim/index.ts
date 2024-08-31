@@ -21,26 +21,35 @@ export async function useVim() {
     });
 
     ptyProcess.onData((data) => {
+      // Uncomment this to see the vim window
       // stdout.write(data);
     });
 
     ptyProcess.write("vim -n\n");
   }
 
-  // delete on start
-  if (fs.existsSync("terminal.txt")) {
-    fs.unlinkSync("terminal.txt");
-  }
-
   if (!snapshotter) {
     snapshotter = new ProcessSnapshotter(ptyProcess, 250);
-
-    snapshotter.onSnapshot((snapshot) => {
-      fs.appendFileSync("terminal.txt", JSON.stringify(snapshot) + "\n");
-    });
   }
 
-  return "vim process started. you can use sendVimInput tool to open and modify files now";
+  await wait(3000);
+  return "vim process started. you can use sendVimInput tool to open and modify files now. Make sure you've opened a file before sending other keys";
+}
+
+export async function openFileInVim(filename: string) {
+  if (!ptyProcess) {
+    await useVim();
+  }
+
+  return sendVimInput([`<ESC>:e ${filename}\n`], 2500);
+}
+
+export async function saveVimFile(filename: string) {
+  if (!ptyProcess) {
+    await useVim();
+  }
+
+  return sendVimInput([`<ESC>:w! ${filename} \n`], 2500);
 }
 
 export async function sendVimInput(keys: string[], delay = 2500) {
@@ -56,7 +65,11 @@ export async function sendVimInput(keys: string[], delay = 2500) {
     "<ENTER>": "\n",
     "<enter>": "\n",
     "<Enter>": "\n",
+    "<CR>": "\n",
   };
+
+  const startingKeys = [":", "/"];
+  const shouldEscapeRegex = /^(?:\/(?!\/)|:)/;
 
   const remapped = keys.map((key) => {
     for (const [from, to] of Object.entries(keymap)) {
@@ -64,13 +77,15 @@ export async function sendVimInput(keys: string[], delay = 2500) {
     }
 
     // we are executing a command
-    if (key.startsWith(":")) {
-      // easiest way to ensure we're in normal mode
-      key = ESCAPE + key;
+    for (const start of startingKeys) {
+      if (shouldEscapeRegex.test(key)) {
+        // easiest way to ensure we're in normal mode
+        key = ESCAPE + key;
 
-      if (!key.endsWith("\n")) {
-        // make sure we actually send the command
-        key = key + "\n";
+        if (!key.endsWith("\n")) {
+          // make sure we actually send the command
+          key = key + "\n";
+        }
       }
     }
 
@@ -96,5 +111,5 @@ export async function closeVim() {
   ptyProcess.kill();
   ptyProcess = undefined;
   snapshotter = undefined;
-  return "vim process closed";
+  return "vim process closed. Are you done? call finalAnswer if so";
 }

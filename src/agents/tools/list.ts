@@ -5,6 +5,7 @@ const pluginNames = Plugins.listPlugins().join(", ");
 import * as github from "./github/definitions";
 import * as asana from "./asana/definitions";
 import * as vim from "./vim/definitions";
+import { Agents } from "../../services/AgentService";
 
 export const includedTools = [
   {
@@ -302,7 +303,8 @@ export const includedTools = [
       },
     },
   },
+
   ...asana.definitions,
   ...github.definitions,
-  ...vim.definitions
+  ...vim.definitions,
 ] as ChatCompletionTool[];

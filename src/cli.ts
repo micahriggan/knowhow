@@ -2,10 +2,20 @@
 import { generate, embed, upload, uploadOpenAi, chat } from "./index";
 import { init } from "./config";
 import { download, purge } from ".";
+import { Agents } from "./services/AgentService";
+import { Researcher } from "./agents/researcher/researcher";
+import { Patcher } from "./agents/patcher/patcher";
+import { Vimmer } from "./agents/vim/vim";
+import { Developer } from "./agents/developer/developer";
 
 const command = process.argv[2];
 
 async function main() {
+  Agents.registerAgent(Researcher);
+  Agents.registerAgent(Patcher);
+  Agents.registerAgent(Vimmer);
+  Agents.registerAgent(Developer);
+
   switch (command) {
     case "init":
       await init();

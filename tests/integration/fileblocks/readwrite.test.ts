@@ -1,20 +1,20 @@
 import * as fs from "fs";
 import { readFile, writeFile } from "../../../src/utils";
-import { Developer } from "../../../src/agents/codebase/codebase";
+import { Patcher } from "../../../src/agents/patcher/patcher";
 import { FlagsService } from "../../../src/services/flags";
 
 describe("Developer", () => {
   beforeAll(() => {
-    Developer.disableTool("searchFiles");
-    Developer.disableTool("execCommand");
-    Developer.enableTool("modifyFile");
-    Developer.enableTool("readFile");
+    Patcher.disableTool("searchFiles");
+    Patcher.disableTool("execCommand");
+    Patcher.enableTool("modifyFile");
+    Patcher.enableTool("readFile");
   });
 
   test("should be able to patch a codebase", async () => {
     const inputPath = "tests/integration/patching/input.txt";
     const originalText = (await readFile(inputPath)).toString();
-    await Developer.call(
+    await Patcher.call(
       `Update the file in ${inputPath} change the string "finalAnswer" to "FinalAnswer" on line 120. Do not modify anything else. Treat this file as a typescript file.`
     );
 
@@ -29,7 +29,7 @@ describe("Developer", () => {
   test("should be able to update the unseen file", async () => {
     const unseenPath = "tests/integration/patching/unseen.txt";
     const originalText = (await readFile(unseenPath)).toString();
-    await Developer.call(
+    await Patcher.call(
       `Update the file in ${unseenPath} change the file additions and deletions count from 200 to 300. Do not modify anything else. Treat this file as a typescript file.`
     );
 
@@ -61,7 +61,7 @@ describe("Developer", () => {
 
       Make sure to module.exports the class and Singleton, as we will be importing it in the test via require("./outputs/flags.js").Flags
 `;
-    await Developer.call(
+    await Patcher.call(
       `Modify the file in ${outputPath} for these instructions.: ${promptText}`
     );
 
@@ -75,7 +75,7 @@ describe("Developer", () => {
       service.flip("test");
       expect(service.enabled("test")).toEqual(true);
 
-      await Developer.call(
+      await Patcher.call(
         `Modify the file in ${outputPath} and add a method called hasFlag that takes a string and returns a boolean. It should return true if the flag is defined at all, even if it is false. This is a unit test, only modify the file I've specified.`
       );
 

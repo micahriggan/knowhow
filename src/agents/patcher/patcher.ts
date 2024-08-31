@@ -71,8 +71,9 @@ You should attempt to apply one hunk at a time, as an error in one hunk can caus
 
 const pluginsReminder = `#PLUGINS REMINDER: Plugins are used to automatically expand user input with more context. The additional context could be from embeddings, files, pull requests, tickets etc. Do not assume the plugin information contains all the information you require to accomplish a task. Be sure to consider tools that you may use to supplement what the plugins initially provided.`;
 
-export class CodebaseAgent extends BaseAgent {
-  name = "Developer";
+export class PatchingAgent extends BaseAgent {
+  name = "Patcher";
+  description = `This agent is prepared to work on the codebase by leveraging patches`;
 
   async getInitialMessages(userInput: string) {
     return [
@@ -88,4 +89,4 @@ export class CodebaseAgent extends BaseAgent {
   }
 }
 
-export const Developer = new CodebaseAgent();
+export const Patcher = new PatchingAgent();

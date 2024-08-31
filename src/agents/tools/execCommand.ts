@@ -11,5 +11,16 @@ export const execCommand = async (command: string): Promise<string> => {
   output += stdout;
   console.log(`$ ${command}:\n${output}`);
 
-  return output;
+  const fullOutput = output.split("\n");
+
+  const maxLines = 1000;
+  const maxCharacters = 40000;
+  const shouldTrim = fullOutput.length > maxLines;
+  const trimmedOutput = shouldTrim ? fullOutput.slice(0, maxLines) : fullOutput;
+
+  const trimmedMessage = shouldTrim
+    ? ` (${fullOutput.length - maxLines} results trimmed)`
+    : "";
+
+  return trimmedOutput.join("\n").slice(0, maxCharacters) + trimmedMessage;
 };
