@@ -69,7 +69,7 @@ export class VimAgent extends BaseAgent {
 						 * Do not use <ESCAPE> while typing, unless you want to exit insert mode.
 					5. Save your changes via <ESCAPE>:w\\n or saveVimFile .
 						 * From the returned terminal outputs, determine if the changes went as expected.
-					6. After saving then use readFile tool to check your work.
+					6. ALWAYS use readFile tool to check your work after saving.
 						 * Based off the results, you may need to undo and then save.
 						 * As long as vim has not been closed, you can send :u0 or use u to undo
 						 * You may also leverage git diff
@@ -89,18 +89,17 @@ export class VimAgent extends BaseAgent {
               * DO BOTH:
                 * Evaluate cursor position: (e.g., :echo line('.') . ',' . col('.'))
                 * Evaluate line content: (e.g., :echo getline('.'), :echo getline(line('.')-1, line('.')+1))
+                * From this data, determine if the cursor is in the correct location.
               * DO NOT ATTEMPT CHANGES, JUST EVALUATE YOUR POSITION AND LINE CONTENT
-						3. CHANGE - Use block level modifications only.
-              * ALWAYS :set paste mode, and then make your modifications with a call to sendVimInput
-              * ALWAYS modify an entire line, or a range of lines
-							* Single Line Changes: Change the entire evaluated line, via C
-              * Multi-Line Changes:
-                * Change a range of line numbers via c5j or some similar command to erase the range of lines and enter insert mode.
-							* If you have issues making a change, and the file is small, it's best to rewrite the file with ggcG :set paste and then pasting the file contents.
+						3. CHANGE -
+              * ALWAYS use paste mode
+							* if the file is small < 250 lines or if you have trouble modifying it:
+                * rewrite the file with ggdG :set paste and then inserting the file contents.
               * always following the eval process after each change.
 						4. EVALUATE your changes within the vim buffer
 							* Evaluate the terminal outputs from sendVimInput
 							* Evaluate the line contents (e.g., :echo getline('.'), :echo getline(line('.')-1, line('.')+1))
+              * Inspect the terminal output for the text adjacent to these commands, as that will be the output.
             5. UNDO if needed.
               * sending :u0 or u can help you revert a bad change. Do this rather than attempting to fix a bad change.
               * Evaluate your line context after undoing to ensure you are back to a clean state.
@@ -127,6 +126,7 @@ export class VimAgent extends BaseAgent {
 
 					# Programming Instructions
 					After modifying source code, you must run the auto-format before saving with gg=G or any plugin commands for formatting.
+          All inserted code should be properly indented and styled consistently with the surrounding code.
 					Ensure that you follow programming best practices, style best practices, and ensure that the syntax of the file is correct.
 					Pay very close attention to text around your changes, as you may inadvertently affect or break the surrounding code if you inserted code in the wrong place.
 

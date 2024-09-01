@@ -3,6 +3,7 @@ import { EventEmitter } from "events";
 import * as fs from "fs";
 import * as pty from "node-pty";
 import { wait } from "../../../utils";
+import { readFile } from "../readFile";
 
 let ptyProcess: pty.IPty;
 let snapshotter: ProcessSnapshotter;
@@ -55,7 +56,7 @@ export async function saveVimFile(filename: string) {
 
   const output = await sendVimInput([`<ESC>:w! ${filename} \n`], 2500);
   GLOBAL_DELAY = 2500;
-  return output;
+  return output + `\n Use readFile to check your work on ${filename}`;
 }
 
 export async function sendVimInput(keys: string[], delay = GLOBAL_DELAY) {
@@ -64,6 +65,7 @@ export async function sendVimInput(keys: string[], delay = GLOBAL_DELAY) {
   }
 
   const ESCAPE = "\x1B";
+  const BACKSPACE = "\x08";
   const keymap = {
     "<ESC>": ESCAPE,
     "<Esc>": ESCAPE,
@@ -72,6 +74,9 @@ export async function sendVimInput(keys: string[], delay = GLOBAL_DELAY) {
     "<enter>": "\n",
     "<Enter>": "\n",
     "<CR>": "\n",
+    "<BACKSPACE>": BACKSPACE,
+    "<BACK>": BACKSPACE,
+    "<BS>": BACKSPACE,
   };
 
   const startingKeys = [":", "/"];
