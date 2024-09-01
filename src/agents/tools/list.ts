@@ -1,3 +1,4 @@
+import { Tool } from "../../clients/types";
 import { ChatCompletionTool } from "openai/resources/chat";
 import { Plugins } from "../../plugins/plugins";
 
@@ -307,4 +308,4 @@ export const includedTools = [
   ...asana.definitions,
   ...github.definitions,
   ...vim.definitions,
-] as ChatCompletionTool[];
+] as Tool[];

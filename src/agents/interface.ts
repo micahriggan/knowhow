@@ -1,10 +1,7 @@
-import { ChatCompletionMessageParam } from "openai/resources/chat";
+import { Message } from "../clients/types";
 
 export interface IAgent {
   name: string;
   description: string;
-  call: (
-    userInput: string,
-    messages?: ChatCompletionMessageParam[]
-  ) => Promise<string>;
+  call: (userInput: string, messages?: Message[]) => Promise<string>;
 }

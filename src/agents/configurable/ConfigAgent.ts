@@ -1,5 +1,5 @@
 import { BaseAgent } from "../base/base";
-import { ChatCompletionMessageParam } from "openai/resources/chat";
+import { Message } from "../../clients/types";
 import { Assistant } from "../../types";
 
 export class ConfigAgent extends BaseAgent {
@@ -15,6 +15,6 @@ export class ConfigAgent extends BaseAgent {
     return [
       { role: "system", content: this.config.instructions },
       { role: "user", content: userInput },
-    ] as ChatCompletionMessageParam[];
+    ] as Message[];
   }
 }

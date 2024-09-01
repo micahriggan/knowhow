@@ -38,7 +38,7 @@ import {
 import { summarizeFile, uploadToOpenAi, createAssistant } from "./ai";
 
 import { abort } from "process";
-import { askGpt } from "./chat";
+import { chatLoop } from "./chat";
 import { convertToText } from "./conversion";
 import { Plugins } from "./plugins/plugins";
 import { AwsS3 } from "./services/S3";
@@ -273,7 +273,7 @@ export async function handleSingleOutputGeneration(
 export async function chat() {
   const config = await getConfig();
   const embeddings = await getConfiguredEmbeddings();
-  await askGpt("knowhow", embeddings, config.plugins);
+  await chatLoop("knowhow", embeddings, config.plugins);
 }
 
 export async function download() {
