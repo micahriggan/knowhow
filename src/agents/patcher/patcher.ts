@@ -77,6 +77,8 @@ export class PatchingAgent extends BaseAgent {
 
   constructor() {
     super();
+    this.setModel("claude-3-5-sonnet-20240620");
+    this.setProvider("anthropic");
     this.disableTool("sendVimInput");
     this.disableTool("openFileInVim");
   }
