@@ -5,7 +5,7 @@ import { ConfigAgent } from "../agents/configurable/ConfigAgent";
 import { Events } from "./EventService";
 import { Tools } from "./Tools";
 
-class AgentService {
+export class AgentService {
   private agents: Map<string, IAgent> = new Map();
 
   constructor() {

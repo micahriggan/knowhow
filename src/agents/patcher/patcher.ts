@@ -75,6 +75,12 @@ export class PatchingAgent extends BaseAgent {
   name = "Patcher";
   description = `This agent is prepared to work on the codebase by leveraging patches`;
 
+  constructor() {
+    super();
+    this.disableTool("sendVimInput");
+    this.disableTool("openFileInVim");
+  }
+
   async getInitialMessages(userInput: string) {
     return [
       {
