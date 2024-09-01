@@ -16,6 +16,7 @@ import { queryEmbedding, getConfiguredEmbeddingMap } from "./embeddings";
 import { Agents } from "./services/AgentService";
 import { FlagsService } from "./services/flags";
 import { IAgent } from "./agents/interface";
+import { Clients, Message } from "./clients";
 
 enum ChatFlags {
   agent = "agent",
@@ -24,6 +25,7 @@ enum ChatFlags {
   multi = "multi",
   search = "search",
   clear = "clear",
+  provider = "provider",
 }
 
 const Flags = new FlagsService(
@@ -110,7 +112,14 @@ Generate an article or document that answers the question.
   return queryEmbedding(fakeDoc, embeddings);
 }
 
-export async function queryGpt4<E extends EmbeddingBase>(query: string) {
+const chatModels = {
+  "openai": "gpt-4o",
+  "anthropic": "claude-3-5-sonnet-20240620"
+}
+export async function askAI<E extends EmbeddingBase>(
+  query: string,
+  provider = "openai"
+) {
   const gptPrompt = `
 
 The user has asked:
@@ -129,16 +138,12 @@ The user has asked:
         "Helpful Codebase assistant. Answer users questions using the embedding data that is provided with the user's question. You have limited access to the codebase based off of how similar the codebase is to the user's question. You may reference file paths by using the IDs present in the embedding data, but be sure to remove the chunk from the end of the filepaths.",
     },
     { role: "user", content: gptPrompt },
-  ] as ChatCompletionMessageParam[];
+  ] as Message[];
 
-  const response = await openai.chat.completions.create({
+  const response = await Clients.createCompletion(provider, {
     messages: thread,
     max_tokens: 2500,
-    model: "gpt-4o",
-    temperature: 0,
-    top_p: 1,
-    presence_penalty: 0,
-    frequency_penalty: 0,
+    model: chatModels[provider],
   });
 
   return response.choices[0].message.content;
@@ -169,12 +174,14 @@ export async function formatChatInput(
   return fullPrompt;
 }
 
-export async function askGpt<E extends GptQuestionEmbedding>(
+export async function chatLoop<E extends GptQuestionEmbedding>(
   aiName: string,
   embeddings: Embeddable<E>[],
   plugins: string[] = []
 ) {
   let activeAgent: IAgent = Agents.getAgent("Developer");
+  let provider = "openai" as keyof typeof Clients.clients;
+  const providers = Object.keys(Clients.clients);
   const commands = [
     "agent",
     "agents",
@@ -183,6 +190,7 @@ export async function askGpt<E extends GptQuestionEmbedding>(
     "multi",
     "search",
     "clear",
+    "provider",
   ];
   console.log("Commands: ", commands.join(", "));
   const promptText = () =>
@@ -226,6 +234,13 @@ export async function askGpt<E extends GptQuestionEmbedding>(
         case ChatFlags.clear:
           chatHistory = [];
           break;
+        case ChatFlags.provider:
+          console.log(providers);
+          provider = await ask(
+            "Which provider would you like to use: ",
+            providers
+          );
+          break;
         case "":
           break;
         default:
@@ -240,7 +255,7 @@ export async function askGpt<E extends GptQuestionEmbedding>(
           if (Flags.enabled("agent")) {
             results = await activeAgent.call(formattedPrompt);
           } else {
-            results = await queryGpt4(formattedPrompt);
+            results = await askAI(formattedPrompt, provider);
           }
           interaction.output = results;
           console.log("\n\n");

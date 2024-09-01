@@ -1,4 +1,4 @@
-import { ChatCompletionMessageParam } from "openai/resources/chat";
+import { Message } from "../../clients/types";
 import { BaseAgent } from "../base/base";
 export class DeveloperAgent extends BaseAgent {
   name = "Developer";
@@ -52,7 +52,7 @@ export class DeveloperAgent extends BaseAgent {
         Users Question: ${userInput}
         Use the agentCall tool and check the work if any changes are made.`,
       },
-    ] as ChatCompletionMessageParam[];
+    ] as Message[];
   }
 }
 

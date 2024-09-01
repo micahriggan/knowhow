@@ -1,4 +1,4 @@
-import { ChatCompletionMessageParam } from "openai/resources/chat";
+import { Message } from "../../clients/types";
 import { BaseAgent } from "../base/base";
 
 const example = `
@@ -91,7 +91,7 @@ export class PatchingAgent extends BaseAgent {
       { role: "user", content: systemReminder },
       { role: "user", content: pluginsReminder },
       { role: "user", content: userInput },
-    ] as ChatCompletionMessageParam[];
+    ] as Message[];
   }
 }
 

@@ -1,5 +1,5 @@
 import * as fs from "fs";
-import { ChatCompletionMessageParam } from "openai/resources/chat";
+import { Message } from "../../clients/types";
 import { BaseAgent } from "../base/base";
 import { readFile, writeFile, execAsync, mkdir } from "../../utils";
 import { openai, singlePrompt } from "../../ai";
@@ -13,7 +13,8 @@ export class VimAgent extends BaseAgent {
   constructor() {
     super();
     this.disableTool("patchFile");
-    this.setModel("gpt-4o");
+    this.setModel("claude-3-5-sonnet-20240620");
+    this.setProvider("anthropic");
   }
 
   async saveVimGuide() {
@@ -65,7 +66,7 @@ export class VimAgent extends BaseAgent {
 							 2.d After opening a file, verify that you are in the correct buffer by checking for the expected file name in the terminal output. If the output shows [No Name] or another buffer name, close Vim and retry opening the correct file.
 					3. Inspect the response from openFileInVim to determine if the file was opened.
 						 * Check for any errors or prompts that may have occurred, respond to them if so.
-					4. Use sendVimInput following the Move Evaluate Change Evaluate (MECE) loop
+					4. Use sendVimInput to modify the file in vim.
 						 * Do not use <ESCAPE> while typing, unless you want to exit insert mode.
 					5. Save your changes via <ESCAPE>:w\\n or saveVimFile .
 						 * From the returned terminal outputs, determine if the changes went as expected.
@@ -78,31 +79,6 @@ export class VimAgent extends BaseAgent {
 					8. After completing your task and checking your work, you MUST call finalAnswer.
 
 
-					# Move Evaluate Change Evaluate Loop (MECE)
-						After Opening a file, when modifying a file in vim, you follow this strategy:
-            Each of these steps should be a SEPERATE CALL TO sendVimInput
-
-						1. MOVE to where the change should occur, with sendVimInput
-							* DO NOT ATTEMPT CHANGES, JUST MOVE
-              * Use search, and line numbers over relative curor movements
-						2. EVALUATE your position and line, to verify you moved to the correct location
-              * DO BOTH:
-                * Evaluate cursor position: (e.g., :echo line('.') . ',' . col('.'))
-                * Evaluate line content: (e.g., :echo getline('.'), :echo getline(line('.')-1, line('.')+1))
-                * From this data, determine if the cursor is in the correct location.
-              * DO NOT ATTEMPT CHANGES, JUST EVALUATE YOUR POSITION AND LINE CONTENT
-						3. CHANGE -
-              * ALWAYS use paste mode
-							* if the file is small < 250 lines or if you have trouble modifying it:
-                * rewrite the file with ggdG :set paste and then inserting the file contents.
-              * always following the eval process after each change.
-						4. EVALUATE your changes within the vim buffer
-							* Evaluate the terminal outputs from sendVimInput
-							* Evaluate the line contents (e.g., :echo getline('.'), :echo getline(line('.')-1, line('.')+1))
-              * Inspect the terminal output for the text adjacent to these commands, as that will be the output.
-            5. UNDO if needed.
-              * sending :u0 or u can help you revert a bad change. Do this rather than attempting to fix a bad change.
-              * Evaluate your line context after undoing to ensure you are back to a clean state.
 
 					After each sendVimInput, the function response will contain the changes in the vim terminal. Inspect that response to get an understanding of what is happening in the editor.
 
@@ -164,7 +140,7 @@ export class VimAgent extends BaseAgent {
 				`,
       },
       { role: "user", content: userInput },
-    ] as ChatCompletionMessageParam[];
+    ] as Message[];
   }
 }
 

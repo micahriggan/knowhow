@@ -1,20 +1,16 @@
-import {
-  ChatCompletionMessageParam,
-  ChatCompletionToolMessageParam,
-  ChatCompletionMessageToolCall,
-} from "openai/resources/chat";
-import { openai } from "../../ai";
+import { Message, Tool, ToolCall } from "../../clients/types";
 import { IAgent } from "../interface";
 import { ToolsService, Tools } from "../../services/Tools";
 import { replaceEscapedNewLines, restoreEscapedNewLines } from "../../utils";
-import { $Command } from "@aws-sdk/client-s3";
 import { Agents, AgentService } from "../../services/AgentService";
 import { Events, EventService } from "../../services/EventService";
+import { AIClient, Clients } from "../../clients";
 
 export abstract class BaseAgent implements IAgent {
   abstract name: string;
   abstract description: string;
 
+  protected provider = "openai";
   protected gptModelName: string = "gpt-4-turbo-preview";
 
   constructor(
@@ -32,6 +28,18 @@ export abstract class BaseAgent implements IAgent {
 
   setModel(value: string) {
     this.gptModelName = value;
+  }
+
+  getProvider() {
+    return this.provider;
+  }
+
+  setProvider(value: keyof typeof Clients.clients) {
+    this.provider = value;
+  }
+
+  getClient() {
+    return Clients.getClient(this.provider);
   }
 
   disabledTools = [];
@@ -60,11 +68,9 @@ export abstract class BaseAgent implements IAgent {
     }
   }
 
-  abstract getInitialMessages(
-    userInput: string
-  ): Promise<ChatCompletionMessageParam[]>;
+  abstract getInitialMessages(userInput: string): Promise<Message[]>;
 
-  async processToolMessages(toolCall: ChatCompletionMessageToolCall) {
+  async processToolMessages(toolCall: ToolCall) {
     const functionName = toolCall.function.name;
     const functionToCall = this.tools.getFunction(functionName);
 
@@ -138,7 +144,7 @@ export abstract class BaseAgent implements IAgent {
     return toolMessages;
   }
 
-  logMessages(messages: ChatCompletionMessageParam[]) {
+  logMessages(messages: Message[]) {
     for (const message of messages) {
       if (message.role === "assistant") {
         console.log(message.content);
@@ -154,27 +160,27 @@ export abstract class BaseAgent implements IAgent {
     return restoreEscapedNewLines(response);
   }
 
-  formatInputMessages(messages: ChatCompletionMessageParam[]) {
+  formatInputMessages(messages: Message[]) {
     return messages.map((m) => ({
       ...m,
       content:
         typeof m.content === "string"
           ? this.formatInputContent(m.content)
           : m.content,
-    })) as ChatCompletionMessageParam[];
+    })) as Message[];
   }
 
-  formatOutputMessages(messages: ChatCompletionMessageParam[]) {
+  formatOutputMessages(messages: Message[]) {
     return messages.map((m) => ({
       ...m,
       content:
         typeof m.content === "string"
           ? this.formatAiResponse(m.content)
           : m.content,
-    })) as ChatCompletionMessageParam[];
+    })) as Message[];
   }
 
-  async call(userInput: string, _messages?: ChatCompletionMessageParam[]) {
+  async call(userInput: string, _messages?: Message[]) {
     const model = this.getModel();
     let messages = _messages || (await this.getInitialMessages(userInput));
     messages = this.formatInputMessages(messages);
@@ -183,7 +189,7 @@ export abstract class BaseAgent implements IAgent {
     const endIndex = messages.length;
     const compressThreshold = 30000;
 
-    const response = await openai.chat.completions.create({
+    const response = await this.getClient().createChatCompletion({
       model,
       messages,
       tools: this.getEnabledTools(),
@@ -192,52 +198,57 @@ export abstract class BaseAgent implements IAgent {
 
     this.logMessages(response.choices.map((c) => c.message));
 
-    const responseMessage = response.choices[0].message;
+    const firstMessage = response.choices[0].message;
+    const newToolCalls = response.choices.flatMap((c) => c.message.tool_calls);
 
-    const toolCalls = responseMessage.tool_calls;
-    if (responseMessage.tool_calls) {
-      // extend conversation with assistant's reply
-      messages.push(responseMessage);
+    for (const choice of response.choices) {
+      const responseMessage = choice.message;
+      console.log(responseMessage);
 
-      for (const toolCall of toolCalls) {
-        const toolMessages = await this.processToolMessages(toolCall);
-        // Add the tool responses to the thread
-        messages.push(...(toolMessages as ChatCompletionToolMessageParam[]));
+      const toolCalls = responseMessage.tool_calls;
+      if (responseMessage.tool_calls) {
+        // extend conversation with assistant's reply
+        messages.push(responseMessage);
 
-        const finalMessage = toolMessages.find((m) => m.name === "finalAnswer");
-        if (finalMessage) {
-          return finalMessage.content;
+        for (const toolCall of toolCalls) {
+          const toolMessages = await this.processToolMessages(toolCall);
+          // Add the tool responses to the thread
+          messages.push(...(toolMessages as Message[]));
+
+          const finalMessage = toolMessages.find(
+            (m) => m.name === "finalAnswer"
+          );
+          if (finalMessage) {
+            return finalMessage.content;
+          }
         }
       }
-
-      if (this.getMessagesLength(messages) > compressThreshold) {
-        messages = await this.compressMessages(messages, startIndex, endIndex);
-      }
-
-      // Send the tool responses back to the model
-      const secondResponse = await openai.chat.completions.create({
-        model,
-        messages,
-      });
-
-      const aiResp = secondResponse.choices.map((c) => c.message);
-      this.logMessages(aiResp);
-      messages.push(...aiResp);
-
-      return this.call(userInput, messages);
     }
 
-    if (responseMessage.content) {
-      return responseMessage.content;
+    /*
+     *if (response.choices.length === 1 && firstMessage.content) {
+     *  return firstMessage.content;
+     *}
+     */
+
+    if (this.getMessagesLength(messages) > compressThreshold) {
+      messages = await this.compressMessages(messages, startIndex, endIndex);
     }
+
+    messages.push({
+      role: "user",
+      content: "Workflow continues until you call finalAnswer.",
+    });
+
+    return this.call(userInput, messages);
   }
 
-  getMessagesLength(messages: ChatCompletionMessageParam[]) {
+  getMessagesLength(messages: Message[]) {
     return JSON.stringify(messages).split(" ").length;
   }
 
   async compressMessages(
-    messages: ChatCompletionMessageParam[],
+    messages: Message[],
     startIndex: number,
     endIndex: number
   ) {
@@ -253,7 +264,7 @@ export abstract class BaseAgent implements IAgent {
 
     const model = this.getModel();
 
-    const response = await openai.chat.completions.create({
+    const response = await this.getClient().createChatCompletion({
       model,
       messages: [
         {

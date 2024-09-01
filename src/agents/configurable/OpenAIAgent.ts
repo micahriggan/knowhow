@@ -1,3 +1,4 @@
+import { Message } from "../../clients/types";
 import { ThreadCreateParams } from "openai/resources/beta/threads";
 import { ChatCompletionMessageParam } from "openai/resources/chat";
 import { openai } from "../../ai";
@@ -13,10 +14,7 @@ export class OpenAIAgent implements IAgent {
     this.name = config.name;
   }
 
-  async call(
-    userInput: string,
-    messages: ChatCompletionMessageParam[] = []
-  ): Promise<string> {
+  async call(userInput: string, messages: Message[] = []): Promise<string> {
     const userThread = [
       { content: userInput, role: "user" },
     ] as ThreadCreateParams.Message[];
