@@ -16,10 +16,6 @@ export class VimAgent extends BaseAgent {
     // this.disableTool("patchFile");
     this.setModelPreferences([
       { model: "claude-3-5-sonnet-20240620", provider: "anthropic" },
-      {
-        model: "gpt-4-turbo-preview",
-        provider: "openai",
-      },
     ]);
   }
 

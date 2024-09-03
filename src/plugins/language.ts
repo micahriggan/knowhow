@@ -22,7 +22,11 @@ export class LanguagePlugin implements Plugin {
     const terms = Object.keys(languageConfig);
 
     // Find all matching terms in the userPrompt
-    const matchingTerms = terms.filter((term) => userPrompt.includes(term));
+    const matchingTerms = terms.filter((term) =>
+      term
+        .split(",")
+        .some((w) => userPrompt.toLowerCase().includes(w.toLowerCase()))
+    );
     if (matchingTerms.length > 0) {
       console.log("LANGUAGE PLUGIN: Found matching terms", matchingTerms);
     }

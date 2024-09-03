@@ -95,6 +95,7 @@ export class PatchingAgent extends BaseAgent {
         content: `${BASE_PROMPT}
 
         Specialization: Patcher Agent, ${this.description}
+        IF you fail twice to patch a file, you may switch using writeFileChunk to rewrite the whole file.
         `,
       },
       { role: "user", content: systemReminder },

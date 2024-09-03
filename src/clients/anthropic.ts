@@ -10,6 +10,10 @@ import {
 
 const config = getConfigSync();
 
+type CachedMessageParam =
+  Anthropic.Beta.PromptCaching.PromptCachingBetaMessageParam;
+type CachedTool = Anthropic.Beta.PromptCaching.PromptCachingBetaTool;
+
 export class GenericAnthropicClient extends Anthropic implements GenericClient {
   constructor() {
     super({
@@ -17,19 +21,27 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
     });
   }
 
-  transformTools(tools?: Tool[]): Anthropic.Tool[] {
+  handleToolCaching(tools: CachedTool[]) {
+    tools[tools.length - 1].cache_control = { type: "ephemeral" };
+  }
+
+  transformTools(tools?: Tool[]): CachedTool[] {
     if (!tools) {
       return [];
     }
-    return tools.map((tool) => ({
+    const transformed = tools.map((tool) => ({
       name: tool.function.name || "",
       description: tool.function.description || "",
       input_schema: {
         properties: tool.function.parameters.properties,
-        type: "object",
+        type: "object" as const,
         required: tool.function.parameters.required || [],
       },
     }));
+
+    this.handleToolCaching(transformed);
+
+    return transformed;
   }
 
   toBlockArray(content: Anthropic.MessageParam["content"]) {
@@ -78,15 +90,33 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
     return messages;
   }
 
+  handleMessageCaching(groupedMessages: CachedMessageParam[]) {
+    const hasTwoUserMesages =
+      groupedMessages.filter((m) => m.role === "user").length >= 2;
+
+    if (hasTwoUserMesages) {
+      // find the last two messages and mark them as ephemeral
+      const lastTwoUserMessages = groupedMessages
+        .filter((m) => m.role === "user")
+        .slice(-2);
+
+      for (const m of lastTwoUserMessages) {
+        if (Array.isArray(m.content)) {
+          m.content[m.content.length - 1].cache_control = { type: "ephemeral" };
+        }
+      }
+    }
+  }
+
   transformMessages(messages: Message[]): Anthropic.MessageParam[] {
     const toolCalls = messages.flatMap((msg) => msg.tool_calls || []);
-    const claudeMessages: Anthropic.MessageParam[] = messages
+    const claudeMessages: CachedMessageParam[] = messages
       .filter((msg) => msg.role !== "system")
       .filter((msg) => msg.content)
       .map((msg) => {
         if (msg.role === "tool") {
           const toolCall = toolCalls.find((tc) => tc.id === msg.tool_call_id);
-          const toolMessages = [] as Anthropic.MessageParam[];
+          const toolMessages = [] as CachedMessageParam[];
           if (!toolCall) {
             console.log(
               "Tool call not found for message",
@@ -127,25 +157,35 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
       })
       .flat();
 
-    return this.combineMessages(claudeMessages);
+    const groupedMessages = this.combineMessages(claudeMessages);
+
+    this.handleMessageCaching(groupedMessages);
+
+    return groupedMessages;
   }
 
   async createChatCompletion(
     options: CompletionOptions
   ): Promise<CompletionResponse> {
     const systemMessage = options.messages
-      .filter((msg) => msg.role === "system")
-      .map((msg) => msg.content || "")
-      .join("\n");
+    .filter((msg) => msg.role === "system")
+    .map((msg) => msg.content || "")
+    .join("\n");
 
     const claudeMessages = this.transformMessages(options.messages);
     console.log(JSON.stringify({ claudeMessages }, null, 2));
 
     const tools = this.transformTools(options.tools);
-    const response = await this.messages.create({
+    const response = await this.beta.promptCaching.messages.create({
       model: options.model,
       messages: claudeMessages,
-      system: systemMessage,
+      system: [
+        {
+          text: systemMessage,
+          cache_control: { type: "ephemeral" },
+          type: "text",
+        },
+      ],
       max_tokens: options.max_tokens || 4096,
       ...(tools.length && {
         tool_choice: { type: "auto" },
