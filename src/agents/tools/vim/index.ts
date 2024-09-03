@@ -59,9 +59,16 @@ export async function saveVimFile(filename: string) {
   return output + `\n Use readFile to check your work on ${filename}`;
 }
 
-export async function sendVimInput(keys: string[], delay = GLOBAL_DELAY) {
+export async function sendVimInput(
+  keys: string | string[],
+  delay = GLOBAL_DELAY
+) {
   if (!ptyProcess) {
     await useVim();
+  }
+
+  if (typeof keys === "string") {
+    keys = [keys];
   }
 
   const ESCAPE = "\x1B";

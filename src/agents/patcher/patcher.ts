@@ -77,10 +77,16 @@ export class PatchingAgent extends BaseAgent {
 
   constructor() {
     super();
-    this.setModel("claude-3-5-sonnet-20240620");
-    this.setProvider("anthropic");
     this.disableTool("sendVimInput");
     this.disableTool("openFileInVim");
+
+    this.setModelPreferences([
+      { model: "claude-3-5-sonnet-20240620", provider: "anthropic" },
+      {
+        model: "gpt-4-turbo-preview",
+        provider: "openai",
+      },
+    ]);
   }
 
   async getInitialMessages(userInput: string) {

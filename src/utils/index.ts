@@ -57,8 +57,8 @@ export function cosineSimilarity(A, B) {
 
 const NEWLINE_REPLACE = "<ESC_NEWLINE>";
 export function replaceEscapedNewLines(str: string): string {
-  const replacedStr = str.replace(/\\n/g, NEWLINE_REPLACE);
-  return replacedStr;
+  // const replacedStr = str.replace(/\\n/g, NEWLINE_REPLACE);
+  return str;
 }
 
 export function restoreEscapedNewLines(str: string): string {

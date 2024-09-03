@@ -9,6 +9,9 @@ export type Config = {
   promptsDir: string;
   lintCommands?: { [fileExtension: string]: string };
 
+  micCommand?: string;
+  defaultMic?: string;
+
   sources: {
     input: string;
     output: string;
@@ -81,4 +84,4 @@ export type Language = {
 export type ChatInteraction = {
   input: string;
   output: string;
-}
+};

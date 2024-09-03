@@ -18,3 +18,4 @@ export * from "./asana";
 export * from "./github";
 export * from "./fileSearch";
 export * from "./vim";
+export * from "./language";

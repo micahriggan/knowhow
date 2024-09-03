@@ -107,6 +107,10 @@ export async function getLanguageConfig() {
   return language as Language;
 }
 
+export async function updateLanguageConfig(language: Language) {
+  await writeFile(".knowhow/language.json", JSON.stringify(language, null, 2));
+}
+
 export async function updateConfig(config: Config) {
   await writeFile(".knowhow/knowhow.json", JSON.stringify(config, null, 2));
 }

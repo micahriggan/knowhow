@@ -5,13 +5,24 @@ import { replaceEscapedNewLines, restoreEscapedNewLines } from "../../utils";
 import { Agents, AgentService } from "../../services/AgentService";
 import { Events, EventService } from "../../services/EventService";
 import { AIClient, Clients } from "../../clients";
+import { openai } from "../../ai";
+
+export interface ModelPreference {
+  model: string;
+  provider: keyof typeof Clients.clients;
+}
 
 export abstract class BaseAgent implements IAgent {
   abstract name: string;
   abstract description: string;
 
+  private lastHealthCheckTime: number = 0;
   protected provider = "openai";
-  protected gptModelName: string = "gpt-4-turbo-preview";
+  protected gptModelName: string = "gpt-4o";
+  protected modelPreferences: ModelPreference[] = [];
+  protected currentModelPreferenceIndex = 0;
+
+  disabledTools = [];
 
   constructor(
     public tools: ToolsService = Tools,
@@ -24,6 +35,27 @@ export abstract class BaseAgent implements IAgent {
 
   getModel(): string {
     return this.gptModelName;
+  }
+
+  setModelPreferences(value: ModelPreference[]) {
+    this.modelPreferences = value;
+    if (value.length) {
+      this.updatePreferences(value[0]);
+    }
+  }
+
+  updatePreferences(value: ModelPreference) {
+    this.setModel(value.model);
+    this.setProvider(value.provider);
+  }
+
+  nextModel() {
+    this.currentModelPreferenceIndex++;
+    if (this.currentModelPreferenceIndex >= this.modelPreferences.length) {
+      throw new Error("We have exhausted all model preferences.");
+    }
+    const nextModel = this.modelPreferences[this.currentModelPreferenceIndex];
+    this.updatePreferences(nextModel);
   }
 
   setModel(value: string) {
@@ -41,8 +73,6 @@ export abstract class BaseAgent implements IAgent {
   getClient() {
     return Clients.getClient(this.provider);
   }
-
-  disabledTools = [];
 
   getEnabledTools() {
     return this.tools
@@ -164,9 +194,9 @@ export abstract class BaseAgent implements IAgent {
     return messages.map((m) => ({
       ...m,
       content:
-        typeof m.content === "string"
-          ? this.formatInputContent(m.content)
-          : m.content,
+      typeof m.content === "string"
+      ? this.formatInputContent(m.content)
+      : m.content,
     })) as Message[];
   }
 
@@ -174,20 +204,50 @@ export abstract class BaseAgent implements IAgent {
     return messages.map((m) => ({
       ...m,
       content:
-        typeof m.content === "string"
-          ? this.formatAiResponse(m.content)
-          : m.content,
+      typeof m.content === "string"
+      ? this.formatAiResponse(m.content)
+      : m.content,
     })) as Message[];
   }
 
+  async healthCheck() {
+    try {
+      const canCallProvider = await this.getClient().createChatCompletion({
+        messages: [{ role: "user", content: "Hello!" }],
+        model: this.getModel(),
+        max_tokens: 2,
+      });
+      return true;
+    } catch (e) {
+      console.error(e);
+      return false;
+    }
+  }
+
+  async selectHealthyModel() {
+    const currentTime = Date.now();
+    if (currentTime - this.lastHealthCheckTime < 60 * 1000) {
+      return;
+    }
+
+    let healthy = await this.healthCheck();
+    this.lastHealthCheckTime = Date.now();
+    while (!healthy) {
+      this.nextModel();
+      healthy = await this.healthCheck();
+    }
+    await this.healthCheck();
+  }
+
   async call(userInput: string, _messages?: Message[]) {
+    await this.selectHealthyModel();
     const model = this.getModel();
     let messages = _messages || (await this.getInitialMessages(userInput));
     messages = this.formatInputMessages(messages);
 
     const startIndex = 0;
     const endIndex = messages.length;
-    const compressThreshold = 30000;
+    const compressThreshold = 5000;
 
     const response = await this.getClient().createChatCompletion({
       model,
@@ -226,9 +286,10 @@ export abstract class BaseAgent implements IAgent {
     }
 
     /*
-     *if (response.choices.length === 1 && firstMessage.content) {
-     *  return firstMessage.content;
-     *}
+     *    if (response.choices.length === 1 && firstMessage.content) {
+     *      return firstMessage.content;
+     *    }
+     *
      */
 
     if (this.getMessagesLength(messages) > compressThreshold) {
@@ -264,8 +325,8 @@ export abstract class BaseAgent implements IAgent {
 
     const model = this.getModel();
 
-    const response = await this.getClient().createChatCompletion({
-      model,
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
       messages: [
         {
           role: "assistant",
@@ -274,10 +335,17 @@ export abstract class BaseAgent implements IAgent {
       ],
     });
 
+    const startMessages = [
+      {
+        role: "user",
+        content: "We have just compressed the conversation to save memory.",
+      },
+    ] as Message[];
     const systemMesasges = toCompress.filter((m) => m.role === "system");
 
     const newMessages = [
       ...systemMesasges,
+      ...startMessages,
       ...response.choices.map((c) => c.message),
       ...messages.slice(endIndex),
     ];

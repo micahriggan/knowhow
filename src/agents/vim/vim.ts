@@ -12,15 +12,20 @@ export class VimAgent extends BaseAgent {
 
   constructor() {
     super();
-    this.disableTool("patchFile");
-    this.setModel("claude-3-5-sonnet-20240620");
-    this.setProvider("anthropic");
+    // this.disableTool("patchFile");
+    this.setModelPreferences([
+      { model: "claude-3-5-sonnet-20240620", provider: "anthropic" },
+      {
+        model: "gpt-4-turbo-preview",
+        provider: "openai",
+      },
+    ]);
   }
 
   async saveVimGuide() {
     const vimrc = await execAsync("cat ~/.vim/vimrc");
     await mkdir(this.toolPath, { recursive: true });
-    const vimRcPrompt = `Extract a minimal format of commands and hotkeys that an ai could leverage from this vimrc ${vimrc}. Only output the hotkeys and commands you see, nothing else`;
+    const vimRcPrompt = `Extract a minimal format of commands and hotkeys that an ai could leverage from this vimrc ${vimrc.stdout}. Only output the hotkeys and commands you see, nothing else`;
     const extraction = await singlePrompt(vimRcPrompt);
     await writeFile(".knowhow/tools/vim/guide.md", extraction);
   }

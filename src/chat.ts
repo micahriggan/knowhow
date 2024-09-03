@@ -17,6 +17,7 @@ import { Agents } from "./services/AgentService";
 import { FlagsService } from "./services/flags";
 import { IAgent } from "./agents/interface";
 import { Clients, Message } from "./clients";
+import { recordAudio, voiceToText } from "./microphone";
 
 enum ChatFlags {
   agent = "agent",
@@ -26,10 +27,11 @@ enum ChatFlags {
   search = "search",
   clear = "clear",
   provider = "provider",
+  voice = "voice",
 }
 
 const Flags = new FlagsService(
-  [ChatFlags.agent, ChatFlags.debug, ChatFlags.multi],
+  [ChatFlags.agent, ChatFlags.debug, ChatFlags.multi, ChatFlags.voice],
   true
 );
 
@@ -113,9 +115,9 @@ Generate an article or document that answers the question.
 }
 
 const chatModels = {
-  "openai": "gpt-4o",
-  "anthropic": "claude-3-5-sonnet-20240620"
-}
+  openai: "gpt-4o",
+  anthropic: "claude-3-5-sonnet-20240620",
+};
 export async function askAI<E extends EmbeddingBase>(
   query: string,
   provider = "openai"
@@ -151,12 +153,19 @@ The user has asked:
 
 export async function getInput(
   question: string,
-  multiLine = false,
   options = []
 ): Promise<string> {
-  const value: string = await (multiLine
-    ? editor({ message: question })
-    : ask(question, options));
+  const multiLine = Flags.enabled(ChatFlags.multi);
+  const voice = Flags.enabled(ChatFlags.voice);
+
+  let value = "";
+  if (voice) {
+    value = await voiceToText();
+  } else if (multiLine) {
+    value = await editor({ message: question });
+  } else {
+    value = await ask(question, options);
+  }
 
   return value.trim();
 }
@@ -191,6 +200,7 @@ export async function chatLoop<E extends GptQuestionEmbedding>(
     "search",
     "clear",
     "provider",
+    "voice",
   ];
   console.log("Commands: ", commands.join(", "));
   const promptText = () =>
@@ -198,11 +208,7 @@ export async function chatLoop<E extends GptQuestionEmbedding>(
       ? `\nAsk ${aiName} ${activeAgent.name}: `
       : `\nAsk ${aiName}: `;
 
-  let input = await getInput(
-    promptText(),
-    Flags.enabled(ChatFlags.multi),
-    commands
-  );
+  let input = await getInput(promptText(), commands);
 
   let chatHistory = new Array<ChatInteraction>();
   let results = "";
@@ -227,6 +233,9 @@ export async function chatLoop<E extends GptQuestionEmbedding>(
           break;
         case ChatFlags.multi:
           Flags.flip(ChatFlags.multi);
+          break;
+        case ChatFlags.voice:
+          Flags.flip(ChatFlags.voice);
           break;
         case ChatFlags.search:
           await askEmbedding("searching");
@@ -266,11 +275,7 @@ export async function chatLoop<E extends GptQuestionEmbedding>(
     } catch (e) {
       console.log(e);
     } finally {
-      input = await getInput(
-        promptText(),
-        Flags.enabled(ChatFlags.multi),
-        commands
-      );
+      input = await getInput(promptText(), commands);
     }
   }
 }
