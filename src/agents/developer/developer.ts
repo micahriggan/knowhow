@@ -1,17 +1,19 @@
 import { Message } from "../../clients/types";
 import { BaseAgent } from "../base/base";
+import { BASE_PROMPT } from "../base/prompt";
 export class DeveloperAgent extends BaseAgent {
   name = "Developer";
-  description = `This agent manages requests and uses tools and delegation to accomplish things`;
+  description = `This agent manages requests and uses tools and delegation via agentCall to accomplish things`;
 
   constructor() {
     super();
     this.disableTool("patchFile");
+    this.disableTool("openFileInVim");
     this.disableTool("sendVimInput");
 
     this.setModelPreferences([
       {
-        model: "gpt-4o",
+        model: "gpt-4-turbo-preview",
         provider: "openai",
       },
     ]);
@@ -21,7 +23,11 @@ export class DeveloperAgent extends BaseAgent {
     return [
       {
         role: "system",
-        content: `Developer Assistant Agent
+        content: `
+        ${BASE_PROMPT}
+
+        Specialization: Developer,  ${this.description}
+
         # Description
         You are a helpful developer assistant that is capable of using tools to assist the user.
         You delegate some tasks to specialized agents. If a request doesn't require the use of a specialized agent, you can handle it yourself.
@@ -37,10 +43,11 @@ export class DeveloperAgent extends BaseAgent {
         - General Questions about codebase or file structure
 
         Patcher
-        - For making modifications to files
+        - For making modifications to files / code
+        - Great for big files
 
         Vimmer
-        - For making modifications to files, when patching is not working
+        - For making modifications to code / files, when patching is not working
         - For making modifications to files, with guidance from quickfix / compiler errors
         - For making refactors using vim commands that would be difficult to do without IDE type plugins
 

@@ -3,7 +3,7 @@ import { execCommand } from "./execCommand";
 
 export async function textSearch(searchTerm) {
   try {
-    const command = `ag "${searchTerm}"`;
+    const command = `ag -m 3 "${searchTerm}"`;
     const output = await execCommand(command);
     return output;
   } catch (err) {

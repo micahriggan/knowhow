@@ -9,3 +9,34 @@ export function writeFile(filePath: string, content: string): string {
     return e.message;
   }
 }
+
+export async function writeFileChunk(
+  filePath: string,
+  content: string,
+  isContinuing: boolean,
+  isDone: boolean
+) {
+  if (!isContinuing) {
+    fs.writeFileSync(filePath, content);
+  }
+
+  if (isContinuing) {
+    fs.appendFileSync(filePath, content);
+  }
+
+  let message = "";
+
+  if (isContinuing) {
+    message = "Appended content to file.";
+  }
+
+  if (!isDone) {
+    message += " Continue calling this tool until file is done.";
+  }
+
+  if (isDone) {
+    message = " File write complete. Use readFile to verify";
+  }
+
+  return message;
+}

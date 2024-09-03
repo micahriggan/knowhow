@@ -3,7 +3,6 @@ import * as util from "util";
 import { applyPatch, createPatch } from "diff";
 import { Plugins } from "../../plugins/plugins";
 import {
-  execAsync,
   writeFile,
   readFile,
   fileExists,

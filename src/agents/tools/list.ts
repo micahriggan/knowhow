@@ -306,6 +306,45 @@ export const includedTools = [
     },
   },
 
+  {
+    type: "function",
+    function: {
+      name: "writeFileChunk",
+      description:
+        "Update or create files by writing in smaller chunks. Suitable for larger files, this tool allows incremental writing by calling it multiple times.",
+      parameters: {
+        type: "object",
+        properties: {
+          filePath: {
+            type: "string",
+            description:
+              "The path to the file where the content will be written",
+          },
+          content: {
+            type: "string",
+            description: "The chunk of content to write to the file",
+          },
+          isContinuing: {
+            type: "boolean",
+            description:
+              "Flag indicating whether to append the content to an existing file (`true`) or start a new file (`false`)",
+          },
+          isDone: {
+            type: "boolean",
+            description:
+              "Flag indicating whether this is the final chunk of content",
+          },
+        },
+        required: ["filePath", "content", "isContinuing", "isDone"],
+      },
+      returns: {
+        type: "string",
+        description:
+          "A message indicating the status of the file writing process",
+      },
+    },
+  },
+
   ...asana.definitions,
   ...github.definitions,
   ...vim.definitions,

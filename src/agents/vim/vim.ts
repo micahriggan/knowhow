@@ -3,6 +3,7 @@ import { Message } from "../../clients/types";
 import { BaseAgent } from "../base/base";
 import { readFile, writeFile, execAsync, mkdir } from "../../utils";
 import { openai, singlePrompt } from "../../ai";
+import { BASE_PROMPT } from "../base/prompt";
 
 export class VimAgent extends BaseAgent {
   name = "Vimmer";
@@ -44,6 +45,10 @@ export class VimAgent extends BaseAgent {
       {
         role: "system",
         content: `
+          ${BASE_PROMPT}
+
+          Specialization: Vim Agent, ${this.description}
+
 					# General Instructions
 
 					You are a software engineering agent. You use tools to gather context on a user's request, answer questions, and create modifications to files in order to help the user work on a codebase.

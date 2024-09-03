@@ -18,7 +18,7 @@ export abstract class BaseAgent implements IAgent {
 
   private lastHealthCheckTime: number = 0;
   protected provider = "openai";
-  protected gptModelName: string = "gpt-4o";
+  protected modelName: string = "gpt-4o";
   protected modelPreferences: ModelPreference[] = [];
   protected currentModelPreferenceIndex = 0;
 
@@ -34,7 +34,7 @@ export abstract class BaseAgent implements IAgent {
   }
 
   getModel(): string {
-    return this.gptModelName;
+    return this.modelName;
   }
 
   setModelPreferences(value: ModelPreference[]) {
@@ -59,7 +59,7 @@ export abstract class BaseAgent implements IAgent {
   }
 
   setModel(value: string) {
-    this.gptModelName = value;
+    this.modelName = value;
   }
 
   getProvider() {
@@ -194,9 +194,9 @@ export abstract class BaseAgent implements IAgent {
     return messages.map((m) => ({
       ...m,
       content:
-      typeof m.content === "string"
-      ? this.formatInputContent(m.content)
-      : m.content,
+        typeof m.content === "string"
+          ? this.formatInputContent(m.content)
+          : m.content,
     })) as Message[];
   }
 
@@ -204,9 +204,9 @@ export abstract class BaseAgent implements IAgent {
     return messages.map((m) => ({
       ...m,
       content:
-      typeof m.content === "string"
-      ? this.formatAiResponse(m.content)
-      : m.content,
+        typeof m.content === "string"
+          ? this.formatAiResponse(m.content)
+          : m.content,
     })) as Message[];
   }
 
@@ -239,69 +239,83 @@ export abstract class BaseAgent implements IAgent {
     await this.healthCheck();
   }
 
+  setNotHealthy() {
+    this.lastHealthCheckTime = 0;
+  }
+
   async call(userInput: string, _messages?: Message[]) {
     await this.selectHealthyModel();
-    const model = this.getModel();
-    let messages = _messages || (await this.getInitialMessages(userInput));
-    messages = this.formatInputMessages(messages);
 
-    const startIndex = 0;
-    const endIndex = messages.length;
-    const compressThreshold = 5000;
+    try {
+      const model = this.getModel();
+      let messages = _messages || (await this.getInitialMessages(userInput));
+      messages = this.formatInputMessages(messages);
 
-    const response = await this.getClient().createChatCompletion({
-      model,
-      messages,
-      tools: this.getEnabledTools(),
-      tool_choice: "auto",
-    });
+      const startIndex = 0;
+      const endIndex = messages.length;
+      const compressThreshold = 5000;
 
-    this.logMessages(response.choices.map((c) => c.message));
+      const response = await this.getClient().createChatCompletion({
+        model,
+        messages,
+        tools: this.getEnabledTools(),
+        tool_choice: "auto",
+      });
 
-    const firstMessage = response.choices[0].message;
-    const newToolCalls = response.choices.flatMap((c) => c.message.tool_calls);
+      this.logMessages(response.choices.map((c) => c.message));
 
-    for (const choice of response.choices) {
-      const responseMessage = choice.message;
-      console.log(responseMessage);
+      const firstMessage = response.choices[0].message;
+      const newToolCalls = response.choices.flatMap(
+        (c) => c.message.tool_calls
+      );
 
-      const toolCalls = responseMessage.tool_calls;
-      if (responseMessage.tool_calls) {
-        // extend conversation with assistant's reply
-        messages.push(responseMessage);
+      for (const choice of response.choices) {
+        const responseMessage = choice.message;
+        console.log(responseMessage);
 
-        for (const toolCall of toolCalls) {
-          const toolMessages = await this.processToolMessages(toolCall);
-          // Add the tool responses to the thread
-          messages.push(...(toolMessages as Message[]));
+        const toolCalls = responseMessage.tool_calls;
+        if (responseMessage.tool_calls) {
+          // extend conversation with assistant's reply
+          messages.push(responseMessage);
 
-          const finalMessage = toolMessages.find(
-            (m) => m.name === "finalAnswer"
-          );
-          if (finalMessage) {
-            return finalMessage.content;
+          for (const toolCall of toolCalls) {
+            const toolMessages = await this.processToolMessages(toolCall);
+            // Add the tool responses to the thread
+            messages.push(...(toolMessages as Message[]));
+
+            const finalMessage = toolMessages.find(
+              (m) => m.name === "finalAnswer"
+            );
+            if (finalMessage) {
+              return finalMessage.content;
+            }
           }
         }
       }
+
+      /*
+       *    if (response.choices.length === 1 && firstMessage.content) {
+       *      return firstMessage.content;
+       *    }
+       *
+       */
+
+      if (this.getMessagesLength(messages) > compressThreshold) {
+        messages = await this.compressMessages(messages, startIndex, endIndex);
+      }
+
+      messages.push({
+        role: "user",
+        content: "Workflow continues until you call finalAnswer.",
+      });
+
+      return this.call(userInput, messages);
+    } catch (e) {
+      if (e.toString().includes("429")) {
+        this.setNotHealthy();
+        return this.call(userInput, _messages);
+      }
     }
-
-    /*
-     *    if (response.choices.length === 1 && firstMessage.content) {
-     *      return firstMessage.content;
-     *    }
-     *
-     */
-
-    if (this.getMessagesLength(messages) > compressThreshold) {
-      messages = await this.compressMessages(messages, startIndex, endIndex);
-    }
-
-    messages.push({
-      role: "user",
-      content: "Workflow continues until you call finalAnswer.",
-    });
-
-    return this.call(userInput, messages);
   }
 
   getMessagesLength(messages: Message[]) {

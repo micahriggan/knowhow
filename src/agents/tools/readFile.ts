@@ -24,9 +24,9 @@ export async function readFile(filePath: string): Promise<FileBlock[]> {
   if (!exists) {
     const fileName = filePath.split("/").pop().split(".")[0];
     const maybeRelated = await fileSearch(fileName);
-    if (maybeRelated.stdout.length > 0) {
+    if (maybeRelated.length > 0) {
       throw new Error(
-        `File not found: ${filePath}. Maybe you meant one of these files: ${maybeRelated.stdout}`
+        `File not found: ${filePath}. Maybe you meant one of these files: ${maybeRelated}`
       );
     }
 

@@ -1,6 +1,6 @@
 import { Octokit } from "@octokit/rest";
 import * as fs from "fs";
-import { execAsync } from "../../../utils";
+import { execCommand } from "../execCommand";
 
 const octokit = new Octokit({
   auth: process.env.GITHUB_TOKEN,
@@ -36,10 +36,10 @@ export async function getPullRequestBuildStatuses(url: string) {
 }
 
 export async function getRunLogs(runId: number, owner: string, repo: string) {
-  const logs = await execAsync(
+  const logs = await execCommand(
     `gh run view ${runId} -R ${owner}/${repo} --log`
   );
-  return logs.stdout;
+  return logs;
 }
 
 export async function getPullRequestBuildFailureLogs(url: string) {
@@ -56,13 +56,12 @@ export async function getPullRequestBuildFailureLogs(url: string) {
   const allLogs = [];
   for (const fail of failures) {
     const [runId, __, jobId] = fail.details_url.split("/").slice(-3);
-    const logs = await execAsync(
+    const logs = await execCommand(
       `gh run view ${runId} -R ${owner}/${repo} --log | grep -E 'FAIL|ERROR' -A 25 -B 25`
     );
-    return logs.stdout;
+    return logs;
     allLogs.push(logs);
   }
 
   return allLogs;
 }
-
