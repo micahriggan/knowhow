@@ -18,11 +18,16 @@ export const wait = promisify(setTimeout);
 
 export const askHistory = [];
 
-export const ask = async (question: string, options: string[] = []) => {
+export const ask = async (
+  question: string,
+  options: string[] = [],
+  history = []
+) => {
+  const fullHistory = [...askHistory, ...history];
   const readline = require("readline").createInterface({
     input: process.stdin,
     output: process.stdout,
-    history: askHistory,
+    history: fullHistory,
     completer: (line) => {
       const hits = options.filter((c) => c.startsWith(line));
       return [hits.length ? hits : options, line];

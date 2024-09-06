@@ -5,6 +5,7 @@ import * as fs from "fs";
 import { openai } from "./ai";
 import { execAsync, ask } from "./utils";
 import { Downloader } from "./plugins/downloader/downloader";
+import { convertToText, convertAudioToText } from "./conversion";
 
 export async function listMicrophones() {
   const regex = /\n\s{8}(\w.*):\n\n/gm;
@@ -44,7 +45,10 @@ sudo apt-get install sox libsox-fmt-all
 
   if (!config.defaultMic) {
     const options = await listMicrophones();
-    const mic = await ask(`Select a microphone (${options.join()})  : `, options);
+    const mic = await ask(
+      `Select a microphone (${options.join()})  : `,
+      options
+    );
     config.defaultMic = mic;
     await updateConfig(config);
   }
@@ -72,9 +76,5 @@ export async function voiceToText() {
   await ask("Press Enter to Stop...");
   recording.stop();
   console.log("Stopped recording");
-  return Downloader.transcribeChunks(
-    ["/tmp/knowhow.wav"],
-    "/tmp/knowhow.txt",
-    false
-  );
+  return convertAudioToText("/tmp/knowhow.wav", false);
 }

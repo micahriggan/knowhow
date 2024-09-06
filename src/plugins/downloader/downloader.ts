@@ -35,7 +35,8 @@ class DownloaderService {
   public async chunk(
     filePath: string,
     outputDir: string,
-    CHUNK_LENGTH_SECONDS = 30
+    CHUNK_LENGTH_SECONDS = 30,
+    reuseExistingChunks = true
   ) {
     const parsed = path.parse(filePath);
     const fileName = parsed.name;
@@ -46,19 +47,31 @@ class DownloaderService {
     // create a temp directory
     const outputDirPath = path.join(outputDir, `${fileName}/chunks`);
     await fs.promises.mkdir(outputDirPath, { recursive: true });
-    const existingChunks = await fs.promises.readdir(outputDirPath);
+    const existingFolderFiles = await fs.promises.readdir(outputDirPath);
+    const existingChunkNames = existingFolderFiles.filter(
+      (f) => f.includes("chunk") && f.endsWith(".mp3")
+    );
 
-    if (existingChunks.length > 0) {
-      console.log("Chunks already exist, skipping");
-      return existingChunks.map((chunkName) =>
-        path.join(outputDirPath, chunkName)
-      );
+    if (existingChunkNames.length > 0) {
+      if (reuseExistingChunks) {
+        console.log("Chunks already exist, skipping");
+        return existingFolderFiles.map((chunkName) =>
+          path.join(outputDirPath, chunkName)
+        );
+      } else {
+        for (const file of existingFolderFiles) {
+          fs.rmSync(path.join(outputDirPath, file), { recursive: true });
+        }
+      }
     }
 
     const command = `ffmpeg -i "${filePath}" -f segment -segment_time ${CHUNK_LENGTH_SECONDS} -map 0:a:0 -acodec mp3 -vn "${outputDirPath}/chunk%03d.mp3"`;
     await execAsync(command);
 
-    const chunkNames = await fs.promises.readdir(outputDirPath);
+    const folderFiles = await fs.promises.readdir(outputDirPath);
+    const chunkNames = folderFiles.filter(
+      (f) => f.includes("chunk") && f.endsWith(".mp3")
+    );
     console.log("Chunked into", chunkNames.length, "chunks");
     return chunkNames.map((chunkName) => path.join(outputDirPath, chunkName));
   }

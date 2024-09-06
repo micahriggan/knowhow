@@ -22,7 +22,12 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
   }
 
   handleToolCaching(tools: CachedTool[]) {
-    tools[tools.length - 1].cache_control = { type: "ephemeral" };
+    const lastTool = tools[tools.length - 1];
+
+    if (lastTool) {
+      lastTool.cache_control = { type: "ephemeral" };
+      console.log("caching last tool");
+    }
   }
 
   transformTools(tools?: Tool[]): CachedTool[] {
@@ -90,9 +95,37 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
     return messages;
   }
 
+  cacheLastContent(message: CachedMessageParam) {
+    if (Array.isArray(message.content)) {
+      message.content[message.content.length - 1].cache_control = {
+        type: "ephemeral",
+      };
+    }
+  }
+
+  handleClearingCache(messages: CachedMessageParam[]) {
+    for (const message of messages) {
+      if (Array.isArray(message.content)) {
+        for (const content of message.content) {
+          if (content.cache_control) {
+            delete content.cache_control;
+          }
+        }
+      }
+    }
+  }
+
   handleMessageCaching(groupedMessages: CachedMessageParam[]) {
+    this.handleClearingCache(groupedMessages);
+
     const hasTwoUserMesages =
       groupedMessages.filter((m) => m.role === "user").length >= 2;
+
+    const firstUserMessage = groupedMessages.find((m) => m.role === "user");
+    if (firstUserMessage) {
+      console.log("caching first user message");
+      this.cacheLastContent(firstUserMessage);
+    }
 
     if (hasTwoUserMesages) {
       // find the last two messages and mark them as ephemeral
@@ -102,7 +135,8 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
 
       for (const m of lastTwoUserMessages) {
         if (Array.isArray(m.content)) {
-          m.content[m.content.length - 1].cache_control = { type: "ephemeral" };
+          console.log("caching user message");
+          this.cacheLastContent(m);
         }
       }
     }
@@ -168,9 +202,9 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
     options: CompletionOptions
   ): Promise<CompletionResponse> {
     const systemMessage = options.messages
-    .filter((msg) => msg.role === "system")
-    .map((msg) => msg.content || "")
-    .join("\n");
+      .filter((msg) => msg.role === "system")
+      .map((msg) => msg.content || "")
+      .join("\n");
 
     const claudeMessages = this.transformMessages(options.messages);
     console.log(JSON.stringify({ claudeMessages }, null, 2));
@@ -179,13 +213,15 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
     const response = await this.beta.promptCaching.messages.create({
       model: options.model,
       messages: claudeMessages,
-      system: [
-        {
-          text: systemMessage,
-          cache_control: { type: "ephemeral" },
-          type: "text",
-        },
-      ],
+      system: systemMessage
+        ? [
+            {
+              text: systemMessage,
+              // cache_control: { type: "ephemeral" },
+              type: "text",
+            },
+          ]
+        : undefined,
       max_tokens: options.max_tokens || 4096,
       ...(tools.length && {
         tool_choice: { type: "auto" },

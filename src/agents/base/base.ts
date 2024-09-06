@@ -286,8 +286,9 @@ export abstract class BaseAgent implements IAgent {
             const finalMessage = toolMessages.find(
               (m) => m.name === "finalAnswer"
             );
+
             if (finalMessage) {
-              return finalMessage.content;
+              return finalMessage.content || "Done";
             }
           }
         }
@@ -304,10 +305,13 @@ export abstract class BaseAgent implements IAgent {
         messages = await this.compressMessages(messages, startIndex, endIndex);
       }
 
-      messages.push({
-        role: "user",
-        content: "Workflow continues until you call finalAnswer.",
-      });
+      if (messages[messages.length - 1].role === "assistant") {
+        // sometimes the agent just says a message and doesn't call a tool
+        messages.push({
+          role: "user",
+          content: "Workflow continues until you call finalAnswer.",
+        });
+      }
 
       return this.call(userInput, messages);
     } catch (e) {
@@ -315,6 +319,9 @@ export abstract class BaseAgent implements IAgent {
         this.setNotHealthy();
         return this.call(userInput, _messages);
       }
+
+      console.error(e);
+      return e.message;
     }
   }
 

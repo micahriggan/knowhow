@@ -153,7 +153,8 @@ The user has asked:
 
 export async function getInput(
   question: string,
-  options = []
+  options = [],
+  chatHistory: ChatInteraction[] = []
 ): Promise<string> {
   const multiLine = Flags.enabled(ChatFlags.multi);
   const voice = Flags.enabled(ChatFlags.voice);
@@ -164,7 +165,8 @@ export async function getInput(
   } else if (multiLine) {
     value = await editor({ message: question });
   } else {
-    value = await ask(question, options);
+    const history = chatHistory.map((c) => c.input);
+    value = await ask(question, options, history);
   }
 
   return value.trim();
@@ -208,9 +210,9 @@ export async function chatLoop<E extends GptQuestionEmbedding>(
       ? `\nAsk ${aiName} ${activeAgent.name}: `
       : `\nAsk ${aiName}: `;
 
-  let input = await getInput(promptText(), commands);
-
   let chatHistory = new Array<ChatInteraction>();
+  let input = await getInput(promptText(), commands, chatHistory);
+
   let results = "";
   while (input !== "exit") {
     try {
@@ -268,14 +270,14 @@ export async function chatLoop<E extends GptQuestionEmbedding>(
           }
           interaction.output = results;
           console.log("\n\n");
-          console.log(Marked.parse(results));
+          console.log(Marked.parse(results || "No response from the AI"));
           chatHistory.push(interaction);
           break;
       }
     } catch (e) {
       console.log(e);
     } finally {
-      input = await getInput(promptText(), commands);
+      input = await getInput(promptText(), commands, chatHistory);
     }
   }
 }

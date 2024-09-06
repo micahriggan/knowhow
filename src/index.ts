@@ -62,7 +62,8 @@ export async function embed() {
   }
 }
 
-export async function purge(filePath: string) {
+export async function purge(globPath: string) {
+  const files = glob.sync(globPath);
   const embeddings = await getConfiguredEmbeddingMap();
   const config = await getConfig();
   const chunkSizes = config.embedSources.reduce((acc, source) => {
@@ -71,9 +72,18 @@ export async function purge(filePath: string) {
   }, {});
 
   for (const file of Object.keys(embeddings)) {
-    const pruned = embeddings[file]
-      .filter((e) => !filePath || !e.id.startsWith(filePath))
-      .filter((e) => e.text.length <= chunkSizes[file]);
+    let pruned = embeddings[file];
+    for (const filePath of files) {
+      const before = pruned.length;
+      pruned = pruned
+        .filter((e) => !filePath || !e.id.startsWith("./" + filePath))
+        .filter((e) => e.text.length <= chunkSizes[file]);
+      const after = pruned.length;
+
+      if (after < before) {
+        console.log("Purging", filePath);
+      }
+    }
     await saveEmbedding(file, pruned);
   }
 }

@@ -71,6 +71,8 @@ export async function sendVimInput(
     keys = [keys];
   }
 
+  keys.unshift(":set paste\n");
+
   const ESCAPE = "\x1B";
   const BACKSPACE = "\x08";
   const keymap = {

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import "source-map-support/register";
 import { generate, embed, upload, uploadOpenAi, chat } from "./index";
 import { init } from "./config";
 import { download, purge } from ".";
@@ -13,8 +14,10 @@ const command = process.argv[2];
 async function main() {
   Agents.registerAgent(Researcher);
   Agents.registerAgent(Patcher);
-  Agents.registerAgent(Vimmer);
   Agents.registerAgent(Developer);
+
+  // VIMMER is disabled for now
+  // Agents.registerAgent(Vimmer);
 
   switch (command) {
     case "init":
