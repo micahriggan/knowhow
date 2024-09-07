@@ -50,19 +50,40 @@ export class GitHubPlugin implements Plugin {
     return diff;
   }
 
+  getLengthOfHunks(hunks: ReturnType<typeof parseHunks>) {
+    return hunks
+      .flatMap((hunk) => [...hunk.additions, ...hunk.subtractions])
+      .reduce((acc, line) => acc + line.length, 0);
+  }
+
   async getParsedDiffs(urls: string[]) {
     return Promise.all(
       urls.map(async (url) => {
         const diff = await this.getDiff(url);
         let parsed = parseHunks(diff.toString());
 
+        console.log(`GITHUB PLUGIN: Parsed ${parsed.length} hunks`);
+
+        const averageHunkSize =
+          parsed.reduce((acc, hunk) => acc + hunk.lines.length, 0) /
+          parsed.length;
+
+        const totalCharacters = parsed
+          .flatMap((hunk) => [...hunk.additions, ...hunk.subtractions])
+          .reduce((acc, line) => acc + line.length, 0);
+
+        console.log(
+          `GITHUB PLUGIN: Average hunk size: ${averageHunkSize}, total characters: ${totalCharacters}`
+        );
+
+        const MAX_CHARACTERS = 10000;
+        const PER_HUNK_LIMIT = Math.min(MAX_CHARACTERS / averageHunkSize, 2000);
+
         parsed = parsed.filter((hunk) => {
-          return (
-            hunk.additions.length < 200 &&
-            hunk.subtractions.length < 200 &&
-            hunksToPatch([hunk]).length < 10000
-          );
+          return this.getLengthOfHunks([hunk]) <= PER_HUNK_LIMIT;
         });
+
+        console.log(`GITHUB PLUGIN: Filtered to ${parsed.length} hunks. ${this.getLengthOfHunks(parsed)} characters`);
         return parsed;
       })
     );
@@ -80,7 +101,7 @@ export class GitHubPlugin implements Plugin {
       // Format the diffs in Markdown
       const diffStrings = responses.map(hunksToPatch);
 
-      console.log(diffStrings);
+      // console.log(diffStrings);
       return `GITHUB PLUGIN: These ${urls} have automatically been expanded to include the changes:\n\n${diffStrings}`;
     }
 
