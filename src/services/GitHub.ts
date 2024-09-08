@@ -52,7 +52,6 @@ export class GitHubService {
   ): Promise<void> {
     const [owner, repo] = orgProject.split("/");
     const content = await this.getFileContent(owner, repo, fileName);
-    console.log(`File content: ${content}`);
     const fs = require("fs");
     fs.writeFileSync(destinationPath, content);
     console.log(
