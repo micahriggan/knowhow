@@ -1,0 +1,14 @@
+session_name: coding
+start_directory: ./
+windows:
+  - window_name: knowhow
+    layout: main-vertical
+    options:
+      main-pane-width: 50%
+    panes:
+      - shell_command:
+        - vim
+      - shell_command:
+      - shell_command:
+      - shell_command:
+

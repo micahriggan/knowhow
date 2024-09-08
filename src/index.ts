@@ -42,6 +42,7 @@ import { chatLoop } from "./chat";
 import { convertToText } from "./conversion";
 import { Plugins } from "./plugins/plugins";
 import { AwsS3 } from "./services/S3";
+import { GitHub } from "./services/GitHub";
 
 const OPENAI_KEY = process.env.OPENAI_KEY;
 const embeddingModel = new OpenAIEmbeddings({ openAIApiKey: OPENAI_KEY });
@@ -92,7 +93,7 @@ export async function upload() {
   const config = await getConfig();
 
   for (const source of config.embedSources) {
-    const bucketName = source.s3Bucket;
+    const bucketName = source.remote;
 
     if (!bucketName) {
       console.log("Skipping", source.output, "because no bucket is configured");
@@ -105,15 +106,24 @@ export async function upload() {
       items,
     };
 
-    console.log(
-      "Uploading",
-      source.output,
-      "to",
-      `${bucketName}/${embeddingName}.json`
-    );
+    if (source.remoteType === "s3") {
+      console.log(
+        "Uploading",
+        source.output,
+        "to",
+        `${bucketName}/${embeddingName}.json`
+      );
 
-    const s3Key = `${embeddingName}.json`;
-    await AwsS3.uploadFile(source.output, bucketName, s3Key);
+      const s3Key = `${embeddingName}.json`;
+      await AwsS3.uploadFile(source.output, bucketName, s3Key);
+    } else {
+      console.log(
+        "Skipping upload to",
+        source.remoteType,
+        "for",
+        source.remote
+      );
+    }
   }
 }
 
@@ -290,25 +300,41 @@ export async function download() {
   const config = await getConfig();
 
   for (const source of config.embedSources) {
-    const bucketName = source.s3Bucket;
+    const { remote, remoteType } = source;
 
-    if (!bucketName) {
-      console.log("Skipping", source.output, "because no bucket is configured");
+    if (!remote) {
+      console.log("Skipping", source.output, "because no remote is configured");
       continue;
     }
+
     const { name } = path.parse(source.output);
-    const s3Key = `${name}.json`;
+    const fileName = `${name}.json`;
     const destinationPath = source.output;
 
-    console.log(
-      "Downloading",
-      s3Key,
-      "from",
-      bucketName,
-      "to",
-      destinationPath
-    );
-
-    await AwsS3.downloadFile(bucketName, s3Key, destinationPath);
+    if (remoteType === "s3") {
+      const bucketName = remote;
+      console.log(
+        "Downloading",
+        fileName,
+        `from ${remoteType}`,
+        bucketName,
+        "to",
+        destinationPath
+      );
+      await AwsS3.downloadFile(bucketName, fileName, destinationPath);
+    } else if (remoteType === "github") {
+      console.log(
+        "Downloading",
+        fileName,
+        "from GitHub repo",
+        remote,
+        "to",
+        destinationPath
+      );
+      const embeddingPath = ".knowhow/embeddings/" + fileName;
+      await GitHub.downloadFile(remote, embeddingPath, destinationPath);
+    } else {
+      console.log("Unsupported remote type for", source.output);
+    }
   }
 }
