@@ -54,9 +54,6 @@ export class GitHubService {
     const content = await this.getFileContent(owner, repo, fileName);
     const fs = require("fs");
     fs.writeFileSync(destinationPath, content);
-    console.log(
-      `File ${fileName} downloaded from GitHub: ${orgProject} to ${destinationPath}`
-    );
   }
 }
 
