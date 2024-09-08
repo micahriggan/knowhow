@@ -40,7 +40,6 @@ export class GitHubService {
       throw new Error("File content not found in GitHub API response");
     }
     const content = Buffer.from(data.content, "base64").toString("utf-8");
-    console.log(data);
     return this.isLfsFile(content)
       ? await this.getLfsContent(data.download_url)
       : content;
