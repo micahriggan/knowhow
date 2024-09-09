@@ -18,7 +18,7 @@ Knowhow is a tool designed to increase the ease of allowing an AI to interact wi
 
 ## Installation
 ```
-git clone git@github.com:tyvm-ai/knowhow.git
+git clone git@github.com:micahriggan/knowhow.git
 cd knowhow
 npm install
 npm link
