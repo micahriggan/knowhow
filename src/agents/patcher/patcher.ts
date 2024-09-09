@@ -1,6 +1,7 @@
 import { Message } from "../../clients/types";
 import { BaseAgent } from "../base/base";
 import { BASE_PROMPT } from "../base/prompt";
+import { Models } from "../../ai";
 
 const example = `
 Index: ./src/agents/base/base.ts
@@ -80,9 +81,9 @@ export class PatchingAgent extends BaseAgent {
     this.disableTool("openFileInVim");
 
     this.setModelPreferences([
-      { model: "claude-3-5-sonnet-20240620", provider: "anthropic" },
+      { model: Models.anthropic.Sonnet, provider: "anthropic" },
       {
-        model: "gpt-4-turbo-preview",
+        model: "gpt-4-turbo-2024-04-09",
         provider: "openai",
       },
     ]);

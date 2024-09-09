@@ -5,7 +5,7 @@ import { replaceEscapedNewLines, restoreEscapedNewLines } from "../../utils";
 import { Agents, AgentService } from "../../services/AgentService";
 import { Events, EventService } from "../../services/EventService";
 import { AIClient, Clients } from "../../clients";
-import { openai } from "../../ai";
+import { Models, openai } from "../../ai";
 
 export interface ModelPreference {
   model: string;
@@ -18,7 +18,7 @@ export abstract class BaseAgent implements IAgent {
 
   private lastHealthCheckTime: number = 0;
   protected provider = "openai";
-  protected modelName: string = "gpt-4o";
+  protected modelName: string = Models.openai.GPT_4o;
   protected modelPreferences: ModelPreference[] = [];
   protected currentModelPreferenceIndex = 0;
 

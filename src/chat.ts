@@ -18,6 +18,7 @@ import { FlagsService } from "./services/flags";
 import { IAgent } from "./agents/interface";
 import { Clients, Message } from "./clients";
 import { recordAudio, voiceToText } from "./microphone";
+import { Models } from "./ai";
 
 enum ChatFlags {
   agent = "agent",
@@ -115,8 +116,8 @@ Generate an article or document that answers the question.
 }
 
 const chatModels = {
-  openai: "gpt-4o",
-  anthropic: "claude-3-5-sonnet-20240620",
+  openai: Models.openai.GPT_4o,
+  anthropic: Models.anthropic.Sonnet,
 };
 export async function askAI<E extends EmbeddingBase>(
   query: string,
@@ -166,7 +167,7 @@ export async function getInput(
     value = await editor({ message: question });
   } else {
     const history = chatHistory.map((c) => c.input);
-    value = await ask(question, options, history);
+    value = await ask(question, options, history.reverse());
   }
 
   return value.trim();

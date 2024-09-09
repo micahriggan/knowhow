@@ -1,3 +1,4 @@
+import { Models } from "../../ai";
 import { Message } from "../../clients/types";
 import { BaseAgent } from "../base/base";
 
@@ -7,7 +8,7 @@ export class ResearcherAgent extends BaseAgent {
 
   constructor() {
     super();
-    this.setModel("gpt-4o");
+    this.setModel(Models.openai.GPT_4o);
     this.disableTool("patchFile");
   }
 

@@ -2,7 +2,7 @@ import * as fs from "fs";
 import { Message } from "../../clients/types";
 import { BaseAgent } from "../base/base";
 import { readFile, writeFile, execAsync, mkdir } from "../../utils";
-import { openai, singlePrompt } from "../../ai";
+import { openai, singlePrompt, Models } from "../../ai";
 import { BASE_PROMPT } from "../base/prompt";
 
 export class VimAgent extends BaseAgent {
@@ -15,7 +15,7 @@ export class VimAgent extends BaseAgent {
     super();
     // this.disableTool("patchFile");
     this.setModelPreferences([
-      { model: "claude-3-5-sonnet-20240620", provider: "anthropic" },
+      { model: Models.anthropic.Sonnet, provider: "anthropic" },
     ]);
   }
 

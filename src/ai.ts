@@ -11,12 +11,23 @@ import { Assistant } from "./types";
 import { convertToText } from "./conversion";
 import { getConfigSync } from "./config";
 
+export const Models = {
+  anthropic: {
+    Sonnet: "claude-3-5-sonnet-20240620",
+  },
+  openai: {
+    GPT_4Turbo: "gpt-4-turbo-2024-04-09",
+    GPT_4o: "gpt-4o-2024-08-06",
+    GPT_4oMini: "gpt-4o-mini-2024-07-18",
+  },
+};
+
 const config = getConfigSync();
 const OPENAI_KEY = process.env.OPENAI_KEY;
 const chatModel = new ChatOpenAI({
   temperature: 0,
   openAIApiKey: OPENAI_KEY,
-  modelName: "gpt-4o",
+  modelName: Models.openai.GPT_4o,
   maxRetries: 2,
 });
 
@@ -28,7 +39,7 @@ export const openai = new OpenAI({
 export async function singlePrompt(userPrompt: string) {
   const extraction = await openai.chat.completions.create({
     messages: [{ role: "user", content: userPrompt }],
-    model: "gpt-4o",
+    model: Models.openai.GPT_4o,
   });
 
   return extraction?.choices?.[0]?.message?.content;
@@ -112,7 +123,7 @@ export async function createAssistant(assistant: Assistant) {
 
 export async function askGptVision(imageUrl: string, question: string) {
   const response = await openai.chat.completions.create({
-    model: "gpt-4o",
+    model: Models.openai.GPT_4o,
     max_tokens: 2500,
     messages: [
       {

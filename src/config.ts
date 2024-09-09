@@ -5,6 +5,7 @@ import { Prompts } from "./prompts";
 import { promisify } from "util";
 import { Config, Language, AssistantConfig } from "./types";
 import { mkdir, writeFile, readFile, fileExists } from "./utils";
+import { Models } from "./ai";
 
 export async function init() {
   // create the folder structure
@@ -59,7 +60,7 @@ export async function init() {
         name: "Codebase Helper",
         description: "Helps you code",
         instructions: "Codebase helper, use files and tools to help us code",
-        model: "gpt-4o",
+        model: Models.openai.GPT_4o,
         tools: [{ type: "code_interpreter" }],
         files: [".knowhow/docs/**/*.mdx"],
       },

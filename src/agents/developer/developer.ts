@@ -14,7 +14,7 @@ export class DeveloperAgent extends BaseAgent {
 
     this.setModelPreferences([
       {
-        model: "gpt-4-turbo-preview",
+        model: "gpt-4-turbo-2024-04-09",
         provider: "openai",
       },
     ]);
@@ -52,7 +52,7 @@ export class DeveloperAgent extends BaseAgent {
         - For making modifications to code / files, when patching is not working
         - For making modifications to files, with guidance from quickfix / compiler errors
         - For making refactors using vim commands that would be difficult to do without IDE type plugins
-        [Deprecated: Use Patcher instead]
+        [Vimmer Deprecated: Use Patcher instead]
 
 
         # Thought process
