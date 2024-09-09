@@ -26,6 +26,8 @@ Here is an overview of examples from various `knowhow.json` configuration files 
       "prompt": "BasicCodeDocumenter"
     }
   ],
+
+  // Generate embeddings from a series of files on your machine
   "embedSources": [
     {
       "input": ".knowhow/docs/**/*.mdx",
@@ -33,7 +35,14 @@ Here is an overview of examples from various `knowhow.json` configuration files 
       "chunkSize": 2000
     }
   ],
+
+  // Define aditional agents you can interact with via chat
   "assistants": [
+    {
+      "name": "linter",
+      "description": "Clean up your code",
+      "instructions": "Read the files that are loaded via vim plugin and provide debugging and linter suggestions"
+    }
     {
       "name": "Codebase Helper",
       "description": "Helps you code",
@@ -51,7 +60,6 @@ Here is an overview of examples from various `knowhow.json` configuration files 
   ]
 }
 ```
-This configuration enables a comprehensive development environment setup, integrating various tools like language servers, code versioning, and project management APIs. It supports the documentation process through automated prompts and embeds information generation for enhanced team collaboration.
 
 ## knowhow generate: meeting transcripts
 ```json
@@ -78,6 +86,8 @@ This configuration enables a comprehensive development environment setup, integr
 Use the source block alongside `knowhow generate` to process a pipeline of files, applying prompts to generate documentation or other artifacts. This example demonstrates the configuration for processing meeting recordings, and then running prompts on the resulting transcripts.
 
 I've been using `CMD+SHIFT+5` to record meetings and then using the `sources` block to process the recordings into notes and tasks.
+
+When a .mov or audio file is an input, it will automatically create a transcript.txt in the same directory, so we can leverage that txt input in the next step. The pipeline is useful for apply one or more prompts to one or more input files.
 
 ## knowhow embed: documentation embeddings
 ```json
@@ -113,21 +123,49 @@ I've been using `CMD+SHIFT+5` to record meetings and then using the `sources` bl
 ```
 You can use `knowhow embed` to generate json embeddings from a set of files. If you want to run a prompt on the input, before embedding, you set an optional `prompt` field to match the filename of the prompt stored in your `.knowhow/prompts` directory.
 
+These embeddings are leveraged by the chat in `knowhow chat` or by the agents to accomplish their tasks
+
 ## knowhow embed: asana tasks
 ```
   "embedSources": [
     {
       "input": "https://app.asana.com/0/111111111111111/list",
       "output": ".knowhow/embeddings/asana.json",
-      "s3Bucket": "mybucket",
+      "remote": "mybucket",
+      "remoteType": "s3",
       "kind": "asana",
       "chunkSize": 2000
     }
   ],
 ```
-Any plugin that implements the embedding function, can generate embeddings if you set the `kind` field to the plugin name. The `s3Bucket` field is optional, and if set, the embeddings will be uploaded to the specified S3 bucket via `knowhow upload`.
 
 
+Any plugin that implements the embedding function, can generate embeddings if you set the `kind` field to the plugin name. The `remote` field is optional, and if set, the embeddings will be uploaded to the specified S3 bucket via `knowhow upload`.
+
+You can download remote embeddings via `knowhow download` and use them in your local environment. 
+
+For downloads we support the following remote options:
+- s3
+- github* - downloads files
+
+For uploads we support the following remote options:
+- s3
+- github* - use git lfs to commit the embeddings to your repository
+
+
+## knowhow embed: github embeddings
+```
+  "embedSources": [
+    {
+      "input": "./src/**/*.ts",
+      "output": ".knowhow/embeddings/knowhow.json",
+      "chunkSize": 2000,
+      "remote": "micahriggan/knowhow",
+      "remoteType": "github"
+    }
+  ],
+```
+Here's an example where you could download embeddings from github. As the code updates occasionally I'll run `knowhow embed` and commit the updated embeddings.
 
 ## Plugins
 ```json
@@ -193,26 +231,49 @@ Configured in `.knowhow/language.json`
 
 Knowhow has a language file, which allows you to define additional context that is included when you use certain phrases in your messages. For instance, you could load a Pull Request when you say "My PR", or load a file from the codebase when you reference it. Languages have "terms" which then load various sources into context. Sources currently can be files, text, or github links.
 
+I primarily use this to define terms like "frontend" or "backend" to load prompt files
+
 ## Example Language Definition
-    {
-      "knowhow config": {
-        "sources": [
-          {
-            "kind": "file",
-            "data": [
-              ".knowhow/knowhow.json"
-            ]
-          }
-        ]
-      },
-      "My PR": {
-        "sources": [
-          {
-            "kind": "github",
-            "data": [
-              "https://github.com/tyvm-ai/knowhow/pulls/1"
-            ]
-          }
+
+```
+{
+  "ui,frontend,component,page": {
+    "sources": [
+      {
+        "data": [
+          "./.knowhow/prompts/frontend.mdx"
+        ],
+        "kind": "file"
+      }
+    ]
+  }
+}
+```
+
+
+Here's and example of having a language term that triggers a plugin.
+This example would load the diff of a PR every time we said "my pr"
+```
+{
+  "knowhow config": {
+    "sources": [
+      {
+        "kind": "file",
+        "data": [
+          ".knowhow/knowhow.json"
         ]
       }
-    }
+    ]
+  },
+  "My PR": {
+    "sources": [
+      {
+        "kind": "github",
+        "data": [
+          "https://github.com/tyvm-ai/knowhow/pulls/1"
+        ]
+      }
+    ]
+  }
+}
+```
