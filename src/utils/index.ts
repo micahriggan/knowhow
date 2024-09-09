@@ -84,3 +84,7 @@ export function splitByNewLines(str: string): string[] {
   // Step 3: Restore the escaped new lines in the split parts
   return parts.map((part) => restoreEscapedNewLines(part));
 }
+
+export function toUniqueArray<T>(arr: T[]): T[] {
+  return Array.from(new Set(arr));
+}
