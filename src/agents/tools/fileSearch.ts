@@ -2,7 +2,7 @@ import glob from "glob";
 import { getConfiguredEmbeddings } from "../../embeddings";
 import { execCommand } from "./execCommand";
 import { getIgnorePattern } from "../../config";
-import { toUniqueArray } from "src/utils";
+import { toUniqueArray } from "../../utils";
 
 export async function fileSearch(searchTerm) {
   const searchTermLower = searchTerm.toLowerCase();
