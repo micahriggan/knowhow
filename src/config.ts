@@ -50,7 +50,7 @@ export async function init() {
     embedSources: [
       {
         input: ".knowhow/docs/**/*.mdx",
-        output: ".knowhow/embeddings",
+        output: ".knowhow/embeddings/docs.json",
         prompt: "BasicEmbeddingExplainer",
         chunkSize: 500,
       },

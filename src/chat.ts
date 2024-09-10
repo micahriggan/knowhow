@@ -167,7 +167,7 @@ export async function getInput(
     value = await editor({ message: question });
   } else {
     const history = chatHistory.map((c) => c.input);
-    value = await ask(question, options, history.reverse());
+    value = await ask(question, options, history);
   }
 
   return value.trim();

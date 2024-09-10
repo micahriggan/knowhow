@@ -309,7 +309,7 @@ export abstract class BaseAgent implements IAgent {
         // sometimes the agent just says a message and doesn't call a tool
         messages.push({
           role: "user",
-          content: "Workflow continues until you call finalAnswer.",
+          content: "Friendly reminder: workflow continues until you call finalAnswer.",
         });
       }
 
@@ -335,7 +335,7 @@ export abstract class BaseAgent implements IAgent {
     endIndex: number
   ) {
     const toCompress = messages.slice(startIndex, endIndex);
-    const toCompressPrompt = `Summarize:
+    const toCompressPrompt = `Summarize the conversation so far:
     1. Initial Request - what this agent was tasked with.
     2. Progress - what has been tried so far,
     3. Next Steps - what we're about to do next to continue the user's original request.
@@ -356,10 +356,14 @@ export abstract class BaseAgent implements IAgent {
       ],
     });
 
+    const summaries = response.choices.map((c) => c.message);
     const startMessages = [
       {
         role: "user",
-        content: "We have just compressed the conversation to save memory.",
+        content: `We have just compressed the conversation to save memory:
+
+        ${JSON.stringify(summaries)}
+        `,
       },
     ] as Message[];
     const systemMesasges = toCompress.filter((m) => m.role === "system");
@@ -367,7 +371,6 @@ export abstract class BaseAgent implements IAgent {
     const newMessages = [
       ...systemMesasges,
       ...startMessages,
-      ...response.choices.map((c) => c.message),
       ...messages.slice(endIndex),
     ];
 
