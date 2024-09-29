@@ -2,7 +2,6 @@ import { EventEmitter } from "events";
 import * as fs from "fs";
 import * as pty from "node-pty";
 import { wait } from "./";
-import { $Command } from "@aws-sdk/client-s3";
 
 function parseTerminalStream(input) {
   // Regular expression to match ANSI escape codes

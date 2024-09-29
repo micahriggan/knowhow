@@ -1,4 +1,4 @@
-import { ProcessSnapshotter } from "../../../utils/terminal";
+import { ProcessSnapshotter } from "../../terminal";
 import { EventEmitter } from "events";
 import * as fs from "fs";
 import * as pty from "node-pty";

@@ -1,0 +1,26 @@
+{
+  "name": "@knowhow/terminal",
+  "version": "1.0.0",
+  "description": "",
+  "main": "ts_build/src/index.js",
+  "scripts": {
+    "test": "jest",
+    "compile": "tsc",
+    "start": "npm run compile && node ts_build/src/index.js",
+    "lint": "tslint"
+  },
+  "keywords": [],
+  "author": "Micah Riggan",
+  "license": "MIT",
+  "devDependencies": {
+    "jest": "^27.5.1",
+    "prettier": "2.6.2",
+    "ts-jest": "^27.1.4",
+    "tslint": "^6.1.3",
+    "@types/node": "^20.6.3"
+  },
+  "dependencies": {
+    "node-pty": "^1.0.0",
+    "typescript": "^4.6.3"
+  }
+}
