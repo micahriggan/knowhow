@@ -4,12 +4,19 @@ Knowhow is a tool designed to increase the ease of allowing an AI to interact wi
 
 ## Key Features
 
-* Automated Documentation: Generates markdown files for each source file in the codebase.
-* Change Detection: Utilizes MD5 hashes to detect changes in source files and prompts, ensuring documentation is up-to-date.
-* Embedding Creation: Transforms documentation into embeddings for advanced search and retrieval capabilities.
-* Chat Feature: Supports querying the knowledgebase through a chat interface, with context-aware responses.
-* Language Configuration: Allows defining terms that map to specific folders, files, or data sources, enriching the chat context.
-* Plugins: Supports chat plugins for vim, embedding search, github, and language expansion
+* Generation Pipelines (`knowhow generate`):
+    * Given a prompt and a source file/ glob, run each file through the prompt and output the results to the output file / folder.
+    * incremental pipelines: after the first run, subsequent runs will only process files that have changed
+    * Can be used for documentation generation, code transformation tasks, or any other task that can be broken down into a prompt and a source file
+
+* Embedding Creation (`knowhow embed`):
+    * given a source file / glob, create embeddings for each file and output them to a single embedding file
+    * enabled chat support for embedding contents via *embedding plugin*
+    * Can generate embeddings from plugins via optional `kind` field
+* Chat Feature (`knowhow chat`):
+    * Supports querying the knowledgebase through a chat interface, with context-aware responses.
+    * Plugins: chat plugins for vim, embedding search, github, and language expansion
+    * Language: Allows defining terms that map to specific folders, files, or data sources, enriching the chat context.
 
 ## Installation
 ```
