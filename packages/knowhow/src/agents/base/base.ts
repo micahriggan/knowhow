@@ -21,6 +21,7 @@ export abstract class BaseAgent implements IAgent {
   protected modelName: string = Models.openai.GPT_4o;
   protected modelPreferences: ModelPreference[] = [];
   protected currentModelPreferenceIndex = 0;
+  protected easyFinalAnswer = false;
 
   disabledTools = [];
 
@@ -72,6 +73,10 @@ export abstract class BaseAgent implements IAgent {
 
   getClient() {
     return Clients.getClient(this.provider);
+  }
+
+  setEasyFinalAnswer(value: boolean) {
+    this.easyFinalAnswer = value;
   }
 
   getEnabledTools() {
@@ -294,12 +299,13 @@ export abstract class BaseAgent implements IAgent {
         }
       }
 
-      /*
-       *    if (response.choices.length === 1 && firstMessage.content) {
-       *      return firstMessage.content;
-       *    }
-       *
-       */
+      if (
+        response.choices.length === 1 &&
+        firstMessage.content &&
+        this.easyFinalAnswer
+      ) {
+        return firstMessage.content;
+      }
 
       if (this.getMessagesLength(messages) > compressThreshold) {
         messages = await this.compressMessages(messages, startIndex, endIndex);
@@ -309,7 +315,8 @@ export abstract class BaseAgent implements IAgent {
         // sometimes the agent just says a message and doesn't call a tool
         messages.push({
           role: "user",
-          content: "Friendly reminder: workflow continues until you call finalAnswer.",
+          content:
+            "Friendly reminder: workflow continues until you call finalAnswer.",
         });
       }
 
