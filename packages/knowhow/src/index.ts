@@ -44,6 +44,11 @@ import { Plugins } from "./plugins/plugins";
 import { AwsS3 } from "./services/S3";
 import { GitHub } from "./services/GitHub";
 
+export * as clients from "./clients";
+export * as agents from "./agents";
+export * as ai from "./ai";
+export * as services from "./services";
+
 const OPENAI_KEY = process.env.OPENAI_KEY;
 const embeddingModel = new OpenAIEmbeddings({ openAIApiKey: OPENAI_KEY });
 const chatModel = new ChatOpenAI({
@@ -155,7 +160,7 @@ export async function uploadOpenAi() {
         files: fileIds,
       };
       const createdAssistant = await createAssistant(toCreate);
-       assistant.id = createdAssistant.id;
+      assistant.id = createdAssistant.id;
       await updateConfig(config);
     }
     console.log(`Assistant ${assistant.id} is ready`);
