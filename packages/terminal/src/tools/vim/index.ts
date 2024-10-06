@@ -2,8 +2,7 @@ import { ProcessSnapshotter } from "../../terminal";
 import { EventEmitter } from "events";
 import * as fs from "fs";
 import * as pty from "node-pty";
-import { wait } from "../../../utils";
-import { readFile } from "../readFile";
+import { wait } from "../../wait";
 
 let ptyProcess: pty.IPty;
 let snapshotter: ProcessSnapshotter;

@@ -108,7 +108,8 @@ export async function uploadToOpenAi(filePath: string) {
 
 export async function createAssistant(assistant: Assistant) {
   const { name, tools, description, instructions, model } = assistant;
-  console.log("Creating assistant", assistant);
+  console.log("Creating assistant is currently broken", assistant);
+  return;
   const created = await openai.beta.assistants.create({
     name,
     tools,

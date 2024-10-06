@@ -7,7 +7,6 @@ import {
 } from "openai/resources/chat";
 import { parsePatch, diffLines, applyPatch } from "diff";
 import { PatchingAgent } from "../../agents/patcher/patcher";
-import dataset from "./dataset.json";
 import { ask, writeFile, mkdir } from "../../utils";
 import {
   fixPatch,
@@ -16,6 +15,7 @@ import {
   hunksToPatch,
 } from "../../agents/tools/patch";
 import { md5Hash } from "../../hashes";
+const dataset = [];
 
 class PatchTestAgent extends PatchingAgent {
   name = "PatchTestAgent";

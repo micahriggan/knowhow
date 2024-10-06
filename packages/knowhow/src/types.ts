@@ -32,6 +32,7 @@ export type Config = {
   }[];
 
   plugins: string[];
+  modules: string[];
 
   assistants: Assistant[];
 };

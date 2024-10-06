@@ -14,7 +14,7 @@ import { GenericClient } from "../clients/types";
 export interface ModuleChatCommand {
   name: string;
   description: string;
-  handler: () => void;
+  handler: (ctx: any) => void;
 }
 
 export interface ModuleTool {
@@ -25,17 +25,12 @@ export interface ModuleTool {
 
 export type ModuleAgent = IAgent;
 
-export type ModulePlugin = Plugin;
-
-export type ModuleAiModel = {
-  modelName: string;
-  modelValue: string;
-};
+export type ModulePlugin = { name: string; plugin: Plugin };
 
 export type ModuleClient = {
   client: GenericClient;
   provider: string;
-  models: ModuleAiModel[];
+  models: string[];
 };
 
 export type InitParams = {
@@ -50,7 +45,4 @@ export interface KnowhowModule {
   agents: ModuleAgent[];
   plugins: ModulePlugin[];
   clients: ModuleClient[];
-  services: { [key: string]: any };
-  utils: { [key: string]: any };
 }
-

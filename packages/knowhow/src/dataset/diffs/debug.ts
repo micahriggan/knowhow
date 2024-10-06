@@ -7,7 +7,6 @@ import {
 } from "openai/resources/chat";
 import { parsePatch, diffLines, applyPatch } from "diff";
 import { PatchingAgent } from "../../agents/patcher/patcher";
-import dataset from "./dataset.json";
 import { ask, writeFile, mkdir, readFile } from "../../utils";
 import { fixPatch, parseHunks } from "../../agents/tools/patch";
 import { md5Hash } from "../../hashes";
@@ -16,6 +15,7 @@ async function debugFailure() {
   const successCount = 0;
   const attempts = 0;
   const testHash = "40eda1dc8f1e3052997f2930ae59fed2";
+  const dataset = [];
 
   let patchData;
   for (const data of dataset) {

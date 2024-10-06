@@ -1,6 +1,15 @@
 module.exports = {
+  extensionsToTreatAsEsm: ['.ts'],
+  moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+  },
   transform: {
-    '^.+\.ts?$': 'ts-jest'
+    '^.+\\.ts?$': [
+      'ts-jest',
+      {
+        useESM: true,
+      },
+    ],
   },
   testEnvironment: 'node',
   testRegex: '/tests/.*\.(test|spec)?\.(ts|tsx|js)$',

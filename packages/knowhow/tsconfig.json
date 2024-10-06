@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "lib": ["es5", "es6", "es2022", "dom"],
+    "skipLibCheck": true,
     "noImplicitAny": false,
     "removeComments": true,
     "resolveJsonModule": true,
@@ -11,7 +12,7 @@
     "moduleResolution": "node",
     "esModuleInterop": true,
     "target": "esnext",
-    "typeRoots": ["./node_modules/@types"],
+    "typeRoots": ["./node_modules/@types", "../../node_modules/@types"],
     "baseUrl": ".",
     "paths": {
       "*": ["*", "./src/*"]

@@ -155,7 +155,7 @@ export async function uploadOpenAi() {
         files: fileIds,
       };
       const createdAssistant = await createAssistant(toCreate);
-      assistant.id = createdAssistant.id;
+       assistant.id = createdAssistant.id;
       await updateConfig(config);
     }
     console.log(`Assistant ${assistant.id} is ready`);

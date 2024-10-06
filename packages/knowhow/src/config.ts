@@ -20,6 +20,7 @@ export async function init() {
   // create knowhow.json
   const config = {
     promptsDir: ".knowhow/prompts",
+    modules: [],
     plugins: [
       "embeddings",
       "language",

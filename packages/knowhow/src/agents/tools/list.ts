@@ -5,7 +5,6 @@ import { Plugins } from "../../plugins/plugins";
 const pluginNames = Plugins.listPlugins().join(", ");
 import * as github from "./github/definitions";
 import * as asana from "./asana/definitions";
-import * as vim from "./vim/definitions";
 import * as language from "./language/definitions";
 import { Agents } from "../../services/AgentService";
 
@@ -347,6 +346,5 @@ export const includedTools = [
 
   ...asana.definitions,
   ...github.definitions,
-  ...vim.definitions,
   ...language.definitions,
 ] as Tool[];

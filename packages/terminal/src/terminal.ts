@@ -1,7 +1,7 @@
 import { EventEmitter } from "events";
 import * as fs from "fs";
 import * as pty from "node-pty";
-import { wait } from "./";
+import { wait } from "./wait";
 
 function parseTerminalStream(input) {
   // Regular expression to match ANSI escape codes

@@ -4,9 +4,9 @@ import { parsePatch, diffLines, applyPatch } from "diff";
 import { PatchingAgent } from "../../agents/patcher/patcher";
 import { ask, writeFile, mkdir, readFile } from "../../utils";
 import { fixPatch, parseHunks } from "../../agents/tools/patch";
-import errors from "./test_files/errors.json";
 
 async function debugFailure() {
+  const errors = [];
   for (const data of errors) {
     try {
       const { fileContent, fixedPatch, originalPatch } = data;
