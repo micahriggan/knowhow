@@ -19,9 +19,5 @@ coverage
 node_modules
 npm-debug.log
 dist
-**/src/vendor
-**/src/dist
-**/ts_build
-**/.knowhow
-**/src/dataset/**/*.json*
-**/src/dataset/**/test_files
+src/vendor
+src/dist
