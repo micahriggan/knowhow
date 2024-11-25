@@ -12,17 +12,59 @@ export class LinearPlugin implements Plugin {
   }
 
   async embed(userPrompt: string): Promise<MinimalEmbedding[]> {
-    const urls = this.extractUrls(userPrompt);
+    const urls = this.extractTaskUrls(userPrompt);
     const tasksData = await this.getTasksFromUrls(urls);
     const tasksDataFiltered = tasksData.filter((task) => task !== null);
 
-    return tasksDataFiltered.map((task) => {
+    const tasksEmbeddings = tasksDataFiltered.map((task) => {
       return {
         id: task.url,
         text: this.getTaskString(task),
-        metadata: {},
+        metadata: {
+          task: JSON.stringify(task),
+        },
       };
     });
+
+    const projectUrls = this.extractProjectUrls(userPrompt);
+    const projectTasks = await this.getTasksFromProjectUrls(projectUrls);
+    const projectTasksFiltered = projectTasks.filter((t) => t !== null);
+
+    const projectTaskEmbeddings = projectTasksFiltered
+      .map((project) => {
+        return project.nodes.map((t) => {
+          return {
+            id: t.url,
+            text: this.getTaskString(t),
+            metadata: {
+              task: JSON.stringify(t),
+            },
+          };
+        });
+      })
+      .flat();
+
+    const teamUrls = this.extractTeamUrls(userPrompt);
+    const teamTasks = await this.getTasksFromTeamUrls(teamUrls);
+    const teamTasksFiltered = teamTasks.filter((t) => t !== null);
+
+    const teamTaskEmbeddings = teamTasksFiltered
+      .map((team) => {
+        return team.nodes.map((t) => {
+          return {
+            id: t.url,
+            text: this.getTaskString(t),
+            metadata: {
+              task: JSON.stringify(t),
+            },
+          };
+        });
+      })
+      .flat();
+
+    return tasksEmbeddings
+      .concat(projectTaskEmbeddings)
+      .concat(teamTaskEmbeddings);
   }
 
   async getIssueData(issueId: string) {
@@ -53,7 +95,75 @@ export class LinearPlugin implements Plugin {
     return tasks;
   }
 
-  extractUrls(userPrompt: string): string[] {
+  extractTeamUrls(userPrompt: string): string[] {
+    const urlRegex = /https:\/\/linear\.app\/[^\/]+\/team\/[^\/]+\/[^\/]+/g;
+    const matches = userPrompt.match(urlRegex);
+    return matches || [];
+  }
+
+  getTeamIdFromUrl(url: string): string {
+    const urlRegex = /https:\/\/linear\.app\/[^\/]+\/team\/([^\/]+)\/[^\/]+/g;
+    const match = urlRegex.exec(url);
+    if (match && match[1]) {
+      return match[1];
+    }
+    return null;
+  }
+
+  extractProjectUrls(userPrompt: string): string[] {
+    const urlRegex = /https:\/\/linear\.app\/[^\/]+\/project\/[^\/]+\/[^\/]+/g;
+    const matches = userPrompt.match(urlRegex);
+    return matches || [];
+  }
+
+  getProjectIdFromUrl(url: string): string {
+    const urlRegex =
+      /https:\/\/linear\.app\/[^\/]+\/project\/([^\/]+)\/[^\/]+/g;
+    const match = urlRegex.exec(url);
+    if (match && match[1]) {
+      const parts = match[1].split("-");
+      return parts[parts.length - 1];
+    }
+    return null;
+  }
+
+  getTasksForProject(projectId: string) {
+    console.log({ projectId });
+    return this.linearClient.issues({
+      filter: {
+        project: { slugId: { eq: projectId } },
+      },
+    });
+  }
+
+  async getTasksFromProjectUrls(urls: string[]) {
+    const tasks = await Promise.all(
+      urls.map(async (url) => {
+        return this.getTasksForProject(this.getProjectIdFromUrl(url));
+      })
+    );
+    return tasks.flat();
+  }
+
+  getTasksForTeam(teamId: string) {
+    console.log({ teamId });
+    return this.linearClient.issues({
+      filter: {
+        team: { key: { eq: teamId } },
+      },
+    });
+  }
+
+  async getTasksFromTeamUrls(urls: string[]) {
+    const tasks = await Promise.all(
+      urls.map(async (url) => {
+        return this.getTasksForTeam(this.getTeamIdFromUrl(url));
+      })
+    );
+    return tasks.flat();
+  }
+
+  extractTaskUrls(userPrompt: string): string[] {
     const urlRegex = /https:\/\/linear\.app\/[^\/]+\/issue\/[^\/]+\/[^\/]+/g;
     const matches = userPrompt.match(urlRegex);
     if (!matches) {
@@ -76,7 +186,7 @@ export class LinearPlugin implements Plugin {
   }
 
   async call(userPrompt: string): Promise<string> {
-    const urls = this.extractUrls(userPrompt);
+    const urls = this.extractTaskUrls(userPrompt);
     if (!urls) {
       return "LINEAR PLUGIN: No issues found";
     }
