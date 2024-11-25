@@ -7,10 +7,10 @@ import { toUniqueArray } from "../../utils";
 export async function fileSearch(searchTerm) {
   const searchTermLower = searchTerm.toLowerCase();
   const pattern = `./**/*${searchTermLower}*`;
-  console.log(pattern);
+  const ignore = await getIgnorePattern();
+  console.log({ pattern, ignore });
   const files = await glob.sync(pattern, {
-    ignore: await getIgnorePattern(),
-    nocase: true,
+    ignore,
   });
 
   if (files.length === 0) {

@@ -48,4 +48,47 @@ export const definitions = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "getAllLanguageTerms",
+      description:
+        "Retrieves all language terms from the language configuration.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+      returns: {
+        type: "array",
+        items: {
+          type: "string",
+        },
+        description: "An array of all language terms in the configuration.",
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "lookupLanguageTerm",
+      description:
+        "Looks up a specific language term and calls the language plugin with it.",
+      parameters: {
+        type: "object",
+        properties: {
+          term: {
+            type: "string",
+            description: "The language term to look up",
+          },
+        },
+        required: ["term"],
+      },
+      returns: {
+        type: "any",
+        description:
+          "The result of calling the language plugin with the specified term.",
+      },
+    },
+  },
 ];
