@@ -31,16 +31,14 @@ export class LinearPlugin implements Plugin {
     const projectTasksFiltered = projectTasks.filter((t) => t !== null);
 
     const projectTaskEmbeddings = projectTasksFiltered
-      .map((project) => {
-        return project.nodes.map((t) => {
-          return {
-            id: t.url,
-            text: this.getTaskString(t),
-            metadata: {
-              task: JSON.stringify(t),
-            },
-          };
-        });
+      .map((t) => {
+        return {
+          id: t.url,
+          text: this.getTaskString(t),
+          metadata: {
+            task: JSON.stringify(t),
+          },
+        };
       })
       .flat();
 
@@ -49,16 +47,14 @@ export class LinearPlugin implements Plugin {
     const teamTasksFiltered = teamTasks.filter((t) => t !== null);
 
     const teamTaskEmbeddings = teamTasksFiltered
-      .map((team) => {
-        return team.nodes.map((t) => {
-          return {
-            id: t.url,
-            text: this.getTaskString(t),
-            metadata: {
-              task: JSON.stringify(t),
-            },
-          };
-        });
+      .map((t) => {
+        return {
+          id: t.url,
+          text: this.getTaskString(t),
+          metadata: {
+            task: JSON.stringify(t),
+          },
+        };
       })
       .flat();
 
@@ -127,13 +123,21 @@ export class LinearPlugin implements Plugin {
     return null;
   }
 
-  getTasksForProject(projectId: string) {
+  async getTasksForProject(projectId: string) {
     console.log({ projectId });
-    return this.linearClient.issues({
+    let tasks = await this.linearClient.issues({
       filter: {
         project: { slugId: { eq: projectId } },
       },
     });
+    let allTasks = tasks.nodes;
+
+    while (tasks.pageInfo.hasNextPage) {
+      tasks = await tasks.fetchNext();
+      allTasks = allTasks.concat(tasks.nodes);
+    }
+
+    return allTasks;
   }
 
   async getTasksFromProjectUrls(urls: string[]) {
@@ -145,13 +149,22 @@ export class LinearPlugin implements Plugin {
     return tasks.flat();
   }
 
-  getTasksForTeam(teamId: string) {
+  async getTasksForTeam(teamId: string) {
     console.log({ teamId });
-    return this.linearClient.issues({
+    let tasks = await this.linearClient.issues({
       filter: {
         team: { key: { eq: teamId } },
       },
     });
+
+    let allTasks = tasks.nodes;
+
+    while (tasks.pageInfo.hasNextPage) {
+      tasks = await tasks.fetchNext();
+      allTasks = allTasks.concat(tasks.nodes);
+    }
+
+    return allTasks;
   }
 
   async getTasksFromTeamUrls(urls: string[]) {
