@@ -85,7 +85,7 @@ export async function chunkText(text: string, chunkSize?: number) {
 export async function summarizeFiles(files: string[], template: string) {
   const texts = [];
   for (const file of files) {
-    const text = await convertToText(file);
+    const text = `file: ${file}\n` + (await convertToText(file));
     texts.push(text);
   }
   return summarizeTexts(texts, template);

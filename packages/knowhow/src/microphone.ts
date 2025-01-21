@@ -66,7 +66,7 @@ export async function listMicrophones() {
     `system_profiler SPAudioDataType | grep "Input Source: " -B 7 -A 1`
   );
 
-  const matches = output.stdout.match(regex);
+  const matches = output.stdout.match(regex) || [];
 
   const options = matches.map((m) => m.trim().slice(0, -1));
   console.log({ options });

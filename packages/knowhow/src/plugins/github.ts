@@ -33,8 +33,13 @@ export class GitHubPlugin implements Plugin {
     return matches;
   }
 
-  async getDiff(url: string) {
+  parseUrl(url: string) {
     const [owner, repo, _, pullNumber] = url.split("/").slice(-4);
+    return { owner, repo, pullNumber };
+  }
+
+  async getDiff(url: string) {
+    const { owner, repo, pullNumber } = this.parseUrl(url);
     console.log(
       `GITHUB PLUGIN: Loading diff for ${owner}/${repo}#${pullNumber}`
     );
@@ -56,9 +61,22 @@ export class GitHubPlugin implements Plugin {
       .reduce((acc, line) => acc + line.length, 0);
   }
 
+  async getPR(url: string) {
+    const { owner, repo, pullNumber } = this.parseUrl(url);
+    const { data: description } = await this.octokit.pulls.get({
+      owner,
+      repo,
+      pull_number: parseInt(pullNumber, 10),
+    });
+
+    return description;
+  }
+
   async getParsedDiffs(urls: string[]) {
     return Promise.all(
       urls.map(async (url) => {
+        const pr = await this.getPR(url);
+        const description = pr.body;
         const diff = await this.getDiff(url);
         let parsed = parseHunks(diff.toString());
 
@@ -83,8 +101,12 @@ export class GitHubPlugin implements Plugin {
           return this.getLengthOfHunks([hunk]) <= PER_HUNK_LIMIT;
         });
 
-        console.log(`GITHUB PLUGIN: Filtered to ${parsed.length} hunks. ${this.getLengthOfHunks(parsed)} characters`);
-        return parsed;
+        console.log(
+          `GITHUB PLUGIN: Filtered to ${
+            parsed.length
+          } hunks. ${this.getLengthOfHunks(parsed)} characters`
+        );
+        return [description, ...parsed];
       })
     );
   }
