@@ -166,7 +166,7 @@ export async function getInput(
   } else if (multiLine) {
     value = await editor({ message: question });
   } else {
-    const history = chatHistory.map((c) => c.input);
+    const history = chatHistory.map((c) => c.input).reverse();
     value = await ask(question, options, history);
   }
 
