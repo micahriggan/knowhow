@@ -34,11 +34,34 @@ export async function checkNoFilesChanged(
       hashes[file].promptHash === promptHash &&
       hashes[file].fileHash === fileHash
     ) {
-      continue;
+      return true;
+    }
+
+    if (hashes[file][promptHash] === fileHash) {
+      return true;
     }
 
     return false;
   }
 
   return true;
+}
+
+export async function saveAllFileHashes(files: string[], promptHash: string) {
+  const hashes = await getHashes();
+
+  for (const file of files) {
+    const fileContent = await convertToText(file);
+    const fileHash = crypto.createHash("md5").update(fileContent).digest("hex");
+
+    if (!hashes[file]) {
+      hashes[file] = {
+        fileHash,
+        promptHash,
+      };
+    }
+    hashes[file][promptHash] = fileHash;
+  }
+
+  await saveHashes(hashes);
 }

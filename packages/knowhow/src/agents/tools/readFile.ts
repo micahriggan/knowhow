@@ -1,8 +1,8 @@
 import * as fs from "fs";
-import { FileBlock } from "./types/fileblock";
 import { fileExists } from "../../utils";
 import { getConfiguredEmbeddings } from "../../embeddings";
 import { fileSearch } from "./fileSearch";
+import { createPatch } from "diff";
 
 /*
  *export function readFile(filePath: string): string {
@@ -17,8 +17,7 @@ import { fileSearch } from "./fileSearch";
  *}
  */
 
-const BLOCK_SIZE = 500;
-export async function readFile(filePath: string): Promise<FileBlock[]> {
+export async function readFile(filePath: string): Promise<string> {
   const exists = await fileExists(filePath);
 
   if (!exists) {
@@ -34,30 +33,7 @@ export async function readFile(filePath: string): Promise<FileBlock[]> {
   }
 
   const text = fs.readFileSync(filePath, "utf8");
-  const lines = text.split("");
-  const blocks = [] as FileBlock[];
+  const patch = createPatch(filePath, "", text);
 
-  let index = 0;
-  let lineCount = 0;
-  while (lines.length > 0) {
-    const block = lines.splice(0, BLOCK_SIZE).join("");
-    blocks.push({
-      blockNumber: index,
-      content: block,
-      startLine: lineCount + 1,
-    });
-    index++;
-    lineCount += block.split("\n").length;
-
-    if (blocks.length > 20 && lines.length > 160000) {
-      blocks.push({
-        blockNumber: index,
-        content: "File trimmed. Too large to display",
-        startLine: lineCount + 1,
-      });
-      break;
-    }
-  }
-
-  return blocks;
+  return patch;
 }

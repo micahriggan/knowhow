@@ -1,5 +1,7 @@
 export type Hashes = {
-  [key: string]: {
+  [file: string]: {
+    [promptHash: string]: string;
+
     promptHash: string;
     fileHash: string;
   };
@@ -13,10 +15,13 @@ export type Config = {
   defaultMic?: string;
 
   sources: {
+    model?: string;
     input: string;
     output: string;
     prompt: string;
     kind?: string;
+    outputExt?: string;
+    outputName?: string;
   }[];
 
   embedSources: {
@@ -86,4 +91,16 @@ export type Language = {
 export type ChatInteraction = {
   input: string;
   output: string;
+};
+
+export const Models = {
+  anthropic: {
+    Sonnet: "claude-3-5-sonnet-20240620",
+    Sonnet3_7: "claude-3-7-sonnet-20250219",
+  },
+  openai: {
+    GPT_4Turbo: "gpt-4-turbo-2024-04-09",
+    GPT_4o: "gpt-4o-2024-08-06",
+    GPT_4oMini: "gpt-4o-mini-2024-07-18",
+  },
 };

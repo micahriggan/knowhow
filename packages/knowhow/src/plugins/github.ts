@@ -35,7 +35,11 @@ export class GitHubPlugin implements Plugin {
 
   parseUrl(url: string) {
     const [owner, repo, _, pullNumber] = url.split("/").slice(-4);
-    return { owner, repo, pullNumber };
+    return {
+      owner,
+      repo,
+      pullNumber,
+    };
   }
 
   async getDiff(url: string) {
@@ -55,28 +59,26 @@ export class GitHubPlugin implements Plugin {
     return diff;
   }
 
-  getLengthOfHunks(hunks: ReturnType<typeof parseHunks>) {
-    return hunks
-      .flatMap((hunk) => [...hunk.additions, ...hunk.subtractions])
-      .reduce((acc, line) => acc + line.length, 0);
-  }
-
-  async getPR(url: string) {
+  getPR(url: string) {
     const { owner, repo, pullNumber } = this.parseUrl(url);
-    const { data: description } = await this.octokit.pulls.get({
+    return this.octokit.rest.pulls.get({
       owner,
       repo,
       pull_number: parseInt(pullNumber, 10),
     });
+  }
 
-    return description;
+  getLengthOfHunks(hunks: ReturnType<typeof parseHunks>) {
+    const length = hunks
+      .flatMap((hunk) => [...hunk.additions, ...hunk.subtractions])
+      .reduce((acc, line) => acc + line.length, 0);
+    console.log(`GITHUB PLUGIN: Length of hunks: ${length}`);
+    return length;
   }
 
   async getParsedDiffs(urls: string[]) {
     return Promise.all(
       urls.map(async (url) => {
-        const pr = await this.getPR(url);
-        const description = pr.body;
         const diff = await this.getDiff(url);
         let parsed = parseHunks(diff.toString());
 
@@ -95,7 +97,8 @@ export class GitHubPlugin implements Plugin {
         );
 
         const MAX_CHARACTERS = 10000;
-        const PER_HUNK_LIMIT = Math.min(MAX_CHARACTERS / averageHunkSize, 2000);
+        const average = MAX_CHARACTERS / averageHunkSize;
+        const PER_HUNK_LIMIT = Math.max(average, 2000);
 
         parsed = parsed.filter((hunk) => {
           return this.getLengthOfHunks([hunk]) <= PER_HUNK_LIMIT;
@@ -106,7 +109,7 @@ export class GitHubPlugin implements Plugin {
             parsed.length
           } hunks. ${this.getLengthOfHunks(parsed)} characters`
         );
-        return [description, ...parsed];
+        return parsed;
       })
     );
   }
@@ -119,12 +122,30 @@ export class GitHubPlugin implements Plugin {
     const urls = this.extractUrls(userPrompt);
 
     if (urls) {
-      const responses = await this.getParsedDiffs(urls);
-      // Format the diffs in Markdown
-      const diffStrings = responses.map(hunksToPatch);
+      const prs = [];
+      for (const url of urls) {
+        const { owner, repo, pullNumber } = this.parseUrl(url);
+        const { data: pr } = await this.getPR(url);
+        const responses = await this.getParsedDiffs(urls);
+        // Format the diffs in Markdown
+        const diffStrings = responses.map(hunksToPatch);
 
-      // console.log(diffStrings);
-      return `GITHUB PLUGIN: These ${urls} have automatically been expanded to include the changes:\n\n${diffStrings}`;
+        prs.push({
+          description: pr.title,
+          url: pr.html_url,
+          body: pr.body,
+          author: pr.user.login,
+          diff: diffStrings,
+        });
+      }
+
+      const context = `GITHUB PLUGIN: These ${urls} have automatically been expanded to include the changes:\n\n${JSON.stringify(
+        prs,
+        null,
+        2
+      )}`;
+      console.log(context);
+      return context;
     }
 
     return "GITHUB PLUGIN: No pull request URLs detected.";

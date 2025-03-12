@@ -4,11 +4,11 @@ import { createPatch } from "diff";
 import { FileBlock } from "./types/fileblock";
 import { readFile } from "./readFile";
 import { getConfig } from "../../config";
-import { lintFile } from ".";
+import { lintFile, readBlocks } from ".";
 export async function modifyFile(fileBlocks: FileBlock[], filePath: string) {
   try {
     const exists = fs.existsSync(filePath);
-    const contentToUpdate = exists ? await readFile(filePath) : [];
+    const contentToUpdate = exists ? await readBlocks(filePath) : [];
     const edits = {};
     const before = [...contentToUpdate];
     const beforeContent = before.map((b) => b.content).join("");

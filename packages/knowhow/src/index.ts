@@ -1,5 +1,5 @@
 import { summarizeFiles } from "./ai";
-import { saveHashes } from "./hashes";
+import { saveAllFileHashes, saveHashes } from "./hashes";
 import axios from "axios";
 import * as fs from "fs";
 import * as path from "path";
@@ -194,14 +194,18 @@ async function handleFileKindGeneration(source: Config["sources"][0]) {
 
   if (source.output.endsWith("/")) {
     await handleMultiOutputGeneration(
+      source.model,
       source.input,
       files,
       prompt,
       source.output,
+      source.outputExt,
+      source.outputName,
       source.kind
     );
   } else {
     await handleSingleOutputGeneration(
+      source.model,
       files,
       prompt,
       source.output,
@@ -210,10 +214,13 @@ async function handleFileKindGeneration(source: Config["sources"][0]) {
   }
 }
 export async function handleMultiOutputGeneration(
+  model: string,
   inputPattern: string,
   files: string[],
   prompt: string,
   output: string,
+  outputExt = "mdx",
+  outputName?: string,
   kind?: string
 ) {
   // get the hash of the prompt
@@ -235,14 +242,6 @@ export async function handleMultiOutputGeneration(
       hashes[file] = { promptHash: "", fileHash: "" };
     }
 
-    if (
-      hashes[file].promptHash === promptHash &&
-      hashes[file].fileHash === fileHash
-    ) {
-      console.log("Skipping file", file, "because it hasn't changed");
-      continue;
-    }
-
     // summarize the file
     console.log("Summarizing", file);
     const summary = prompt ? await summarizeFile(file, prompt) : fileContent;
@@ -250,24 +249,32 @@ export async function handleMultiOutputGeneration(
     // write the summary to the output file
     const { name, ext, dir } = path.parse(file);
     const nestedFolder = inputPath ? (dir + "/").replace(inputPath, "") : "";
-    console.log({ dir, inputPath, nestedFolder });
     const outputFolder = path.join(output, nestedFolder);
 
     if (!fs.existsSync(outputFolder)) {
       fs.mkdirSync(outputFolder, { recursive: true });
     }
 
-    const outputFile = path.join(outputFolder, name + ".mdx");
+    outputName = outputName || name;
+    const outputFile = path.join(outputFolder, outputName + "." + outputExt);
+    console.log({ dir, inputPath, nestedFolder, outputFile });
+
+    const toCheck = [file, outputFile];
+    const noChanges = await checkNoFilesChanged(toCheck, promptHash, hashes);
+    if (noChanges) {
+      console.log("Skipping file", file, "because it hasn't changed");
+      continue;
+    }
 
     console.log("Writing summary to", outputFile);
     await writeFile(outputFile, summary);
 
-    hashes[file] = { promptHash, fileHash };
-    await saveHashes(hashes);
+    await saveAllFileHashes(toCheck, promptHash);
   }
 }
 
 export async function handleSingleOutputGeneration(
+  model: string,
   files: string[],
   prompt: string,
   outputFile: string,
@@ -276,7 +283,8 @@ export async function handleSingleOutputGeneration(
   const hashes = await getHashes();
   const promptHash = crypto.createHash("md5").update(prompt).digest("hex");
 
-  const noChanges = await checkNoFilesChanged(files, promptHash, hashes);
+  const filesToCheck = [outputFile, ...files];
+  const noChanges = await checkNoFilesChanged(filesToCheck, promptHash, hashes);
   if (noChanges) {
     console.log(`Skipping ${files.length} files because they haven't changed`);
     return;
@@ -291,8 +299,8 @@ export async function handleSingleOutputGeneration(
 
   console.log("Writing summary to", outputFile);
   await writeFile(outputFile, summary);
-  hashes[outputFile] = { promptHash, fileHash };
-  await saveHashes(hashes);
+
+  await saveAllFileHashes(filesToCheck, promptHash);
 }
 
 export async function chat() {

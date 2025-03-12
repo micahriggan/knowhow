@@ -157,9 +157,9 @@ export const includedTools = [
         required: ["filePath"],
       },
       returns: {
-        type: "array",
+        type: "string",
         description:
-          "An array of file blocks, where each block contains a portion of the file's content",
+          "The file contents in diff format",
       },
     },
   },

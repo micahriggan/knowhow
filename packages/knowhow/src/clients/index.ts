@@ -1,7 +1,7 @@
 import { CompletionOptions, CompletionResponse, GenericClient } from "./types";
 import { GenericOpenAiClient } from "./openai";
 import { GenericAnthropicClient } from "./anthropic";
-import { Models } from "../ai";
+import { Models } from "../types";
 
 export class AIClient {
   clients = {
