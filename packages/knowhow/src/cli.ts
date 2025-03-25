@@ -8,6 +8,10 @@ import { Researcher } from "./agents/researcher/researcher";
 import { Patcher } from "./agents/patcher/patcher";
 import { Vimmer } from "./agents/vim/vim";
 import { Developer } from "./agents/developer/developer";
+import { Tools } from "./services";
+import { includedTools } from "./agents/tools/list";
+import * as allTools from "./agents/tools";
+import { Mcp } from "./services/Mcp";
 
 const command = process.argv[2];
 
@@ -15,6 +19,10 @@ async function main() {
   Agents.registerAgent(Researcher);
   Agents.registerAgent(Patcher);
   Agents.registerAgent(Developer);
+  Tools.addTools(includedTools);
+  Tools.addFunctions(allTools.addInternalTools(allTools));
+
+  await Mcp.connectToConfigured(Tools);
 
   // VIMMER is disabled for now
   // Agents.registerAgent(Vimmer);

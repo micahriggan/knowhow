@@ -7,6 +7,7 @@ export const definitions = [
         "Fetches a pull request from GitHub using the provided URL. Requires a valid GITHUB_TOKEN.",
       parameters: {
         type: "object",
+        positional: true,
         properties: {
           url: {
             type: "string",
@@ -25,6 +26,7 @@ export const definitions = [
         "Fetches the build statuses for a pull request using the provided URL. Requires a valid GITHUB_TOKEN.",
       parameters: {
         type: "object",
+        positional: true,
         properties: {
           url: {
             type: "string",
@@ -44,6 +46,7 @@ export const definitions = [
         "Retrieves the run logs for a specified GitHub Actions run ID in the specified repository.",
       parameters: {
         type: "object",
+        positional: true,
         properties: {
           runId: {
             type: "number",
@@ -71,6 +74,7 @@ export const definitions = [
         "Fetches the build failure logs for a pull request using the provided URL. Specifically focuses on failures.",
       parameters: {
         type: "object",
+        positional: true,
         properties: {
           url: {
             type: "string",

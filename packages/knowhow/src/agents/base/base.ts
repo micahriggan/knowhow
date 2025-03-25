@@ -7,6 +7,7 @@ import { Events, EventService } from "../../services/EventService";
 import { AIClient, Clients } from "../../clients";
 import { Models, openai } from "../../ai";
 
+export { Message, Tool, ToolCall };
 export interface ModelPreference {
   model: string;
   provider: keyof typeof Clients.clients;
@@ -123,11 +124,14 @@ export abstract class BaseAgent implements IAgent {
 
     const toolDefinition = this.tools.getTool(functionName);
     const properties = toolDefinition?.function?.parameters?.properties || {};
-    const positionalArgs = Object.keys(properties).map((p) => functionArgs[p]);
+    const isPositional = toolDefinition.function.parameters.positional;
+    const fnArgs = isPositional
+      ? Object.keys(properties).map((p) => functionArgs[p])
+      : functionArgs;
 
     console.log(
       `Calling function ${functionName} with args:`,
-      JSON.stringify(positionalArgs, null, 2)
+      JSON.stringify(fnArgs, null, 2)
     );
 
     if (!functionToCall) {
@@ -145,12 +149,12 @@ export abstract class BaseAgent implements IAgent {
     }
 
     const functionResponse = await Promise.resolve(
-      functionToCall(...positionalArgs)
+      isPositional ? functionToCall(...fnArgs) : functionToCall(fnArgs)
     ).catch((e) => e.message);
     let toolMessages = [];
 
     if (functionName === "multi_tool_use.parallel") {
-      const args = positionalArgs[0] as {
+      const args = fnArgs[0] as {
         recipient_name: string;
         parameters: any;
       }[];

@@ -7,12 +7,6 @@ import * as crypto from "crypto";
 import { promisify } from "util";
 import glob from "glob";
 
-import { loadSummarizationChain } from "langchain/chains";
-import { PromptTemplate } from "langchain/prompts";
-import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
-
-import { OpenAIEmbeddings } from "langchain/embeddings/openai";
-import { ChatOpenAI } from "langchain/chat_models/openai";
 import { Prompts } from "./prompts";
 import { Config, Hashes, Embeddable } from "./types";
 import { getHashes, checkNoFilesChanged } from "./hashes";
@@ -50,13 +44,6 @@ export * as ai from "./ai";
 export * as services from "./services";
 
 const OPENAI_KEY = process.env.OPENAI_KEY;
-const embeddingModel = new OpenAIEmbeddings({ openAIApiKey: OPENAI_KEY });
-const chatModel = new ChatOpenAI({
-  temperature: 0,
-  openAIApiKey: OPENAI_KEY,
-  modelName: "gpt-4",
-  maxRetries: 2,
-});
 
 export async function embed() {
   // load config

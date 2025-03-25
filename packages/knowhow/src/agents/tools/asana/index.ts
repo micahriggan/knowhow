@@ -1,15 +1,12 @@
-import { Client } from "asana";
-
 const workspace = process.env.ASANA_WORKSPACE;
 class AsanaTools {
-  private client: Client;
+  private client = require("asana").ApiClient.instance;
 
   constructor(private accessToken: string) {
-    this.client = Client.create({
-      defaultHeaders: {
-        "Asana-Enable": "new_user_task_lists,new_goal_memberships",
-      },
-    }).useAccessToken(process.env.ASANA_TOKEN);
+    this.client.authentications.token = process.env.ASANA_TOKEN;
+    this.client.defaultHeaders = {
+      "Asana-Enable": "new_user_task_lists,new_goal_memberships",
+    };
   }
 
   async createTask(projectId: string, taskName: string, taskNotes: string) {

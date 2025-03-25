@@ -6,6 +6,7 @@ export const definitions = [
       description: "Create a new task in Asana",
       parameters: {
         type: "object",
+        positional: true,
         properties: {
           projectId: {
             type: "string",
@@ -35,6 +36,7 @@ export const definitions = [
       description: "Update an existing task in Asana",
       parameters: {
         type: "object",
+        positional: true,
         properties: {
           taskId: {
             type: "string",
@@ -61,6 +63,7 @@ export const definitions = [
       description: "Search for tasks in Asana based on a search term",
       parameters: {
         type: "object",
+        positional: true,
         properties: {
           searchTerm: {
             type: "string",
@@ -82,6 +85,7 @@ export const definitions = [
       description: "List all projects in Asana",
       parameters: {
         type: "object",
+        positional: true,
         properties: {},
         required: [],
       },
@@ -99,6 +103,7 @@ export const definitions = [
       description: "Find a specific task in Asana by its ID",
       parameters: {
         type: "object",
+        positional: true,
         properties: {
           taskId: {
             type: "string",
@@ -121,6 +126,7 @@ export const definitions = [
         "Retrieve tasks assigned to the current user in Asana, only shows the uncompleted ones",
       parameters: {
         type: "object",
+        positional: true,
         properties: {
           project: {
             type: "string",
@@ -142,6 +148,7 @@ export const definitions = [
       description: "Retrieve all subtasks for a given Asana task.",
       parameters: {
         type: "object",
+        positional: true,
         properties: {
           taskId: {
             type: "string",
@@ -165,6 +172,7 @@ export const definitions = [
       description: "Create a new subtask under a given Asana task.",
       parameters: {
         type: "object",
+        positional: true,
         properties: {
           taskId: {
             type: "string",

@@ -17,6 +17,7 @@ export const includedTools = [
         "Fuzzy search with cosine similarity for files related to the user's goal. Uses embeddings. Use textSearch for exact matches. Use fileSearch for file paths.",
       parameters: {
         type: "object",
+        positional: true,
         properties: {
           keyword: {
             type: "string",
@@ -40,6 +41,7 @@ export const includedTools = [
         "Execute a command in the system's command line interface. Use this to run tests and things in the terminal",
       parameters: {
         type: "object",
+        positional: true,
         properties: {
           command: {
             type: "string",
@@ -73,6 +75,7 @@ export const includedTools = [
         "Finalize the AI's task and return the answer to the user. You are required to call this at the end to send the response to the user",
       parameters: {
         type: "object",
+        positional: true,
         properties: {
           answer: {
             type: "string",
@@ -96,6 +99,7 @@ export const includedTools = [
       description: `Call a specified plugin with given input. Plugins provide additional context from supported URLs or words. This is a read-only operation. Currently available plugins: ${pluginNames}`,
       parameters: {
         type: "object",
+        positional: true,
         properties: {
           pluginName: {
             type: "string",
@@ -121,6 +125,7 @@ export const includedTools = [
       description: "Ask the vision API a question about an image url",
       parameters: {
         type: "object",
+        positional: true,
         properties: {
           imageUrl: {
             type: "string",
@@ -148,6 +153,7 @@ export const includedTools = [
         "Read the contents of a file and return them as an array of blocks",
       parameters: {
         type: "object",
+        positional: true,
         properties: {
           filePath: {
             type: "string",
@@ -158,8 +164,7 @@ export const includedTools = [
       },
       returns: {
         type: "string",
-        description:
-          "The file contents in diff format",
+        description: "The file contents in diff format",
       },
     },
   },
@@ -171,6 +176,7 @@ export const includedTools = [
         "Read specific blocks from a file based on block numbers. Blocks are numbered blocks of text, containing a few lines of content",
       parameters: {
         type: "object",
+        positional: true,
         properties: {
           filePath: {
             type: "string",
@@ -202,6 +208,7 @@ export const includedTools = [
         "Modify file with patch. Can also create new files. Use GNU diffutils syntax with - in front of removals and + in front of additions. Always check your work after applying a patch to ensure the patch did what you expected. Think step by step while constructing the patch, of which lines your will add and remove. Make sure that your patch is maintaining proper syntax. Do not modify lines unrelated to the goal. Patches should contain 3 to 6 lines of context before and after changes. No omissions of lines for removals are allowed. Use multiple small patches over one large patch that affects multiple places in the file.",
       parameters: {
         type: "object",
+        positional: true,
         properties: {
           filePath: {
             type: "string",
@@ -225,6 +232,7 @@ export const includedTools = [
         "Lint a file based on the file extension using predefined linting commands from the configuration.",
       parameters: {
         type: "object",
+        positional: true,
         properties: {
           filePath: {
             type: "string",
@@ -248,6 +256,7 @@ export const includedTools = [
         "Exact Search. Search for exact matches of text across files. Use embeddingSearch for fuzzy search. Use fileSearch for file paths",
       parameters: {
         type: "object",
+        positional: true,
         properties: {
           searchTerm: {
             type: "string",
@@ -269,6 +278,7 @@ export const includedTools = [
       description: "Search for files where the filepath includes a searchTerm",
       parameters: {
         type: "object",
+        positional: true,
         properties: {
           searchTerm: {
             type: "string",
@@ -290,6 +300,7 @@ export const includedTools = [
       description: "Ask a human a question and get a response.",
       parameters: {
         type: "object",
+        positional: true,
         properties: {
           question: {
             type: "string",
@@ -313,6 +324,7 @@ export const includedTools = [
         "Update or create files by writing in smaller chunks. Suitable for larger files, this tool allows incremental writing by calling it multiple times.",
       parameters: {
         type: "object",
+        positional: true,
         properties: {
           filePath: {
             type: "string",
