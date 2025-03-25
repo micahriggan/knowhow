@@ -66,6 +66,13 @@ export async function init() {
         files: [".knowhow/docs/**/*.mdx"],
       },
     ],
+    mcps: [
+      {
+        name: "browser",
+        command: "npx",
+        args: ["-y", "@modelcontextprotocol/server-puppeteer"],
+      },
+    ],
   } as Config;
   await updateConfig(config);
 

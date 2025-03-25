@@ -8,6 +8,7 @@ export const definitions = [
         "Add a new language term to the language config, which can help load context for given terms in the future.",
       parameters: {
         type: "object",
+        positional: true,
         properties: {
           term: {
             type: "string",
@@ -56,6 +57,7 @@ export const definitions = [
         "Retrieves all language terms from the language configuration.",
       parameters: {
         type: "object",
+        positional: true,
         properties: {},
         required: [],
       },
@@ -76,6 +78,7 @@ export const definitions = [
         "Looks up a specific language term and calls the language plugin with it.",
       parameters: {
         type: "object",
+        positional: true,
         properties: {
           term: {
             type: "string",

@@ -40,6 +40,7 @@ export type Config = {
   modules: string[];
 
   assistants: Assistant[];
+  mcps: McpConfig[];
 };
 
 export type Assistant = {
@@ -50,6 +51,13 @@ export type Assistant = {
   model: string;
   tools: { type: "code_interpreter" | "retrieval" }[];
   files: string[];
+};
+
+export type McpConfig = {
+  name: string;
+  command: string;
+  args?: string[];
+  env?: { [key: string]: string };
 };
 
 export type AssistantConfig = {

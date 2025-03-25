@@ -65,7 +65,18 @@ Knowhow is highly configurable, allowing you to specify source patterns, output 
           "prompt": "BasicProjectDocumenter"
         }
       ],
-    }
+    },
+
+    mcps: [
+      {
+        name: "browser",
+        command: "npx",
+        args: ["-y", "@modelcontextprotocol/server-puppeteer"],
+        env: {
+          VALUE_1: "browser",
+          SERVER: "http://localhost:3000",
+      },
+    ],
 
 This config would enable two things.
 - `knowhow generate` would run all the mdx files in the src folder through the BasicCodeDocumenter prompt, and output them to the .knowhow/docs folder

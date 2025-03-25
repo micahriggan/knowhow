@@ -1,16 +1,14 @@
-import { Client } from "asana";
 import { Plugin } from "./types";
 import { Embeddable, MinimalEmbedding } from "../types";
 
 export class AsanaPlugin implements Plugin {
-  asanaClient: Client;
+  private asanaClient = require("asana").ApiClient.instance;
 
   constructor() {
-    this.asanaClient = Client.create({
-      defaultHeaders: {
-        "Asana-Enable": "new_user_task_lists,new_goal_memberships",
-      },
-    }).useAccessToken(process.env.ASANA_TOKEN);
+    this.asanaClient.authentications.token = process.env.ASANA_TOKEN;
+    this.asanaClient.defaultHeaders = {
+      "Asana-Enable": "new_user_task_lists,new_goal_memberships",
+    };
   }
 
   getTaskString(task: any) {

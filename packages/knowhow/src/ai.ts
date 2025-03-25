@@ -1,11 +1,6 @@
 import * as fs from "fs";
-import { loadSummarizationChain } from "langchain/chains";
-import { PromptTemplate } from "langchain/prompts";
-import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import { readFile } from "./utils";
 
-import { OpenAIEmbeddings } from "langchain/embeddings/openai";
-import { ChatOpenAI } from "langchain/chat_models/openai";
 import OpenAI from "openai";
 import { Assistant } from "./types";
 import { convertToText } from "./conversion";
@@ -34,15 +29,6 @@ export async function singlePrompt(
   });
 
   return resp?.choices?.[0]?.message?.content;
-}
-
-export async function getChatClient(model = Models.openai.GPT_4o) {
-  return new ChatOpenAI({
-    temperature: 0,
-    openAIApiKey: OPENAI_KEY,
-    modelName: model,
-    maxRetries: 2,
-  });
 }
 
 export async function summarizeTexts(

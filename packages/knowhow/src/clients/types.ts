@@ -12,7 +12,8 @@ export interface Tool {
     name: string;
     description: string;
     parameters: {
-      type: "object";
+      type: string;
+      positional?: boolean;
       properties: {
         [key: string]: {
           type: string;
