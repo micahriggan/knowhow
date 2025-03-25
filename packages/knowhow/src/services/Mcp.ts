@@ -58,12 +58,29 @@ export class McpService {
     }
   }
 
+  async closeTransports() {
+    await Promise.all(
+      this.transports.map((transport) => {
+        transport.close();
+      })
+    );
+
+    this.transports = [];
+  }
+
   async closeClients() {
-    return Promise.all(
+    await Promise.all(
       this.clients.map((client) => {
         client.close();
       })
     );
+
+    this.clients = [];
+  }
+
+  async closeAll() {
+    await this.closeTransports();
+    await this.closeClients();
   }
 
   getClientIndex(clientName: string) {
@@ -166,6 +183,7 @@ export class McpService {
         description: tool.description,
         parameters: {
           type: "object",
+          positional: Boolean(tool.inputSchema.positional),
           properties: tool.inputSchema.properties as any,
           required: tool.inputSchema.required as string[],
         },
