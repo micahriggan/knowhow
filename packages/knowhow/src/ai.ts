@@ -93,32 +93,35 @@ export async function summarizeFile(
   return await summarizeFiles([file], template, model);
 }
 
-export async function uploadToOpenAi(filePath: string) {
-  // Upload a file with an "assistants" purpose
-  const file = await openai.files.create({
-    file: fs.createReadStream(filePath),
-    purpose: "assistants",
-  });
-
-  console.log(`File uploaded successfully. ID: ${file.id}`);
-  return file;
-}
-
-export async function createAssistant(assistant: Assistant) {
-  const { name, tools, description, instructions, model } = assistant;
-  console.log("Creating assistant is currently broken", assistant);
-  return;
-  const created = await openai.beta.assistants.create({
-    name,
-    tools,
-    description,
-    file_ids: assistant.files,
-    instructions,
-    model,
-  });
-  console.log(`Assistant created successfully. ID: ${created.id}`);
-  return created;
-}
+/*
+ *export async function uploadToOpenAi(filePath: string) {
+ *  // Upload a file with an "assistants" purpose
+ *  const file = await openai.files.create({
+ *    file: fs.createReadStream(filePath),
+ *    purpose: "assistants",
+ *  });
+ *
+ *  console.log(`File uploaded successfully. ID: ${file.id}`);
+ *  return file;
+ *}
+ *
+ */
+/*
+ *export async function createAssistant(assistant: Assistant) {
+ *  const { name, tools, description, instructions, model } = assistant;
+ *  console.log("Creating assistant is currently broken", assistant);
+ *  return;
+ *  const created = await openai.beta.assistants.create({
+ *    name,
+ *    tools,
+ *    description,
+ *    instructions,
+ *    model,
+ *  });
+ *  console.log(`Assistant created successfully. ID: ${created.id}`);
+ *  return created;
+ *}
+ */
 
 export async function askGptVision(imageUrl: string, question: string) {
   const response = await openai.chat.completions.create({

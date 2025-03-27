@@ -7,6 +7,8 @@ import {
   ChatCompletionMessageToolCall,
 } from "openai/resources/chat";
 
+import { OpenAiReasoningModels } from "../types";
+
 const config = getConfigSync();
 
 export class GenericOpenAiClient extends OpenAI implements GenericClient {
@@ -36,6 +38,10 @@ export class GenericOpenAiClient extends OpenAI implements GenericClient {
       model: options.model,
       messages: openaiMessages,
       max_tokens: options.max_tokens,
+      ...(OpenAiReasoningModels.includes(options.model) && {
+        max_tokens: undefined,
+        max_completion_tokens: options.max_tokens,
+      }),
 
       ...(options.tools && {
         tools: options.tools,

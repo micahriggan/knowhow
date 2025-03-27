@@ -25,6 +25,7 @@ enum ChatFlags {
   agents = "agents",
   debug = "debug",
   multi = "multi",
+  model = "model",
   search = "search",
   clear = "clear",
   provider = "provider",
@@ -115,13 +116,14 @@ Generate an article or document that answers the question.
   return queryEmbedding(fakeDoc, embeddings);
 }
 
-const chatModels = {
+const ChatModelDefaults = {
   openai: Models.openai.GPT_4o,
   anthropic: Models.anthropic.Sonnet,
 };
 export async function askAI<E extends EmbeddingBase>(
   query: string,
-  provider = "openai"
+  provider = "openai",
+  model = ChatModelDefaults[provider]
 ) {
   const gptPrompt = `
 
@@ -146,7 +148,7 @@ The user has asked:
   const response = await Clients.createCompletion(provider, {
     messages: thread,
     max_tokens: 2500,
-    model: chatModels[provider],
+    model,
   });
 
   return response.choices[0].message.content;
@@ -193,6 +195,7 @@ export async function chatLoop<E extends GptQuestionEmbedding>(
 ) {
   let activeAgent: IAgent = Agents.getAgent("Developer");
   let provider = "openai" as keyof typeof Clients.clients;
+  let model = ChatModelDefaults[provider];
   const providers = Object.keys(Clients.clients);
   const commands = [
     "agent",
@@ -253,6 +256,15 @@ export async function chatLoop<E extends GptQuestionEmbedding>(
             providers
           );
           break;
+        case ChatFlags.model:
+          const models = Object.keys(Models[provider]);
+          console.log(models);
+          const selectedModel = await ask(
+            "Which model would you like to use: ",
+            models
+          );
+          model = Models[provider][selectedModel];
+          break;
         case "":
           break;
         default:
@@ -267,7 +279,7 @@ export async function chatLoop<E extends GptQuestionEmbedding>(
           if (Flags.enabled("agent")) {
             results = await activeAgent.call(formattedPrompt);
           } else {
-            results = await askAI(formattedPrompt, provider);
+            results = await askAI(formattedPrompt, provider, model);
           }
           interaction.output = results;
           console.log("\n\n");

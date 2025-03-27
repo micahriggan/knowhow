@@ -15,8 +15,6 @@ import {
   getConfig,
   loadPrompt,
   updateConfig,
-  getAssistantsConfig,
-  updateAssistants,
   getIgnorePattern,
 } from "./config";
 import {
@@ -29,7 +27,7 @@ import {
   embedSource,
   getConfiguredEmbeddingMap,
 } from "./embeddings";
-import { summarizeFile, uploadToOpenAi, createAssistant } from "./ai";
+import { summarizeFile } from "./ai";
 
 import { abort } from "process";
 import { chatLoop } from "./chat";
@@ -119,40 +117,42 @@ export async function upload() {
   }
 }
 
-export async function uploadOpenAi() {
-  const config = await getConfig();
-  const ignorePattern = await getIgnorePattern();
-  const assistantsConfig = await getAssistantsConfig();
-  for (const assistant of config.assistants) {
-    if (!assistant.model) {
-      // Skip non openai assistants
-      continue;
-    }
-    if (!assistant.id) {
-      const fileIds = [];
-      for (const globPath of assistant.files) {
-        const files = await glob.sync(globPath, { ignore: ignorePattern });
-        for (const file of files) {
-          if (!assistantsConfig.files[file]) {
-            const uploaded = await uploadToOpenAi(file);
-            assistantsConfig.files[file] = uploaded.id;
-            await updateAssistants(assistantsConfig);
-          }
-          fileIds.push(assistantsConfig.files[file]);
-        }
-      }
-
-      const toCreate = {
-        ...assistant,
-        files: fileIds,
-      };
-      const createdAssistant = await createAssistant(toCreate);
-      assistant.id = createdAssistant.id;
-      await updateConfig(config);
-    }
-    console.log(`Assistant ${assistant.id} is ready`);
-  }
-}
+/*
+ *export async function uploadOpenAi() {
+ *  const config = await getConfig();
+ *  const ignorePattern = await getIgnorePattern();
+ *  const assistantsConfig = await getAssistantsConfig();
+ *  for (const assistant of config.assistants) {
+ *    if (!assistant.model) {
+ *      // Skip non openai assistants
+ *      continue;
+ *    }
+ *    if (!assistant.id) {
+ *      const fileIds = [];
+ *      for (const globPath of assistant.files) {
+ *        const files = await glob.sync(globPath, { ignore: ignorePattern });
+ *        for (const file of files) {
+ *          if (!assistantsConfig.files[file]) {
+ *            const uploaded = await uploadToOpenAi(file);
+ *            assistantsConfig.files[file] = uploaded.id;
+ *            await updateAssistants(assistantsConfig);
+ *          }
+ *          fileIds.push(assistantsConfig.files[file]);
+ *        }
+ *      }
+ *
+ *      const toCreate = {
+ *        ...assistant,
+ *        files: fileIds,
+ *      };
+ *      const createdAssistant = await createAssistant(toCreate);
+ *      assistant.id = createdAssistant.id;
+ *      await updateConfig(config);
+ *    }
+ *    console.log(`Assistant ${assistant.id} is ready`);
+ *  }
+ *}
+ */
 
 export async function generate() {
   const config = await getConfig();

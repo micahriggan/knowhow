@@ -25,18 +25,20 @@ export const knowhowConfig = {
 };
 
 export class McpService {
+  connected = false;
   transports: StdioClientTransport[] = [];
   clients: Client[] = [];
   config: McpConfig[] = [];
   tools: Tool[] = [];
 
-  async createClients(mcpServers: McpConfig[]) {
+  async createClients(mcpServers: McpConfig[] = []) {
     if (this.clients.length) {
       return this.clients;
     }
 
     this.config = mcpServers;
     this.transports = mcpServers.map((mcp) => {
+      console.log("Creating transport for", mcp);
       return new StdioClientTransport(mcp);
     });
 
@@ -49,7 +51,12 @@ export class McpService {
 
   async connectToConfigured(tools?: ToolsService) {
     const config = await getConfig();
-    const clients = await this.createClients(config.mcps);
+
+    return this.connectTo(config.mcps, tools);
+  }
+
+  async connectTo(mcpServers: McpConfig[] = [], tools?: ToolsService) {
+    const clients = await this.createClients(mcpServers);
     await this.connectAll();
 
     if (tools) {
@@ -66,6 +73,7 @@ export class McpService {
     );
 
     this.transports = [];
+    this.connected = false;
   }
 
   async closeClients() {
@@ -76,6 +84,7 @@ export class McpService {
     );
 
     this.clients = [];
+    this.connected = false;
   }
 
   async closeAll() {
@@ -86,6 +95,16 @@ export class McpService {
   getClientIndex(clientName: string) {
     const index = this.config.findIndex((mcp) => mcp.name === clientName);
     return index;
+  }
+
+  parseToolName(toolName: string) {
+    const split = toolName.split("_");
+
+    if (split.length < 2) {
+      return null;
+    }
+
+    return split.slice(2).join("_");
   }
 
   getToolClientIndex(toolName: string) {
@@ -112,12 +131,14 @@ export class McpService {
   getFunction(toolName: string) {
     const client = this.getToolClient(toolName);
 
+    const realName = this.parseToolName(toolName);
     return async (args: any) => {
-      console.log("Calling tool", toolName, "with args", args);
+      console.log("Calling tool", realName, "with args", args);
       const tool = await client.callTool({
-        name: toolName,
+        name: realName,
         arguments: args,
       });
+      return tool;
     };
   }
 
@@ -137,11 +158,17 @@ export class McpService {
   }
 
   async connectAll() {
-    return Promise.all(
+    if (this.connected) {
+      return;
+    }
+
+    await Promise.all(
       this.clients.map((client, index) => {
         return client.connect(this.transports[index]);
       })
     );
+
+    this.connected = true;
   }
 
   async getClient() {

@@ -1,7 +1,11 @@
 import { Message, Tool, ToolCall } from "../../clients/types";
 import { IAgent } from "../interface";
 import { ToolsService, Tools } from "../../services/Tools";
-import { replaceEscapedNewLines, restoreEscapedNewLines } from "../../utils";
+import {
+  mcpToolName,
+  replaceEscapedNewLines,
+  restoreEscapedNewLines,
+} from "../../utils";
 import { Agents, AgentService } from "../../services/AgentService";
 import { Events, EventService } from "../../services/EventService";
 import { AIClient, Clients } from "../../clients";
@@ -23,6 +27,7 @@ export abstract class BaseAgent implements IAgent {
   protected modelPreferences: ModelPreference[] = [];
   protected currentModelPreferenceIndex = 0;
   protected easyFinalAnswer = false;
+  protected requiredToolNames = ["finalAnswer"];
 
   disabledTools = [];
 
@@ -293,7 +298,9 @@ export abstract class BaseAgent implements IAgent {
             messages.push(...(toolMessages as Message[]));
 
             const finalMessage = toolMessages.find(
-              (m) => m.name === "finalAnswer"
+              (m) =>
+                this.requiredToolNames.includes(m.name) ||
+                this.requiredToolNames.includes(mcpToolName(m.name))
             );
 
             if (finalMessage) {
@@ -319,8 +326,7 @@ export abstract class BaseAgent implements IAgent {
         // sometimes the agent just says a message and doesn't call a tool
         messages.push({
           role: "user",
-          content:
-            "Friendly reminder: workflow continues until you call finalAnswer.",
+          content: `Friendly reminder: workflow continues until you call on of ${this.requiredToolNames}.`,
         });
       }
 

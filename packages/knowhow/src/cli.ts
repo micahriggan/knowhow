@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import "source-map-support/register";
-import { generate, embed, upload, uploadOpenAi, chat } from "./index";
+import { generate, embed, upload, chat } from "./index";
 import { init } from "./config";
 import { download, purge } from ".";
 import { Agents } from "./services/AgentService";
@@ -45,9 +45,6 @@ async function main() {
       break;
     case "download":
       await download();
-      break;
-    case "upload:openai":
-      await uploadOpenAi();
       break;
     case "chat":
       await chat();

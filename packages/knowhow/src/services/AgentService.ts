@@ -1,6 +1,5 @@
 import { getConfigSync } from "../config";
 import { IAgent } from "../agents/interface";
-import { OpenAIAgent } from "../agents/configurable/OpenAIAgent";
 import { ConfigAgent } from "../agents/configurable/ConfigAgent";
 import { Events } from "./EventService";
 import { Tools } from "./Tools";
@@ -22,6 +21,7 @@ export class AgentService {
         ${this.getAgentDescriptions()}`,
         parameters: {
           type: "object",
+          positional: true,
           properties: {
             agentName: {
               type: "string",
@@ -80,20 +80,10 @@ export class AgentService {
 
   public loadAgentsFromConfig() {
     const config = getConfigSync();
-    const assistants = config.assistants || [];
+    const assistants = config.agents || [];
 
     for (const assistant of assistants) {
-      if (assistant.model) {
-        if (!assistant.id) {
-          console.error(
-            `Cannot register assistant: ${assistant.name}. Need to upload the assistant to openai first. Call knowhow upload:openai\n`
-          );
-          continue;
-        }
-        this.registerAgent(new OpenAIAgent(assistant));
-      } else {
-        this.registerAgent(new ConfigAgent(assistant));
-      }
+      this.registerAgent(new ConfigAgent(assistant));
     }
   }
 
