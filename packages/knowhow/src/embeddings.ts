@@ -12,6 +12,8 @@ import {
 import { summarizeTexts, openai, chunkText } from "./ai";
 import { Plugins } from "./plugins/plugins";
 
+export { cosineSimilarity };
+
 export async function loadEmbedding(filePath: string) {
   if (await fileExists(filePath)) {
     return JSON.parse(await readFile(filePath, "utf8")) as Embeddable[];

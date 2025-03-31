@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { Models } from "../types";
 import { getConfigSync } from "../config";
 import {
   GenericClient,
@@ -7,6 +8,8 @@ import {
   Tool,
   Message,
 } from "./types";
+
+type CachedUsage = Anthropic.Beta.PromptCaching.PromptCachingBetaUsage;
 
 const config = getConfigSync();
 
@@ -258,6 +261,52 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
           };
         }
       }),
+
+      model: options.model,
+      usage: response.usage,
+      usd_cost: this.calculateCost(options.model, response.usage),
     };
+  }
+
+  pricesPerMillion() {
+    return {
+      [Models.anthropic.Sonnet3_7]: {
+        input: 3.0,
+        cache_write: 3.75,
+        cache_hit: 0.3,
+        output: 15.0,
+      },
+      [Models.anthropic.Sonnet]: {
+        input: 3.0,
+        cache_write: 3.75,
+        cache_hit: 0.3,
+        output: 15.0,
+      },
+    };
+  }
+
+  calculateCost(model: string, usage: CachedUsage): number | undefined {
+    const pricing = this.pricesPerMillion()[model];
+    console.log({ pricing });
+
+    if (!pricing) {
+      return undefined;
+    }
+
+    const cachedInputTokens = usage.cache_creation_input_tokens;
+    const cachedInputCost = (cachedInputTokens * pricing.cache_write) / 1e6;
+
+    const cachedReadTokens = usage.cache_read_input_tokens;
+    const cachedReadCost = (cachedReadTokens * pricing.cache_hit) / 1e6;
+
+    const inputTokens = usage.input_tokens;
+    const inputCost = ((inputTokens - cachedInputCost) * pricing.input) / 1e6;
+
+    const outputTokens = usage.output_tokens;
+    const outputCost = (outputTokens * pricing.output) / 1e6;
+
+    const total = cachedInputCost + inputCost + outputCost;
+    console.log({ total });
+    return total;
   }
 }

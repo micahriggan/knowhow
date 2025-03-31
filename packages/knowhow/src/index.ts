@@ -40,6 +40,8 @@ export * as clients from "./clients";
 export * as agents from "./agents";
 export * as ai from "./ai";
 export * as services from "./services";
+export * as embeddings from "./embeddings";
+export * as types from "./types";
 
 const OPENAI_KEY = process.env.OPENAI_KEY;
 

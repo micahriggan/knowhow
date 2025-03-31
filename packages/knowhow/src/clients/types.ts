@@ -46,6 +46,10 @@ export interface CompletionResponse {
   choices: {
     message: Message;
   }[];
+
+  model: string;
+  usage: any;
+  usd_cost?: number;
 }
 
 export interface GenericClient {

@@ -255,6 +255,7 @@ export async function chatLoop<E extends GptQuestionEmbedding>(
             "Which provider would you like to use: ",
             providers
           );
+          model = ChatModelDefaults[provider];
           break;
         case ChatFlags.model:
           const models = Object.keys(Models[provider]);

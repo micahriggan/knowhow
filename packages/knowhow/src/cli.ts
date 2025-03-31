@@ -2,6 +2,7 @@
 import "source-map-support/register";
 import { generate, embed, upload, chat } from "./index";
 import { init } from "./config";
+
 import { download, purge } from ".";
 import { Agents } from "./services/AgentService";
 import { Researcher } from "./agents/researcher/researcher";
@@ -12,6 +13,7 @@ import { Tools } from "./services";
 import { includedTools } from "./agents/tools/list";
 import * as allTools from "./agents/tools";
 import { Mcp } from "./services/Mcp";
+import { login } from "./login";
 
 const command = process.argv[2];
 
@@ -30,6 +32,9 @@ async function main() {
   switch (command) {
     case "init":
       await init();
+      break;
+    case "login":
+      await login();
       break;
     case "generate":
       await generate();
@@ -51,7 +56,7 @@ async function main() {
       break;
     default:
       console.log(
-        "Unknown command. Please use one of the following: init, generate, embed"
+        "Unknown command. Please use one of the following: init, login, generate, embed, embed:purge, upload, download, chat"
       );
       break;
   }
