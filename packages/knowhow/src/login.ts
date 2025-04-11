@@ -54,15 +54,21 @@ export async function login(): Promise<void> {
       );
     }
     console.log(
-      "Error: Unable to fetch user information. Please check your JWT and try again."
+      "Error: Unable to fetch user information. Please check your JWT and try again.", error
     );
   }
 }
 
-async function loadJwt(): Promise<string> {
+export async function loadJwt(): Promise<string> {
   const jwtFile = path.join(process.cwd(), ".knowhow", ".jwt");
   if (!fs.existsSync(jwtFile)) {
     throw new Error("Error: JWT file not found.");
   }
-  return fs.readFileSync(jwtFile, "utf-8").trim();
+  const jwt = fs.readFileSync(jwtFile, "utf-8").trim();
+
+  if (!jwt) {
+    throw new Error("Error: JWT is empty. Re-login with knowhow login --jwt.");
+  }
+
+  return jwt;
 }

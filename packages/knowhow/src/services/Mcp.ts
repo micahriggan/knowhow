@@ -6,13 +6,16 @@ import { McpConfig } from "../types";
 import { Tool } from "../clients";
 import { getConfig } from "../config";
 import { ToolsService } from "./Tools";
+import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { StdioServerParameters } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { MCPWebSocketTransport } from "./McpWebsocketTransport";
 
 type CachedTool = Anthropic.Beta.PromptCaching.PromptCachingBetaTool;
-type McpTool = CachedTool & {
+export type McpTool = CachedTool & {
   inputSchema: CachedTool["input_schema"];
 };
 
-export const knowhowClient = {
+export const knowhowMcpClient = {
   name: "knowhow-mcp-client",
   version: "1.0.0",
 };
@@ -24,14 +27,18 @@ export const knowhowConfig = {
   },
 };
 
+export * from "./McpServer";
+export * from "./McpWebsocketTransport";
+
 export class McpService {
-  connected = false;
-  transports: StdioClientTransport[] = [];
+  connected = [];
+  transports: Transport[] = [];
   clients: Client[] = [];
   config: McpConfig[] = [];
   tools: Tool[] = [];
+  mcpPrefix = "mcp";
 
-  async createClients(mcpServers: McpConfig[] = []) {
+  async createStdioClients(mcpServers: McpConfig[] = []) {
     if (this.clients.length) {
       return this.clients;
     }
@@ -39,14 +46,29 @@ export class McpService {
     this.config = mcpServers;
     this.transports = mcpServers.map((mcp) => {
       console.log("Creating transport for", mcp);
-      return new StdioClientTransport(mcp);
+      if (mcp.command) {
+        return new StdioClientTransport(mcp as StdioServerParameters);
+      }
+      if (mcp?.params?.socket) {
+        return new MCPWebSocketTransport(mcp.params.socket);
+      }
     });
 
     this.clients = this.transports.map((transport) => {
-      return new Client(knowhowClient, knowhowConfig);
+      return new Client(knowhowMcpClient, knowhowConfig);
     });
 
     return this.clients;
+  }
+
+  setMcpPrefix(prefix: string) {
+    this.mcpPrefix = prefix;
+  }
+
+  createClient(mcp: McpConfig, transport: Transport) {
+    this.config.push(mcp);
+    this.clients.push(new Client(knowhowMcpClient, knowhowConfig));
+    this.transports.push(transport);
   }
 
   async connectToConfigured(tools?: ToolsService) {
@@ -56,35 +78,47 @@ export class McpService {
   }
 
   async connectTo(mcpServers: McpConfig[] = [], tools?: ToolsService) {
-    const clients = await this.createClients(mcpServers);
+    const clients = await this.createStdioClients(mcpServers);
     await this.connectAll();
 
     if (tools) {
-      tools.addTools(await this.getTools());
-      tools.addFunctions(await this.getToolMap());
+      await this.addTools(tools);
     }
+  }
+
+  async addTools(tools: ToolsService) {
+    tools.addTools(await this.getTools());
+    tools.addFunctions(await this.getToolMap());
+  }
+
+  async copyFrom(mcp: McpService) {
+    this.clients.push(...mcp.clients);
+    this.transports.push(...mcp.transports);
+    this.config.push(...mcp.config);
+    this.connected.push(...mcp.connected);
   }
 
   async closeTransports() {
     await Promise.all(
-      this.transports.map((transport) => {
-        transport.close();
+      this.transports.map(async (transport, index) => {
+        this.connected[index] = false;
+        return transport.close();
       })
     );
 
     this.transports = [];
-    this.connected = false;
+    this.connected = [];
   }
 
   async closeClients() {
     await Promise.all(
       this.clients.map((client) => {
-        client.close();
+        return client.close();
       })
     );
 
     this.clients = [];
-    this.connected = false;
+    this.connected = [];
   }
 
   async closeAll() {
@@ -158,17 +192,15 @@ export class McpService {
   }
 
   async connectAll() {
-    if (this.connected) {
-      return;
-    }
-
     await Promise.all(
-      this.clients.map((client, index) => {
-        return client.connect(this.transports[index]);
+      this.clients.map(async (client, index) => {
+        if (this.connected[index]) {
+          return;
+        }
+        await client.connect(this.transports[index]);
+        this.connected[index] = true;
       })
     );
-
-    this.connected = true;
   }
 
   async getClient() {
@@ -176,7 +208,7 @@ export class McpService {
       return this.clients;
     }
 
-    this.clients = await this.createClients(this.config);
+    this.clients = await this.createStdioClients(this.config);
 
     return this.clients;
   }
@@ -206,7 +238,7 @@ export class McpService {
     const transformed: Tool = {
       type: "function",
       function: {
-        name: `mcp_${index}_${tool.name}`,
+        name: `${this.mcpPrefix}_${index}_${tool.name}`,
         description: tool.description,
         parameters: {
           type: "object",

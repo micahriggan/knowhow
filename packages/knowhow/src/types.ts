@@ -1,4 +1,6 @@
 import { AssistantTool } from "openai/resources/beta";
+import { WebSocket } from "ws";
+
 export type Hashes = {
   [file: string]: {
     [promptHash: string]: string;
@@ -33,6 +35,7 @@ export type Config = {
     uploadMode?: boolean;
     remote?: string;
     remoteType?: string;
+    remoteId?: string;
     chunkSize?: number;
     minLength?: number;
   }[];
@@ -54,9 +57,11 @@ export type Assistant = {
 
 export type McpConfig = {
   name: string;
-  command: string;
+  command?: string;
+  url?: string;
   args?: string[];
   env?: { [key: string]: string };
+  params?: Partial<{ socket: WebSocket }>;
 };
 
 export type AssistantConfig = {

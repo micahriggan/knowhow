@@ -14,6 +14,7 @@ import { includedTools } from "./agents/tools/list";
 import * as allTools from "./agents/tools";
 import { Mcp } from "./services/Mcp";
 import { login } from "./login";
+import { worker } from "./worker";
 
 const command = process.argv[2];
 
@@ -53,6 +54,9 @@ async function main() {
       break;
     case "chat":
       await chat();
+      break;
+    case "worker":
+      await worker();
       break;
     default:
       console.log(

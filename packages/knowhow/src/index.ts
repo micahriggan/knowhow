@@ -35,6 +35,8 @@ import { convertToText } from "./conversion";
 import { Plugins } from "./plugins/plugins";
 import { AwsS3 } from "./services/S3";
 import { GitHub } from "./services/GitHub";
+import { knowhowMcpClient } from "./services/Mcp";
+import { knowhowApiClient } from "./services/KnowhowClient";
 
 export * as clients from "./clients";
 export * as agents from "./agents";
@@ -87,8 +89,12 @@ export async function upload() {
   for (const source of config.embedSources) {
     const bucketName = source.remote;
 
-    if (!bucketName) {
-      console.log("Skipping", source.output, "because no bucket is configured");
+    if (!source.remoteType) {
+      console.log(
+        "Skipping",
+        source.output,
+        "because no remoteType is configured"
+      );
       continue;
     }
     const items = JSON.parse(await readFile(source.output, "utf8"));
@@ -108,6 +114,13 @@ export async function upload() {
 
       const s3Key = `${embeddingName}.json`;
       await AwsS3.uploadFile(source.output, bucketName, s3Key);
+    } else if (source.remoteType === "knowhow") {
+      if (!source.remoteId) {
+        throw new Error("remoteId is required for knowhow uploads");
+      }
+      const url = await knowhowApiClient.getPresignedUploadUrl(source);
+      console.log("Uploading to", url);
+      await AwsS3.uploadToPresignedUrl(url, source.output);
     } else {
       console.log(
         "Skipping upload to",
@@ -304,8 +317,12 @@ export async function download() {
   for (const source of config.embedSources) {
     const { remote, remoteType } = source;
 
-    if (!remote) {
-      console.log("Skipping", source.output, "because no remote is configured");
+    if (!remoteType) {
+      console.log(
+        "Skipping",
+        source.output,
+        "because no remoteType is configured"
+      );
       continue;
     }
 
@@ -335,6 +352,21 @@ export async function download() {
       );
       const embeddingPath = ".knowhow/embeddings/" + fileName;
       await GitHub.downloadFile(remote, embeddingPath, destinationPath);
+    } else if (remoteType === "knowhow") {
+      if (!source.remoteId) {
+        throw new Error("remoteId is required for knowhow downloads");
+      }
+      console.log(
+        "Downloading",
+        fileName,
+        "from Knowhow",
+        "to",
+        destinationPath
+      );
+      const preSignedUrl = await knowhowApiClient.getPresignedDownloadUrl(
+        source
+      );
+      await AwsS3.downloadFromPresignedUrl(preSignedUrl, destinationPath);
     } else {
       console.log("Unsupported remote type for", source.output);
     }

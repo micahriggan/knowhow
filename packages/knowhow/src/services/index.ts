@@ -4,4 +4,4 @@ export * from "./flags";
 export * from "./GitHub";
 export * from "./S3";
 export * from "./Tools";
-export * from "./Mcp";
+export * as MCP from "./Mcp";
