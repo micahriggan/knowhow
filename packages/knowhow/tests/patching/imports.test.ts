@@ -23,4 +23,21 @@ describe("fixPatch", () => {
     console.log("PATCH OUTPUT");
     console.log(patched);
   });
+
+  it("should patch interface.text", async () => {
+    const patch = fs
+      .readFileSync(__dirname + "/interface.patch.txt")
+      .toString();
+    const originalContent = fs
+      .readFileSync(__dirname + "/interface.txt")
+      .toString();
+
+    const hunks = parseHunks(patch);
+    const fixedPatch = await fixPatch(originalContent, patch);
+    console.log(fixedPatch);
+
+    const patched = applyPatch(originalContent, fixedPatch);
+    console.log("PATCH OUTPUT");
+    console.log(patched);
+  });
 });

@@ -71,11 +71,15 @@ export class McpServerService {
         async (args, extra) => {
           const fn = this.toolsService.getFunction(tool.function.name);
 
-          let response = "";
+          let response = "" as string | any;
           if (tool.function.parameters.positional) {
             response = await fn(...Object.values(args));
           } else {
             response = await fn(args);
+          }
+
+          if (response && typeof response === "object" && response.content) {
+            return response;
           }
 
           return {

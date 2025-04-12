@@ -5,7 +5,6 @@ import { Prompts } from "./prompts";
 import { promisify } from "util";
 import { Config, Language, AssistantConfig, Providers } from "./types";
 import { mkdir, writeFile, readFile, fileExists } from "./utils";
-import { Models } from "./ai";
 
 export async function init() {
   // create the folder structure
@@ -62,8 +61,8 @@ export async function init() {
         description:
           "You can define agents in the config. They will have access to all tools.",
         instructions: "Reply to the user saying 'Hello, world!'",
-        model: Models.openai.GPT_4o,
-        provider: Providers.openai,
+        model: "gpt-4o-2024-08-06",
+        provider: "openai",
       },
     ],
     mcps: [
@@ -73,6 +72,8 @@ export async function init() {
         args: ["-y", "@modelcontextprotocol/server-puppeteer"],
       },
     ],
+
+    modelProviders: [{ url: "http://localhost:1234", provider: "lms" }],
   } as Config;
   await updateConfig(config);
 

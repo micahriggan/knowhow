@@ -15,6 +15,7 @@ import * as allTools from "./agents/tools";
 import { Mcp } from "./services/Mcp";
 import { login } from "./login";
 import { worker } from "./worker";
+import { Clients } from "./clients";
 
 const command = process.argv[2];
 
@@ -26,6 +27,7 @@ async function main() {
   Tools.addFunctions(allTools.addInternalTools(allTools));
 
   await Mcp.connectToConfigured(Tools);
+  await Clients.registerConfiguredModels();
 
   // VIMMER is disabled for now
   // Agents.registerAgent(Vimmer);

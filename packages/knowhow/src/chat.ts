@@ -193,19 +193,20 @@ export async function chatLoop<E extends GptQuestionEmbedding>(
   embeddings: Embeddable<E>[],
   plugins: string[] = []
 ) {
-  let activeAgent: IAgent = Agents.getAgent("Developer");
+  let activeAgent = Agents.getAgent("Developer");
   let provider = "openai" as keyof typeof Clients.clients;
   let model = ChatModelDefaults[provider];
   const providers = Object.keys(Clients.clients);
   const commands = [
     "agent",
     "agents",
+    "clear",
     "debugger",
     "exit",
+    "model",
     "multi",
-    "search",
-    "clear",
     "provider",
+    "search",
     "voice",
   ];
   console.log("Commands: ", commands.join(", "));
@@ -255,16 +256,29 @@ export async function chatLoop<E extends GptQuestionEmbedding>(
             "Which provider would you like to use: ",
             providers
           );
-          model = ChatModelDefaults[provider];
+          model =
+            ChatModelDefaults[provider] ||
+            (await Clients.getRegisteredModels(provider))[0];
+
+          if (Flags.enabled("agent")) {
+            activeAgent.setProvider(provider);
+            activeAgent.setModel(model);
+          }
+
           break;
         case ChatFlags.model:
-          const models = Object.keys(Models[provider]);
+          const models = Clients.getRegisteredModels(provider);
           console.log(models);
           const selectedModel = await ask(
             "Which model would you like to use: ",
             models
           );
-          model = Models[provider][selectedModel];
+          model = selectedModel;
+
+          if (Flags.enabled("agent")) {
+            activeAgent.setProvider(provider);
+            activeAgent.setModel(model);
+          }
           break;
         case "":
           break;

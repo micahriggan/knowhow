@@ -1,6 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { Models } from "../types";
-import { getConfigSync } from "../config";
 import {
   GenericClient,
   CompletionOptions,
@@ -11,7 +10,6 @@ import {
 
 type CachedUsage = Anthropic.Beta.PromptCaching.PromptCachingBetaUsage;
 
-const config = getConfigSync();
 
 type CachedMessageParam =
   Anthropic.Beta.PromptCaching.PromptCachingBetaMessageParam;

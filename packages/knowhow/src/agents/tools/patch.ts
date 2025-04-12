@@ -1,7 +1,6 @@
 import * as fs from "fs";
 import * as util from "util";
 import { applyPatch, createPatch } from "diff";
-import { Plugins } from "../../plugins/plugins";
 import {
   writeFile,
   readFile,
@@ -9,7 +8,7 @@ import {
   mkdir,
   splitByNewLines,
 } from "../../utils";
-import { lintFile } from ".";
+import { lintFile } from "./lintFile";
 
 function findAllLineNumbers(fullText: string, searchText: string) {
   const lines = splitByNewLines(fullText);
@@ -254,7 +253,20 @@ export function fixHunkContext(hunk: Hunk, originalContent: string) {
       .map((l) => ` ${l}`);
 
     const subtractionLineIndex = hunk.lines.indexOf(firstSubtraction);
-    hunk.lines.splice(0, subtractionLineIndex, ...beforeContext);
+
+    let beforeContextIndex = 0;
+    for (let i = 0; i < subtractionLineIndex; i++) {
+      const line = hunk.lines[i];
+      if (hunk.lines[i].startsWith("+")) {
+        continue;
+      }
+      if (line !== beforeContext[beforeContextIndex]) {
+        hunk.lines[i] = beforeContext[beforeContextIndex];
+      }
+      beforeContextIndex++;
+    }
+
+    // hunk.lines.splice(0, subtractionLineIndex, ...beforeContext);
     console.log("before context", beforeContext);
     console.log("corrected", hunk.lines);
   }
@@ -496,28 +508,33 @@ export async function patchFile(
       fs.writeFileSync(filePath, "");
     }
     const originalContent = fs.readFileSync(filePath, "utf8");
-    let fixedPatch = fixPatch(originalContent, patch);
+    let updatedContent = applyPatch(originalContent, patch);
 
-    if (!fixedPatch) {
-      await savePatchError(patch, fixedPatch, originalContent);
-      throw new Error("Patch failed to apply");
-    }
-
-    let updatedContent = applyPatch(originalContent, fixedPatch);
-    console.log("Applying patch:");
-    console.log(fixedPatch);
-
-    if (!fixedPatch.endsWith("\n") && !updatedContent) {
-      fixedPatch += "\n";
-      updatedContent = applyPatch(originalContent, fixedPatch);
-    }
-
-    if (updatedContent) {
-      fs.writeFileSync(filePath, updatedContent);
-    }
+    // If the patch doesn't apply, we need to fix it
     if (!updatedContent) {
-      await savePatchError(patch, fixedPatch, originalContent);
-      throw new Error("Patch failed to apply");
+      let fixedPatch = fixPatch(originalContent, patch);
+
+      if (!fixedPatch) {
+        await savePatchError(patch, fixedPatch, originalContent);
+        throw new Error("Patch failed to apply");
+      }
+
+      updatedContent = applyPatch(originalContent, fixedPatch);
+      console.log("Applying patch:");
+      console.log(fixedPatch);
+
+      if (!fixedPatch.endsWith("\n") && !updatedContent) {
+        fixedPatch += "\n";
+        updatedContent = applyPatch(originalContent, fixedPatch);
+      }
+
+      if (updatedContent) {
+        fs.writeFileSync(filePath, updatedContent);
+      }
+      if (!updatedContent) {
+        await savePatchError(patch, fixedPatch, originalContent);
+        throw new Error("Patch failed to apply");
+      }
     }
 
     const lintResult = await lintFile(filePath);

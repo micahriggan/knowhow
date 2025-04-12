@@ -45,6 +45,7 @@ export type Config = {
 
   agents: Assistant[];
   mcps: McpConfig[];
+  modelProviders: ModelProvider[];
 };
 
 export type Assistant = {
@@ -62,6 +63,11 @@ export type McpConfig = {
   args?: string[];
   env?: { [key: string]: string };
   params?: Partial<{ socket: WebSocket }>;
+};
+
+export type ModelProvider = {
+  url: string;
+  provider: string;
 };
 
 export type AssistantConfig = {

@@ -53,10 +53,6 @@ export abstract class BaseAgent implements IAgent {
     this.events.registerAgent(this);
   }
 
-  getModel(): string {
-    return this.modelName;
-  }
-
   setModelPreferences(value: ModelPreference[]) {
     this.modelPreferences = value;
     if (value.length) {
@@ -76,6 +72,10 @@ export abstract class BaseAgent implements IAgent {
     }
     const nextModel = this.modelPreferences[this.currentModelPreferenceIndex];
     this.updatePreferences(nextModel);
+  }
+
+  getModel(): string {
+    return this.modelName;
   }
 
   setModel(value: string) {
