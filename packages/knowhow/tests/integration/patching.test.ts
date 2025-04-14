@@ -3,6 +3,10 @@ import { createPatch, applyPatch } from "diff";
 import { scanFile } from "../../src/agents/tools";
 import { patchFile } from "../../src/agents/tools/patch";
 import { Agents } from "../../src/services/AgentService";
+import { Patcher } from "../../src/agents";
+import { Tools } from "../../src/services";
+import { includedTools } from "../../src/agents/tools/list";
+import * as allTools from "../../src/agents/tools";
 
 const inputPath = "tests/integration/patching/input.txt";
 const outputPath = "tests/integration/patching/output.txt";
@@ -24,7 +28,13 @@ const brokenPatch = `Index: tests/integration/patching/input.txt
          }
        }\n`;
 
-describe("Developer", () => {
+describe("Patcher", () => {
+  beforeAll(async () => {
+    Agents.registerAgent(Patcher);
+    Tools.addTools(includedTools);
+    Tools.addFunctions(allTools.addInternalTools(allTools));
+  });
+
   test("should be able to apply actual patch", async () => {
     const oldString = (await readFile(inputPath)).toString();
     const newString = (await readFile(outputPath)).toString();
@@ -77,9 +87,11 @@ describe("Developer", () => {
 
   test("should be able to patch a codebase", async () => {
     const originalText = (await readFile(inputPath)).toString();
-    await Agents.callAgent(
-      "Developer",
-      `Update the file in ${inputPath} change the string "finalAnswer" to "FinalAnswer", as we are changing the tool name to be FinalAnswer instead of finalAnswer. This should be around line 120. Do not modify anything else. Treat this file as a typescript file. Only try one patch. If it fails stop`
+    console.log(
+      await Agents.callAgent(
+        "Patcher",
+        `Update the file in ${inputPath} change the string "finalAnswer" to "FinalAnswer", as we are changing the tool name to be FinalAnswer instead of finalAnswer. This should be around line 120. Do not modify anything else. Treat this file as a typescript file. Only try one patch. If it fails stop`
+      )
     );
 
     const updatedText = (await readFile(inputPath)).toString();
@@ -93,7 +105,7 @@ describe("Developer", () => {
   it("should be able to patch when given the answer", async () => {
     const originalText = (await readFile(inputPath)).toString();
     await Agents.callAgent(
-      "Developer",
+      "Patcher",
       `Update the file in ${inputPath} change the string "finalAnswer" to "FinalAnswer" on line 120. Do not modify anything else. Heres the answer: ${brokenPatch}.`
     );
 
@@ -109,7 +121,7 @@ describe("Developer", () => {
     const unseenPath = "tests/integration/patching/unseen.txt";
     const originalText = (await readFile(unseenPath)).toString();
     await Agents.callAgent(
-      "Developer",
+      "Patcher",
       `Update the file in ${unseenPath} change the file additions and deletions count from 200 to 300. Do not modify anything else. Treat this file as a typescript file.`
     );
 

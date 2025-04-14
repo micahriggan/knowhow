@@ -168,7 +168,7 @@ export abstract class BaseAgent implements IAgent {
 
     const toolDefinition = this.tools.getTool(functionName);
     const properties = toolDefinition?.function?.parameters?.properties || {};
-    const isPositional = toolDefinition.function.parameters.positional;
+    const isPositional = toolDefinition?.function?.parameters?.positional || false;
     const fnArgs = isPositional
       ? Object.keys(properties).map((p) => functionArgs[p])
       : functionArgs;
