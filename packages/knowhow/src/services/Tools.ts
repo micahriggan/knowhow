@@ -3,7 +3,7 @@ import { includedTools } from "../agents/tools/list";
 import { Tool } from "../clients/types";
 
 export class ToolsService {
-  tools = [];
+  tools = [] as Tool[];
 
   functions = {};
 

@@ -3,9 +3,8 @@ import * as path from "path";
 import gitignoreToGlob from "gitignore-to-glob";
 import { Prompts } from "./prompts";
 import { promisify } from "util";
-import { Config, Language, AssistantConfig } from "./types";
+import { Config, Language, AssistantConfig, Providers } from "./types";
 import { mkdir, writeFile, readFile, fileExists } from "./utils";
-import { Models } from "./ai";
 
 export async function init() {
   // create the folder structure
@@ -56,14 +55,14 @@ export async function init() {
         chunkSize: 500,
       },
     ],
-    assistants: [
+    agents: [
       {
-        name: "Codebase Helper",
-        description: "Helps you code",
-        instructions: "Codebase helper, use files and tools to help us code",
-        model: Models.openai.GPT_4o,
-        tools: [{ type: "code_interpreter" }],
-        files: [".knowhow/docs/**/*.mdx"],
+        name: "Example agent",
+        description:
+          "You can define agents in the config. They will have access to all tools.",
+        instructions: "Reply to the user saying 'Hello, world!'",
+        model: "gpt-4o-2024-08-06",
+        provider: "openai",
       },
     ],
     mcps: [
@@ -73,6 +72,8 @@ export async function init() {
         args: ["-y", "@modelcontextprotocol/server-puppeteer"],
       },
     ],
+
+    modelProviders: [{ url: "http://localhost:1234", provider: "lms" }],
   } as Config;
   await updateConfig(config);
 
@@ -94,21 +95,6 @@ export async function init() {
   await writeFile(".knowhow/language.json", JSON.stringify(language, null, 2));
   await writeFile(".knowhow/.hashes.json", "{}");
   await writeFile(".knowhow/.ignore", "");
-  await updateAssistants(assistants);
-}
-
-export async function getAssistantsConfig() {
-  const assistants = JSON.parse(
-    await readFile(".knowhow/.assistants.json", "utf8")
-  );
-  return assistants as AssistantConfig;
-}
-
-export async function updateAssistants(assistants: AssistantConfig) {
-  await writeFile(
-    ".knowhow/.assistants.json",
-    JSON.stringify(assistants, null, 2)
-  );
 }
 
 export async function getLanguageConfig() {

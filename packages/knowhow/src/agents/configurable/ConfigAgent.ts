@@ -9,6 +9,7 @@ export class ConfigAgent extends BaseAgent {
   constructor(private config: Assistant) {
     super();
     this.name = config.name;
+    this.setModelPreferences([{ model: config.model, provider: config.provider }]);
   }
 
   async getInitialMessages(userInput: string) {

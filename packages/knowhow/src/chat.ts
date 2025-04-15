@@ -25,6 +25,7 @@ enum ChatFlags {
   agents = "agents",
   debug = "debug",
   multi = "multi",
+  model = "model",
   search = "search",
   clear = "clear",
   provider = "provider",
@@ -115,13 +116,14 @@ Generate an article or document that answers the question.
   return queryEmbedding(fakeDoc, embeddings);
 }
 
-const chatModels = {
+const ChatModelDefaults = {
   openai: Models.openai.GPT_4o,
   anthropic: Models.anthropic.Sonnet,
 };
 export async function askAI<E extends EmbeddingBase>(
   query: string,
-  provider = "openai"
+  provider = "openai",
+  model = ChatModelDefaults[provider]
 ) {
   const gptPrompt = `
 
@@ -146,7 +148,7 @@ The user has asked:
   const response = await Clients.createCompletion(provider, {
     messages: thread,
     max_tokens: 2500,
-    model: chatModels[provider],
+    model,
   });
 
   return response.choices[0].message.content;
@@ -191,18 +193,20 @@ export async function chatLoop<E extends GptQuestionEmbedding>(
   embeddings: Embeddable<E>[],
   plugins: string[] = []
 ) {
-  let activeAgent: IAgent = Agents.getAgent("Developer");
+  let activeAgent = Agents.getAgent("Developer");
   let provider = "openai" as keyof typeof Clients.clients;
+  let model = ChatModelDefaults[provider];
   const providers = Object.keys(Clients.clients);
   const commands = [
     "agent",
     "agents",
+    "clear",
     "debugger",
     "exit",
+    "model",
     "multi",
-    "search",
-    "clear",
     "provider",
+    "search",
     "voice",
   ];
   console.log("Commands: ", commands.join(", "));
@@ -252,6 +256,29 @@ export async function chatLoop<E extends GptQuestionEmbedding>(
             "Which provider would you like to use: ",
             providers
           );
+          model =
+            ChatModelDefaults[provider] ||
+            (await Clients.getRegisteredModels(provider))[0];
+
+          if (Flags.enabled("agent")) {
+            activeAgent.setProvider(provider);
+            activeAgent.setModel(model);
+          }
+
+          break;
+        case ChatFlags.model:
+          const models = Clients.getRegisteredModels(provider);
+          console.log(models);
+          const selectedModel = await ask(
+            "Which model would you like to use: ",
+            models
+          );
+          model = selectedModel;
+
+          if (Flags.enabled("agent")) {
+            activeAgent.setProvider(provider);
+            activeAgent.setModel(model);
+          }
           break;
         case "":
           break;
@@ -267,7 +294,7 @@ export async function chatLoop<E extends GptQuestionEmbedding>(
           if (Flags.enabled("agent")) {
             results = await activeAgent.call(formattedPrompt);
           } else {
-            results = await askAI(formattedPrompt, provider);
+            results = await askAI(formattedPrompt, provider, model);
           }
           interaction.output = results;
           console.log("\n\n");

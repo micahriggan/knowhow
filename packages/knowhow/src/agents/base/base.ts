@@ -1,7 +1,12 @@
+import { EventEmitter } from "events";
 import { Message, Tool, ToolCall } from "../../clients/types";
 import { IAgent } from "../interface";
 import { ToolsService, Tools } from "../../services/Tools";
-import { replaceEscapedNewLines, restoreEscapedNewLines } from "../../utils";
+import {
+  mcpToolName,
+  replaceEscapedNewLines,
+  restoreEscapedNewLines,
+} from "../../utils";
 import { Agents, AgentService } from "../../services/AgentService";
 import { Events, EventService } from "../../services/EventService";
 import { AIClient, Clients } from "../../clients";
@@ -23,6 +28,19 @@ export abstract class BaseAgent implements IAgent {
   protected modelPreferences: ModelPreference[] = [];
   protected currentModelPreferenceIndex = 0;
   protected easyFinalAnswer = false;
+  protected requiredToolNames = ["finalAnswer"];
+  protected totalCostUsd = 0;
+  protected currentThread = 0;
+  protected threads = [];
+
+  public agentEvents = new EventEmitter();
+  public eventTypes = {
+    newThread: "new_thread",
+    threadUpdate: "thread_update",
+    costUpdate: "cost_update",
+    toolUsed: "tool_used",
+    done: "done",
+  };
 
   disabledTools = [];
 
@@ -33,10 +51,6 @@ export abstract class BaseAgent implements IAgent {
 
   register() {
     this.events.registerAgent(this);
-  }
-
-  getModel(): string {
-    return this.modelName;
   }
 
   setModelPreferences(value: ModelPreference[]) {
@@ -58,6 +72,10 @@ export abstract class BaseAgent implements IAgent {
     }
     const nextModel = this.modelPreferences[this.currentModelPreferenceIndex];
     this.updatePreferences(nextModel);
+  }
+
+  getModel(): string {
+    return this.modelName;
   }
 
   setModel(value: string) {
@@ -104,6 +122,32 @@ export abstract class BaseAgent implements IAgent {
     }
   }
 
+  adjustTotalCostUsd(cost: number) {
+    if (cost) {
+      this.totalCostUsd += cost;
+      this.agentEvents.emit(this.eventTypes.costUpdate, this.totalCostUsd);
+    }
+  }
+
+  getTotalCostUsd() {
+    return this.totalCostUsd;
+  }
+
+  startNewThread(messages: Message[]) {
+    this.currentThread++;
+    this.agentEvents.emit(this.eventTypes.newThread, messages);
+    this.updateCurrentThread(messages);
+  }
+
+  updateCurrentThread(messages: Message[]) {
+    this.threads[this.currentThread] = messages;
+    this.agentEvents.emit(this.eventTypes.threadUpdate, messages);
+  }
+
+  getThreads() {
+    return this.threads;
+  }
+
   abstract getInitialMessages(userInput: string): Promise<Message[]>;
 
   async processToolMessages(toolCall: ToolCall) {
@@ -124,7 +168,7 @@ export abstract class BaseAgent implements IAgent {
 
     const toolDefinition = this.tools.getTool(functionName);
     const properties = toolDefinition?.function?.parameters?.properties || {};
-    const isPositional = toolDefinition.function.parameters.positional;
+    const isPositional = toolDefinition?.function?.parameters?.positional || false;
     const fnArgs = isPositional
       ? Object.keys(properties).map((p) => functionArgs[p])
       : functionArgs;
@@ -151,6 +195,12 @@ export abstract class BaseAgent implements IAgent {
     const functionResponse = await Promise.resolve(
       isPositional ? functionToCall(...fnArgs) : functionToCall(fnArgs)
     ).catch((e) => e.message);
+
+    this.agentEvents.emit(this.eventTypes.toolUsed, {
+      toolCall,
+      functionResponse,
+    });
+
     let toolMessages = [];
 
     if (functionName === "multi_tool_use.parallel") {
@@ -259,6 +309,7 @@ export abstract class BaseAgent implements IAgent {
       const model = this.getModel();
       let messages = _messages || (await this.getInitialMessages(userInput));
       messages = this.formatInputMessages(messages);
+      this.updateCurrentThread(messages);
 
       const startIndex = 0;
       const endIndex = messages.length;
@@ -271,6 +322,7 @@ export abstract class BaseAgent implements IAgent {
         tool_choice: "auto",
       });
 
+      this.adjustTotalCostUsd(response.usd_cost);
       this.logMessages(response.choices.map((c) => c.message));
 
       const firstMessage = response.choices[0].message;
@@ -293,11 +345,15 @@ export abstract class BaseAgent implements IAgent {
             messages.push(...(toolMessages as Message[]));
 
             const finalMessage = toolMessages.find(
-              (m) => m.name === "finalAnswer"
+              (m) =>
+                this.requiredToolNames.includes(m.name) ||
+                this.requiredToolNames.includes(mcpToolName(m.name))
             );
 
             if (finalMessage) {
-              return finalMessage.content || "Done";
+              const doneMsg = finalMessage.content || "Done";
+              this.agentEvents.emit(this.eventTypes.done, doneMsg);
+              return doneMsg;
             }
           }
         }
@@ -308,22 +364,24 @@ export abstract class BaseAgent implements IAgent {
         firstMessage.content &&
         this.easyFinalAnswer
       ) {
+        this.agentEvents.emit(this.eventTypes.done, firstMessage.content);
         return firstMessage.content;
       }
 
       if (this.getMessagesLength(messages) > compressThreshold) {
         messages = await this.compressMessages(messages, startIndex, endIndex);
+        this.startNewThread(messages);
       }
 
       if (messages[messages.length - 1].role === "assistant") {
         // sometimes the agent just says a message and doesn't call a tool
         messages.push({
           role: "user",
-          content:
-            "Friendly reminder: workflow continues until you call finalAnswer.",
+          content: `Friendly reminder: workflow continues until you call on of ${this.requiredToolNames}.`,
         });
       }
 
+      this.updateCurrentThread(messages);
       return this.call(userInput, messages);
     } catch (e) {
       if (e.toString().includes("429")) {
@@ -332,6 +390,7 @@ export abstract class BaseAgent implements IAgent {
       }
 
       console.error(e);
+      this.agentEvents.emit(this.eventTypes.done, e.message);
       return e.message;
     }
   }
@@ -357,8 +416,8 @@ export abstract class BaseAgent implements IAgent {
 
     const model = this.getModel();
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+    const response = await this.getClient().createChatCompletion({
+      model,
       messages: [
         {
           role: "assistant",
@@ -366,6 +425,8 @@ export abstract class BaseAgent implements IAgent {
         },
       ],
     });
+
+    this.adjustTotalCostUsd(response.usd_cost);
 
     const summaries = response.choices.map((c) => c.message);
     const startMessages = [

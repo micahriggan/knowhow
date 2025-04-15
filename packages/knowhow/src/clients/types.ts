@@ -6,6 +6,13 @@ export interface Message {
   tool_calls?: ToolCall[];
 }
 
+export interface ToolProp {
+  type: string;
+  description: string;
+  properties?: { [key: string]: ToolProp };
+  items?: ToolProp;
+}
+
 export interface Tool {
   type: "function";
   function: {
@@ -15,10 +22,7 @@ export interface Tool {
       type: string;
       positional?: boolean;
       properties: {
-        [key: string]: {
-          type: string;
-          description: string;
-        };
+        [key: string]: ToolProp;
       };
       required: string[];
     };
@@ -46,6 +50,10 @@ export interface CompletionResponse {
   choices: {
     message: Message;
   }[];
+
+  model: string;
+  usage: any;
+  usd_cost?: number;
 }
 
 export interface GenericClient {

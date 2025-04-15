@@ -6,13 +6,16 @@ import { McpConfig } from "../types";
 import { Tool } from "../clients";
 import { getConfig } from "../config";
 import { ToolsService } from "./Tools";
+import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { StdioServerParameters } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { MCPWebSocketTransport } from "./McpWebsocketTransport";
 
 type CachedTool = Anthropic.Beta.PromptCaching.PromptCachingBetaTool;
-type McpTool = CachedTool & {
+export type McpTool = CachedTool & {
   inputSchema: CachedTool["input_schema"];
 };
 
-export const knowhowClient = {
+export const knowhowMcpClient = {
   name: "knowhow-mcp-client",
   version: "1.0.0",
 };
@@ -24,58 +27,98 @@ export const knowhowConfig = {
   },
 };
 
+export * from "./McpServer";
+export * from "./McpWebsocketTransport";
+
 export class McpService {
-  transports: StdioClientTransport[] = [];
+  connected = [];
+  transports: Transport[] = [];
   clients: Client[] = [];
   config: McpConfig[] = [];
   tools: Tool[] = [];
+  mcpPrefix = "mcp";
 
-  async createClients(mcpServers: McpConfig[]) {
+  async createStdioClients(mcpServers: McpConfig[] = []) {
     if (this.clients.length) {
       return this.clients;
     }
 
     this.config = mcpServers;
     this.transports = mcpServers.map((mcp) => {
-      return new StdioClientTransport(mcp);
+      console.log("Creating transport for", mcp);
+      if (mcp.command) {
+        return new StdioClientTransport(mcp as StdioServerParameters);
+      }
+      if (mcp?.params?.socket) {
+        return new MCPWebSocketTransport(mcp.params.socket);
+      }
     });
 
     this.clients = this.transports.map((transport) => {
-      return new Client(knowhowClient, knowhowConfig);
+      return new Client(knowhowMcpClient, knowhowConfig);
     });
 
     return this.clients;
   }
 
+  setMcpPrefix(prefix: string) {
+    this.mcpPrefix = prefix;
+  }
+
+  createClient(mcp: McpConfig, transport: Transport) {
+    this.config.push(mcp);
+    this.clients.push(new Client(knowhowMcpClient, knowhowConfig));
+    this.transports.push(transport);
+  }
+
   async connectToConfigured(tools?: ToolsService) {
     const config = await getConfig();
-    const clients = await this.createClients(config.mcps);
+
+    return this.connectTo(config.mcps, tools);
+  }
+
+  async connectTo(mcpServers: McpConfig[] = [], tools?: ToolsService) {
+    const clients = await this.createStdioClients(mcpServers);
     await this.connectAll();
 
     if (tools) {
-      tools.addTools(await this.getTools());
-      tools.addFunctions(await this.getToolMap());
+      await this.addTools(tools);
     }
+  }
+
+  async addTools(tools: ToolsService) {
+    tools.addTools(await this.getTools());
+    tools.addFunctions(await this.getToolMap());
+  }
+
+  async copyFrom(mcp: McpService) {
+    this.clients.push(...mcp.clients);
+    this.transports.push(...mcp.transports);
+    this.config.push(...mcp.config);
+    this.connected.push(...mcp.connected);
   }
 
   async closeTransports() {
     await Promise.all(
-      this.transports.map((transport) => {
-        transport.close();
+      this.transports.map(async (transport, index) => {
+        this.connected[index] = false;
+        return transport.close();
       })
     );
 
     this.transports = [];
+    this.connected = [];
   }
 
   async closeClients() {
     await Promise.all(
       this.clients.map((client) => {
-        client.close();
+        return client.close();
       })
     );
 
     this.clients = [];
+    this.connected = [];
   }
 
   async closeAll() {
@@ -86,6 +129,16 @@ export class McpService {
   getClientIndex(clientName: string) {
     const index = this.config.findIndex((mcp) => mcp.name === clientName);
     return index;
+  }
+
+  parseToolName(toolName: string) {
+    const split = toolName.split("_");
+
+    if (split.length < 2) {
+      return null;
+    }
+
+    return split.slice(2).join("_");
   }
 
   getToolClientIndex(toolName: string) {
@@ -112,12 +165,14 @@ export class McpService {
   getFunction(toolName: string) {
     const client = this.getToolClient(toolName);
 
+    const realName = this.parseToolName(toolName);
     return async (args: any) => {
-      console.log("Calling tool", toolName, "with args", args);
+      console.log("Calling tool", realName, "with args", args);
       const tool = await client.callTool({
-        name: toolName,
+        name: realName,
         arguments: args,
       });
+      return tool;
     };
   }
 
@@ -137,9 +192,13 @@ export class McpService {
   }
 
   async connectAll() {
-    return Promise.all(
-      this.clients.map((client, index) => {
-        return client.connect(this.transports[index]);
+    await Promise.all(
+      this.clients.map(async (client, index) => {
+        if (this.connected[index]) {
+          return;
+        }
+        await client.connect(this.transports[index]);
+        this.connected[index] = true;
       })
     );
   }
@@ -149,7 +208,7 @@ export class McpService {
       return this.clients;
     }
 
-    this.clients = await this.createClients(this.config);
+    this.clients = await this.createStdioClients(this.config);
 
     return this.clients;
   }
@@ -179,7 +238,7 @@ export class McpService {
     const transformed: Tool = {
       type: "function",
       function: {
-        name: `mcp_${index}_${tool.name}`,
+        name: `${this.mcpPrefix}_${index}_${tool.name}`,
         description: tool.description,
         parameters: {
           type: "object",

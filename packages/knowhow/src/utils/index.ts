@@ -88,3 +88,13 @@ export function splitByNewLines(str: string): string[] {
 export function toUniqueArray<T>(arr: T[]): T[] {
   return Array.from(new Set(arr));
 }
+
+export function mcpToolName(toolName: string): string {
+  const split = toolName.split("_");
+
+  if (split.length < 2) {
+    return null;
+  }
+
+  return split.slice(2).join("_");
+}
