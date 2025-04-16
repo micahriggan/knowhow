@@ -19,3 +19,4 @@ export * from "./github";
 export * from "./fileSearch";
 export * from "./language";
 export * from "./askHuman";
+export * from "./aiClient";

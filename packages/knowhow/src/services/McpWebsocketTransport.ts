@@ -27,7 +27,7 @@ export class MCPWebSocketTransport implements Transport {
         } else {
           parsed = JSON.parse(data.toString());
         }
-        console.log("MCPW Message received", parsed);
+        console.log("MCPW Message received", JSON.stringify(parsed));
         const message = JSONRPCMessageSchema.parse(parsed);
         this.onmessage?.(message);
       } catch (error) {

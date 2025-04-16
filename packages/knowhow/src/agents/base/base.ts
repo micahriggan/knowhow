@@ -168,7 +168,8 @@ export abstract class BaseAgent implements IAgent {
 
     const toolDefinition = this.tools.getTool(functionName);
     const properties = toolDefinition?.function?.parameters?.properties || {};
-    const isPositional = toolDefinition?.function?.parameters?.positional || false;
+    const isPositional =
+      toolDefinition?.function?.parameters?.positional || false;
     const fnArgs = isPositional
       ? Object.keys(properties).map((p) => functionArgs[p])
       : functionArgs;
@@ -369,12 +370,21 @@ export abstract class BaseAgent implements IAgent {
       }
 
       if (this.getMessagesLength(messages) > compressThreshold) {
+        console.log(
+          "Compressing messages",
+          this.getMessagesLength(messages),
+          "exceeds",
+          compressThreshold
+        );
         messages = await this.compressMessages(messages, startIndex, endIndex);
         this.startNewThread(messages);
       }
 
-      if (messages[messages.length - 1].role === "assistant") {
-        // sometimes the agent just says a message and doesn't call a tool
+      if (["assistant", "tool"].includes(messages[messages.length - 1].role)) {
+        // sometimes the agent just says a message and doesn't call a tool, or compression ends on a tool message
+        console.log(
+          "Agent continuing to the next iteration, reminding agent how to terminate"
+        );
         messages.push({
           role: "user",
           content: `Friendly reminder: workflow continues until you call on of ${this.requiredToolNames}.`,

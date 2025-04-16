@@ -356,6 +356,87 @@ export const includedTools = [
     },
   },
 
+  {
+    type: "function",
+    function: {
+      name: "createAiCompletion",
+      description: "Create a completion using the knowhow ai client",
+      parameters: {
+        type: "object",
+        positional: true,
+        properties: {
+          provider: {
+            type: "string",
+            description:
+              "The AI provider to use (e.g., 'openai', 'anthropic'). Use listAllModels to figure out which provider to use if you don't know",
+          },
+          options: {
+            type: "object",
+            description: "The completion options",
+            properties: {
+              model: { type: "string", description: "The model to use" },
+              messages: {
+                type: "array",
+                description: "The messages for the completion",
+                items: {
+                  type: "object",
+                  properties: {
+                    role: { type: "string" },
+                    content: { type: "string" },
+                  },
+                },
+              },
+              max_tokens: {
+                type: "number",
+                description: "Maximum number of tokens to generate",
+              },
+            },
+            required: ["model", "messages"],
+          },
+        },
+        required: ["provider", "options"],
+      },
+      returns: {
+        type: "object",
+        description: "The completion response from the AI provider",
+      },
+    },
+  },
+
+  {
+    type: "function",
+    function: {
+      name: "listAllModels",
+      description: "List all available models using the knowhow ai client",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+      returns: {
+        type: "object",
+        description: "A dictionary of all available models for each provider",
+      },
+    },
+  },
+
+  {
+    type: "function",
+    function: {
+      name: "listAllProviders",
+      description: "List all available providers using the knowhow ai client",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+      returns: {
+        type: "array",
+        description: "An array of all available providers",
+      },
+    },
+  },
+
   ...asana.definitions,
   ...github.definitions,
   ...language.definitions,

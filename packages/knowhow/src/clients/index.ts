@@ -48,16 +48,86 @@ export class AIClient {
     );
   }
 
+  private providerHasModel(provider: string, model: string): boolean {
+    const models = this.clientModels[provider];
+    if (!models) return false;
+    return models.includes(model);
+  }
+
+  private detectProviderModel(provider: string, model: string) {
+    if (this.providerHasModel(provider, model)) {
+      return { provider, model };
+    }
+
+    if (model.includes("/")) {
+      const split = model.split("/");
+
+      const inferredProvider = split[0];
+      const inferredModel = split.slice(1).join("/");
+
+      if (this.providerHasModel(inferredProvider, inferredModel)) {
+        return { provider: inferredProvider, model: inferredModel };
+      }
+    }
+
+    return { provider, model };
+  }
+
   async createCompletion(
     provider: string,
     options: CompletionOptions
   ): Promise<CompletionResponse> {
+    const detected = this.detectProviderModel(provider, options.model);
+
+    provider = detected.provider;
+    options.model = detected.model;
+
+    if (!this.clients[provider]) {
+      throw new Error(
+        `Provider ${provider} not registered. Available providers: ${Object.keys(
+          this.clients
+        )}`
+      );
+    }
+
+    const hasModel = this.providerHasModel(provider, options.model);
+
+    if (!hasModel) {
+      const doesHave = Object.keys(this.clientModels).filter((key) =>
+        this.providerHasModel(key, options.model)
+      );
+
+      if (doesHave.length) {
+        throw new Error(
+          `Model ${options.model} not registered for provider ${provider}. ${doesHave} has model ${options.model}`
+        );
+      } else {
+        throw new Error(
+          `Model ${
+            options.model
+          } not registered for any provider. ${JSON.stringify(
+            this.clientModels,
+            null,
+            2
+          )} are the available models`
+        );
+      }
+    }
+
     const client = this.getClient(provider);
     return client.createChatCompletion(options);
   }
 
   getRegisteredModels(provider: string): string[] {
     return this.clientModels[provider] || [];
+  }
+
+  listAllModels() {
+    return this.clientModels;
+  }
+
+  listAllProviders() {
+    return Object.keys(this.clientModels);
   }
 }
 

@@ -34,8 +34,8 @@ export class McpServerService {
         schema[key] = z.number();
       } else if (value.type === "boolean") {
         schema[key] = z.boolean();
-      } else if (value.type === "array" && value.items) {
-        schema[key] = z.array(this.toZodSchema({ item: value.items }));
+      } else if (value.type === "array" && value?.items?.properties) {
+        schema[key] = z.array(this.toZodSchema(value.items.properties));
       } else if (value.type === "object" && value.properties) {
         schema[key] = this.toZodSchema(value.properties);
       } else {

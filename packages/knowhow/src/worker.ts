@@ -23,11 +23,13 @@ export async function worker() {
     console.log(`Connecting to ${API_URL}`);
 
     const dir = process.cwd();
+    const homedir = os.homedir();
+    const root = dir === homedir ? "~" : dir.replace(homedir, "~");
     const ws = new WebSocket(`${API_URL}`, {
       headers: {
         Authorization: `Bearer ${jwt}`,
         "User-Agent": `${clientName}/${clientVersion}/${os.hostname()}`,
-        Root: `${dir}`,
+        Root: `${root}`,
       },
     });
 
