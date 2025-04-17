@@ -1,6 +1,6 @@
 import { BaseAgent } from "../base/base";
 import { Message } from "../../clients/types";
-import { Assistant } from "../../types";
+import { Assistant, Config } from "../../types";
 
 export class ConfigAgent extends BaseAgent {
   name: string;
@@ -9,7 +9,9 @@ export class ConfigAgent extends BaseAgent {
   constructor(private config: Assistant) {
     super();
     this.name = config.name;
-    this.setModelPreferences([{ model: config.model, provider: config.provider }]);
+    this.setModelPreferences([
+      { model: config.model, provider: config.provider },
+    ]);
   }
 
   async getInitialMessages(userInput: string) {

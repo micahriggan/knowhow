@@ -9,6 +9,31 @@ export type Hashes = {
     fileHash: string;
   };
 };
+
+export type GenerationSource = {
+  model?: string;
+  agent?: string;
+  input: string;
+  output: string;
+  prompt: string;
+  kind?: string;
+  outputExt?: string;
+  outputName?: string;
+};
+
+export type EmbedSource = {
+  input: string;
+  output: string;
+  prompt?: string;
+  kind?: string;
+  uploadMode?: boolean;
+  remote?: string;
+  remoteType?: string;
+  remoteId?: string;
+  chunkSize?: number;
+  minLength?: number;
+};
+
 export type Config = {
   openaiBaseUrl?: string;
   promptsDir: string;
@@ -17,28 +42,8 @@ export type Config = {
   micCommand?: string;
   defaultMic?: string;
 
-  sources: {
-    model?: string;
-    input: string;
-    output: string;
-    prompt: string;
-    kind?: string;
-    outputExt?: string;
-    outputName?: string;
-  }[];
-
-  embedSources: {
-    input: string;
-    output: string;
-    prompt?: string;
-    kind?: string;
-    uploadMode?: boolean;
-    remote?: string;
-    remoteType?: string;
-    remoteId?: string;
-    chunkSize?: number;
-    minLength?: number;
-  }[];
+  sources: GenerationSource[];
+  embedSources: EmbedSource[];
 
   plugins: string[];
   modules: string[];
@@ -48,7 +53,7 @@ export type Config = {
   modelProviders: ModelProvider[];
 
   worker?: {
-    allowedTools: string[];
+    allowedTools?: string[];
   };
 };
 

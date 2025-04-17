@@ -1,5 +1,10 @@
-import { summarizeFiles } from "./ai";
-import { saveAllFileHashes, saveHashes } from "./hashes";
+import { summarizeFiles, summarizeFile } from "./ai";
+import {
+  saveAllFileHashes,
+  saveHashes,
+  getHashes,
+  checkNoFilesChanged,
+} from "./hashes";
 import axios from "axios";
 import * as fs from "fs";
 import * as path from "path";
@@ -8,8 +13,7 @@ import { promisify } from "util";
 import glob from "glob";
 
 import { Prompts } from "./prompts";
-import { Config, Hashes, Embeddable } from "./types";
-import { getHashes, checkNoFilesChanged } from "./hashes";
+import { Config, Hashes, Embeddable, GenerationSource } from "./types";
 import { readFile, writeFile, fileExists } from "./utils";
 import {
   getConfig,
@@ -27,7 +31,6 @@ import {
   embedSource,
   getConfiguredEmbeddingMap,
 } from "./embeddings";
-import { summarizeFile } from "./ai";
 
 import { abort } from "process";
 import { chatLoop } from "./chat";
@@ -169,27 +172,53 @@ export async function upload() {
  *}
  */
 
-export async function generate() {
+export async function generate(): Promise<void> {
   const config = await getConfig();
   for (const source of config.sources) {
     console.log("Generating", source.input, "to", source.output);
-    await handleAllKindsGeneration(source);
+    if (source.kind === "file" || !source.kind) {
+      const files = glob.sync(source.input);
+      const prompt = await loadPrompt(source.prompt);
+
+      if (source.output.endsWith("/")) {
+        await handleMultiOutputGeneration(
+          source.model,
+          source.input,
+          files,
+          prompt,
+          source.output,
+          source.outputExt,
+          source.outputName,
+          source.kind
+        );
+      } else {
+        await handleSingleOutputGeneration(
+          source.model,
+          files,
+          prompt,
+          source.output,
+          source.kind
+        );
+      }
+    } else {
+      await handleAllKindsGeneration(source);
+    }
   }
 }
 
-async function handleAllKindsGeneration(source: Config["sources"][0]) {
+async function handleAllKindsGeneration(source: GenerationSource) {
   const { kind, input } = source;
   if (Plugins.isPlugin(kind)) {
     const data = await Plugins.call(kind, input);
     if (source.output.endsWith("/")) {
-      throw new Error("Plugins can only output to a single file");
+      throw new Error(`Plugin ${kind} can only output to a single file`);
     }
     await writeFile(source.output, data);
   }
   return handleFileKindGeneration(source);
 }
 
-async function handleFileKindGeneration(source: Config["sources"][0]) {
+async function handleFileKindGeneration(source: GenerationSource) {
   const prompt = await loadPrompt(source.prompt);
   const files = glob.sync(source.input);
   console.log("Analyzing files: ", files);
@@ -246,7 +275,9 @@ export async function handleMultiOutputGeneration(
 
     // summarize the file
     console.log("Summarizing", file);
-    const summary = prompt ? await summarizeFile(file, prompt) : fileContent;
+    const summary = prompt
+      ? await summarizeFile(file, prompt, model)
+      : fileContent;
 
     // write the summary to the output file
     const { name, ext, dir } = path.parse(file);
@@ -294,7 +325,7 @@ export async function handleSingleOutputGeneration(
 
   console.log("Summarizing", files.length, "files");
   const summary = prompt
-    ? await summarizeFiles(files, prompt)
+    ? await summarizeFiles(files, prompt, model)
     : (await Promise.all(files.map(convertToText))).join("\n\n");
 
   const fileHash = crypto.createHash("md5").update(summary).digest("hex");

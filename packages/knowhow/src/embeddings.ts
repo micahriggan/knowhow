@@ -51,12 +51,22 @@ function getChunkId(id: string, index: number, chunkSize: number) {
   return chunkSize ? `${id}-${index}` : id;
 }
 
+export async function generateEmbeddings(input: string): Promise<number[]> {
+  console.log("Generating embeddings for input string");
+  const openAiEmbedding = await openai.embeddings.create({
+    input: input,
+    model: "text-embedding-ada-002",
+  });
+  return openAiEmbedding.data[0].embedding;
+}
+
 export async function embedSource(
   source: Config["embedSources"][0],
   ignorePattern: string[]
 ) {
   if (!source.input) {
-    console.log("Skpping", source.output, "with blank input property");
+    console.log("Skipping", source.output, "with blank input property");
+    if (typeof source.input === "string") return generateEmbeddings(source.input);
     return;
   }
 
