@@ -7,14 +7,31 @@ import { Agents, Tools } from "./services";
 import { Mcp, McpServerService } from "./services/Mcp";
 import * as allTools from "./agents/tools";
 import { wait } from "./utils";
+import { getConfig, updateConfig } from "./config";
 
 const API_URL = process.env.KNOWHOW_API_URL;
 
 export async function worker() {
   const mcpServer = new McpServerService(Tools);
   const clientName = "knowhow-worker";
-  const clientVersion = "1.0.0";
-  mcpServer.createServer(clientName, clientVersion).withTools(Tools.getTools());
+  const clientVersion = "1.1.1";
+  const config = await getConfig();
+
+  if (!config.worker || !config.worker.allowedTools) {
+    console.log(
+      "Worker tools configured! Update knowhow.json to adjust which tools are allowed by the worker."
+    );
+    config.worker = {
+      ...config.worker,
+      allowedTools: Tools.getToolNames(),
+    };
+
+    await updateConfig(config);
+    return;
+  }
+
+  const toolsToUse = Tools.getToolsByNames(config.worker.allowedTools);
+  mcpServer.createServer(clientName, clientVersion).withTools(toolsToUse);
 
   let connected = false;
 

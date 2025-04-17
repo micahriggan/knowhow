@@ -46,6 +46,10 @@ export type Config = {
   agents: Assistant[];
   mcps: McpConfig[];
   modelProviders: ModelProvider[];
+
+  worker?: {
+    allowedTools: string[];
+  };
 };
 
 export type Assistant = {
@@ -122,13 +126,25 @@ export const Models = {
     Sonnet3_7: "claude-3-7-sonnet-20250219",
   },
   openai: {
-    GPT_4Turbo: "gpt-4-turbo-2024-04-09",
+    GPT_41: "gpt-4.1-2025-04-14",
+    GPT_41_Mini: "gpt-4.1-mini-2025-04-14",
+    GPT_41_Nano: "gpt-4.1-nano-2025-04-14",
+    GPT_45: "gpt-4.5-preview-2025-02-27",
     GPT_4o: "gpt-4o-2024-08-06",
-    GPT_4oMini: "gpt-4o-mini-2024-07-18",
-    o3_Mini: "o3-mini-2025-01-31",
+    GPT_4o_Audio: "gpt-4o-audio-preview-2024-12-17",
+    GPT_4o_Realtime: "gpt-4o-realtime-preview-2024-12-17",
+    GPT_4o_Mini: "gpt-4o-mini-2024-07-18",
+    GPT_4o_Mini_Audio: "gpt-4o-mini-audio-preview-2024-12-17",
+    GPT_4o_Mini_Realtime: "gpt-4o-mini-realtime-preview-2024-12-17",
     o1: "o1-2024-12-17",
+    o1_Pro: "o1-pro-2025-03-19",
+    o3: "o3-2025-04-16",
+    o4_Mini: "o4-mini-2025-04-16",
+    o3_Mini: "o3-mini-2025-01-31",
     o1_Mini: "o1-mini-2024-09-12",
-    GPT_4_5: "gpt-4.5-preview-2025-02-27",
+    GPT_4o_Mini_Search: "gpt-4o-mini-search-preview-2025-03-11",
+    GPT_4o_Search: "gpt-4o-search-preview-2025-03-11",
+    Computer_Use: "computer-use-preview-2025-03-11",
   },
 };
 
@@ -136,4 +152,6 @@ export const OpenAiReasoningModels = [
   Models.openai.o1,
   Models.openai.o1_Mini,
   Models.openai.o3_Mini,
+  Models.openai.o3,
+  Models.openai.o4_Mini,
 ];

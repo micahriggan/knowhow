@@ -8,12 +8,8 @@ import {
   Message,
 } from "./types";
 
-type CachedUsage = Anthropic.Beta.PromptCaching.PromptCachingBetaUsage;
-
-
-type CachedMessageParam =
-  Anthropic.Beta.PromptCaching.PromptCachingBetaMessageParam;
-type CachedTool = Anthropic.Beta.PromptCaching.PromptCachingBetaTool;
+type MessageParam = Anthropic.MessageParam;
+type Usage = Anthropic.Usage;
 
 export class GenericAnthropicClient extends Anthropic implements GenericClient {
   constructor() {
@@ -22,7 +18,7 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
     });
   }
 
-  handleToolCaching(tools: CachedTool[]) {
+  handleToolCaching(tools: Anthropic.Tool[]) {
     const lastTool = tools[tools.length - 1];
 
     if (lastTool) {
@@ -31,7 +27,7 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
     }
   }
 
-  transformTools(tools?: Tool[]): CachedTool[] {
+  transformTools(tools?: Tool[]): Anthropic.Tool[] {
     if (!tools) {
       return [];
     }
@@ -50,7 +46,7 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
     return transformed;
   }
 
-  toBlockArray(content: Anthropic.MessageParam["content"]) {
+  toBlockArray(content: MessageParam["content"]) {
     if (typeof content === "string") {
       return [
         {
@@ -73,9 +69,7 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
     return content;
   }
 
-  combineMessages(
-    messages: Anthropic.MessageParam[]
-  ): Anthropic.MessageParam[] {
+  combineMessages(messages: MessageParam[]): MessageParam[] {
     if (messages.length <= 1) {
       return messages;
     }
@@ -96,19 +90,25 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
     return messages;
   }
 
-  cacheLastContent(message: CachedMessageParam) {
+  cacheLastContent(message: MessageParam) {
     if (Array.isArray(message.content)) {
-      message.content[message.content.length - 1].cache_control = {
-        type: "ephemeral",
-      };
+      const lastMessage = message.content[message.content.length - 1];
+      if (
+        lastMessage.type !== "thinking" &&
+        lastMessage.type !== "redacted_thinking"
+      ) {
+        lastMessage.cache_control = {
+          type: "ephemeral",
+        };
+      }
     }
   }
 
-  handleClearingCache(messages: CachedMessageParam[]) {
+  handleClearingCache(messages: MessageParam[]) {
     for (const message of messages) {
       if (Array.isArray(message.content)) {
         for (const content of message.content) {
-          if (content.cache_control) {
+          if ("cache_control" in content && content.cache_control) {
             delete content.cache_control;
           }
         }
@@ -116,7 +116,7 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
     }
   }
 
-  handleMessageCaching(groupedMessages: CachedMessageParam[]) {
+  handleMessageCaching(groupedMessages: MessageParam[]) {
     this.handleClearingCache(groupedMessages);
 
     const hasTwoUserMesages =
@@ -143,15 +143,15 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
     }
   }
 
-  transformMessages(messages: Message[]): Anthropic.MessageParam[] {
+  transformMessages(messages: Message[]): MessageParam[] {
     const toolCalls = messages.flatMap((msg) => msg.tool_calls || []);
-    const claudeMessages: CachedMessageParam[] = messages
+    const claudeMessages: MessageParam[] = messages
       .filter((msg) => msg.role !== "system")
       .filter((msg) => msg.content)
       .map((msg) => {
         if (msg.role === "tool") {
           const toolCall = toolCalls.find((tc) => tc.id === msg.tool_call_id);
-          const toolMessages = [] as CachedMessageParam[];
+          const toolMessages = [] as MessageParam[];
           if (!toolCall) {
             console.log(
               "Tool call not found for message",
@@ -211,7 +211,7 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
     console.log(JSON.stringify({ claudeMessages }, null, 2));
 
     const tools = this.transformTools(options.tools);
-    const response = await this.beta.promptCaching.messages.create({
+    const response = await this.messages.create({
       model: options.model,
       messages: claudeMessages,
       system: systemMessage
@@ -253,7 +253,7 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
           return {
             message: {
               role: "assistant",
-              content: c.text,
+              content: "text" in c ? c.text : c.type,
               tool_calls: [],
             },
           };
@@ -283,7 +283,7 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
     };
   }
 
-  calculateCost(model: string, usage: CachedUsage): number | undefined {
+  calculateCost(model: string, usage: Usage): number | undefined {
     const pricing = this.pricesPerMillion()[model];
     console.log({ pricing });
 
@@ -306,5 +306,12 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
     const total = cachedInputCost + inputCost + outputCost;
     console.log({ total });
     return total;
+  }
+
+  async getModels() {
+    const models = await this.models.list();
+    return models.data.map((m) => ({
+      id: m.id,
+    }));
   }
 }

@@ -58,4 +58,5 @@ export interface CompletionResponse {
 
 export interface GenericClient {
   createChatCompletion(options: CompletionOptions): Promise<CompletionResponse>;
+  getModels(): Promise<{ id: string }[]>;
 }

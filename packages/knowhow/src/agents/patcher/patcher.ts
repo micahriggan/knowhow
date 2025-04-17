@@ -83,7 +83,7 @@ export class PatchingAgent extends BaseAgent {
     this.setModelPreferences([
       { model: Models.anthropic.Sonnet, provider: "anthropic" },
       {
-        model: Models.openai.GPT_4Turbo,
+        model: Models.openai.GPT_41,
         provider: "openai",
       },
     ]);

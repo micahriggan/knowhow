@@ -10,7 +10,7 @@ import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { StdioServerParameters } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { MCPWebSocketTransport } from "./McpWebsocketTransport";
 
-type CachedTool = Anthropic.Beta.PromptCaching.PromptCachingBetaTool;
+type CachedTool = Anthropic.Tool;
 export type McpTool = CachedTool & {
   inputSchema: CachedTool["input_schema"];
 };
@@ -45,7 +45,13 @@ export class McpService {
 
     this.config = mcpServers;
     this.transports = mcpServers.map((mcp) => {
-      console.log("Creating transport for", mcp);
+      const logFormat = `${mcp.name}: ${[
+        mcp.command,
+        ...mcp.args,
+        mcp.url,
+      ].join(" ")}`;
+
+      console.log("Creating transport for", logFormat);
       if (mcp.command) {
         return new StdioClientTransport(mcp as StdioServerParameters);
       }

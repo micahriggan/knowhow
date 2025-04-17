@@ -74,6 +74,13 @@ export async function init() {
     ],
 
     modelProviders: [{ url: "http://localhost:1234", provider: "lms" }],
+    worker: {
+      allowedTools: [
+        "readFile",
+        "writeFileChunk",
+        "execCommand"
+      ]
+    }
   } as Config;
   await updateConfig(config);
 

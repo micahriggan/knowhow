@@ -11,6 +11,10 @@ export class ToolsService {
     return this.tools;
   }
 
+  getToolsByNames(names: string[]) {
+    return this.tools.filter((tool) => names.includes(tool.function.name));
+  }
+
   getToolNames() {
     return this.tools.map((tool) => tool.function.name);
   }
