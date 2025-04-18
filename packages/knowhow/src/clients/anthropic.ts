@@ -176,7 +176,7 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
             content: [
               {
                 type: "tool_result",
-                content: msg.content,
+                content: msg.content as string,
                 tool_use_id: msg.tool_call_id,
               },
             ],
@@ -186,7 +186,7 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
         }
 
         return {
-          content: msg.content,
+          content: this.transformContent(msg),
           role: msg.role === "system" ? "assistant" : msg.role,
         };
       })
@@ -197,6 +197,36 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
     this.handleMessageCaching(groupedMessages);
 
     return groupedMessages;
+  }
+
+  transformContent(message: Message) {
+    if (typeof message.content === "string") {
+      return message.content;
+    }
+
+    const transformContextElement = (
+      e: Message["content"]["0"]
+    ): Anthropic.ContentBlockParam => {
+      if (typeof e === "object" && e.type === "text") {
+        return { type: "text", text: e.text };
+      }
+      if (typeof e === "object" && e.type === "image_url") {
+        const isUrl = e.image_url.url.startsWith("http");
+        return {
+          type: "image",
+          source: {
+            data: isUrl ? e.image_url.url : undefined,
+            media_type: "image/jpeg",
+            type: isUrl ? ("url" as const) : ("base64" as const),
+            url: isUrl ? e.image_url.url : undefined,
+          },
+        };
+      }
+    };
+
+    if (Array.isArray(message.content)) {
+      return message.content.map((e) => transformContextElement(e));
+    }
   }
 
   async createChatCompletion(

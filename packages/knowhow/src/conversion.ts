@@ -4,24 +4,25 @@ import * as path from "path";
 import { readFile, fileExists } from "./utils";
 import { Downloader } from "./plugins/downloader/downloader";
 
-export async function convertAudioToText(
+export async function processAudio(
   filePath: string,
-  reusePreviousTranscript = true
-) {
+  reusePreviousTranscript = true,
+  chunkTime = 30
+): Promise<string[]> {
   const parsed = path.parse(filePath);
-  const outputPath = `${parsed.dir}/${parsed.name}/transcript.txt`;
+  const outputPath = `${parsed.dir}/${parsed.name}/transcript.json`;
 
   const exists = await fileExists(outputPath);
   if (exists && reusePreviousTranscript) {
     console.log(`Transcription ${outputPath} already exists, skipping`);
     const fileContent = await readFile(outputPath, "utf8");
-    return fileContent;
+    return outputPath.endsWith("txt") ? fileContent : JSON.parse(fileContent);
   }
 
   const chunks = await Downloader.chunk(
     filePath,
     parsed.dir,
-    30,
+    chunkTime,
     reusePreviousTranscript
   );
   const transcription = await Downloader.transcribeChunks(
@@ -29,7 +30,83 @@ export async function convertAudioToText(
     outputPath,
     reusePreviousTranscript
   );
+
   return transcription;
+}
+
+export async function convertAudioToText(
+  filePath: string,
+  reusePreviousTranscript = true,
+  chunkTime = 30
+) {
+  const audios = await processAudio(
+    filePath,
+    reusePreviousTranscript,
+    chunkTime
+  );
+
+  let fullString = "";
+
+  for (let i = 0; i < audios.length; i++) {
+    const audio = audios[i];
+    fullString += `[${i * chunkTime}:${(i + 1) * chunkTime}s] ${audio}`;
+  }
+
+  return fullString;
+}
+
+async function processVideo(
+  filePath: string,
+  reusePreviousTranscript = true,
+  chunkTime = 30
+) {
+  const parsed = path.parse(filePath);
+  const outputPath = `${parsed.dir}/${parsed.name}/video.json`;
+  const transcriptions = await processAudio(
+    filePath,
+    reusePreviousTranscript,
+    chunkTime
+  );
+  const videoAnalysis = await Downloader.extractKeyframes(
+    filePath,
+    outputPath,
+    chunkTime
+  );
+
+  console.log({ transcriptions });
+
+  return videoAnalysis.map((frame, index) => {
+    return {
+      frame,
+      transcription: transcriptions[index],
+    };
+  });
+}
+
+async function convertVideoToText(
+  filePath: string,
+  reusePreviousTranscript = true,
+  chunkTime = 30
+) {
+  const processed = await processVideo(
+    filePath,
+    reusePreviousTranscript,
+    chunkTime
+  );
+
+  let fullString = "";
+
+  for (let i = 0; i < processed.length; i++) {
+    const chunk = processed[i];
+    fullString += `
+    Start Timestamp: [${i * chunkTime}s]
+    Visual: ${chunk.frame.description}
+    Audio: ${chunk.transcription}
+    End Timestamp: [${i * chunkTime}s]
+    `;
+  }
+
+  return fullString;
 }
 
 async function convertPdfToText(filePath: string) {
@@ -42,14 +119,15 @@ export async function convertToText(filePath: string) {
   const extension = filePath.split(".").pop();
 
   switch (extension) {
-    case "mp3":
     case "mp4":
+    case "webm":
+    case "mov":
     case "mpeg":
+      return convertVideoToText(filePath);
+    case "mp3":
     case "mpga":
     case "m4a":
     case "wav":
-    case "webm":
-    case "mov":
       return convertAudioToText(filePath);
     case "pdf":
       return convertPdfToText(filePath);

@@ -11,6 +11,7 @@ const config = getConfigSync();
 const OPENAI_KEY = process.env.OPENAI_KEY;
 
 import { Models } from "./types";
+import { Agents } from "./services";
 export { Models };
 
 export const openai = new OpenAI({
@@ -18,12 +19,24 @@ export const openai = new OpenAI({
   ...(config.openaiBaseUrl && { baseURL: config.openaiBaseUrl }),
 });
 
-export async function singlePrompt(
-  userPrompt: string,
-  model = Models.openai.GPT_4o,
-  provider = "openai"
-) {
-  const resp = await Clients.createCompletion(provider, {
+export async function singlePrompt(userPrompt: string, model = "", agent = "") {
+  if (agent) {
+    const agentConfig = await Agents.getAgent(agent);
+    if (!agentConfig) {
+      throw new Error(`Agent ${agent} not found`);
+    }
+    if (model) {
+      agentConfig.setModel(model);
+    }
+    return agentConfig.call(userPrompt);
+  }
+
+  if (!model) {
+    model = Models.openai.GPT_4o;
+  }
+
+  // Assume we're using provider/model format of model
+  const resp = await Clients.createCompletion("", {
     model,
     messages: [{ role: "user", content: userPrompt }],
   });
@@ -34,8 +47,8 @@ export async function singlePrompt(
 export async function summarizeTexts(
   texts: string[],
   template: string,
-  model = Models.openai.GPT_4o,
-  provider = "openai"
+  model = "",
+  agent = ""
 ) {
   const summaries = [];
   for (const text of texts) {
@@ -43,7 +56,7 @@ export async function summarizeTexts(
 
     console.log(content);
 
-    const summary = await singlePrompt(content, model, provider);
+    const summary = await singlePrompt(content, model, agent);
     summaries.push(summary);
   }
 
@@ -57,7 +70,7 @@ export async function summarizeTexts(
     `Generate a final output for this prompt ${template} with these incremental summaries: ` +
     summaries.join("\n\n");
 
-  const finalSummary = await singlePrompt(finalPrompt, model, provider);
+  const finalSummary = await singlePrompt(finalPrompt, model, agent);
   return finalSummary;
 }
 
@@ -75,22 +88,24 @@ export async function chunkText(text: string, chunkSize?: number) {
 export async function summarizeFiles(
   files: string[],
   template: string,
-  model = Models.openai.GPT_4o
+  model = "",
+  agent = ""
 ) {
   const texts = [];
   for (const file of files) {
     const text = `file: ${file}\n` + (await convertToText(file));
     texts.push(text);
   }
-  return summarizeTexts(texts, template, model);
+  return summarizeTexts(texts, template, model, agent);
 }
 
 export async function summarizeFile(
   file: string,
   template: string,
-  model = Models.openai.GPT_4o
+  model = "",
+  agent = ""
 ) {
-  return await summarizeFiles([file], template, model);
+  return await summarizeFiles([file], template, model, agent);
 }
 
 /*
@@ -123,9 +138,14 @@ export async function summarizeFile(
  *}
  */
 
-export async function askGptVision(imageUrl: string, question: string) {
-  const response = await openai.chat.completions.create({
-    model: Models.openai.GPT_4o,
+export async function askGptVision(
+  imageUrl: string,
+  question: string,
+  provider = "openai",
+  model = Models.openai.GPT_4o
+) {
+  const response = await Clients.createCompletion(provider, {
+    model,
     max_tokens: 2500,
     messages: [
       {

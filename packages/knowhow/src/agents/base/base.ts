@@ -32,6 +32,7 @@ export abstract class BaseAgent implements IAgent {
   protected totalCostUsd = 0;
   protected currentThread = 0;
   protected threads = [];
+  protected summaries = [];
 
   public agentEvents = new EventEmitter();
   public eventTypes = {
@@ -416,9 +417,12 @@ export abstract class BaseAgent implements IAgent {
   ) {
     const toCompress = messages.slice(startIndex, endIndex);
     const toCompressPrompt = `Summarize the conversation so far:
-    1. Initial Request - what this agent was tasked with.
+    1. Initial Request - what this agent was originally tasked with.
     2. Progress - what has been tried so far,
     3. Next Steps - what we're about to do next to continue the user's original request.
+
+    Use the previous summaries to ensure consistency:
+    ${JSON.stringify(this.summaries)}
 
       This summary will become the agent's only memory of the past, all other messages will be dropped: \n\n${JSON.stringify(
         toCompress
@@ -439,6 +443,8 @@ export abstract class BaseAgent implements IAgent {
     this.adjustTotalCostUsd(response.usd_cost);
 
     const summaries = response.choices.map((c) => c.message);
+    this.summaries.push(...summaries);
+
     const startMessages = [
       {
         role: "user",

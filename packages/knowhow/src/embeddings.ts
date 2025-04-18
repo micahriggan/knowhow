@@ -56,7 +56,7 @@ export async function embedSource(
   ignorePattern: string[]
 ) {
   if (!source.input) {
-    console.log("Skpping", source.output, "with blank input property");
+    console.log("Skipping", source.output, "with blank input property");
     return;
   }
 

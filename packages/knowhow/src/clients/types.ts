@@ -1,9 +1,18 @@
+export type MessageContent =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
 export interface Message {
   role: "system" | "user" | "assistant" | "tool";
-  content: string | null;
+  content: string | MessageContent[];
+
   name?: string;
   tool_call_id?: string;
   tool_calls?: ToolCall[];
+}
+
+export interface OutputMessage extends Message {
+  content: string;
 }
 
 export interface ToolProp {
@@ -48,7 +57,7 @@ export interface CompletionOptions {
 
 export interface CompletionResponse {
   choices: {
-    message: Message;
+    message: OutputMessage;
   }[];
 
   model: string;
