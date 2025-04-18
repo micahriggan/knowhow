@@ -123,9 +123,14 @@ export async function summarizeFile(
  *}
  */
 
-export async function askGptVision(imageUrl: string, question: string) {
-  const response = await openai.chat.completions.create({
-    model: Models.openai.GPT_4o,
+export async function askGptVision(
+  imageUrl: string,
+  question: string,
+  provider = "openai",
+  model = Models.openai.GPT_4o
+) {
+  const response = await Clients.createCompletion(provider, {
+    model,
     max_tokens: 2500,
     messages: [
       {

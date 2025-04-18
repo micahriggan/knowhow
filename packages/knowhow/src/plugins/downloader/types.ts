@@ -15,6 +15,12 @@ export class AudioFormat {
   format: string;
 }
 
+export interface KeyframeInfo {
+  path: string;
+  description: string;
+  timestamp: number;
+}
+
 export class RequestedDownload {
   ext: string;
   format_id: string;
