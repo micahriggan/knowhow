@@ -189,7 +189,8 @@ export async function generate(): Promise<void> {
           source.output,
           source.outputExt,
           source.outputName,
-          source.kind
+          source.kind,
+          source.agent
         );
       } else {
         await handleSingleOutputGeneration(
@@ -197,7 +198,8 @@ export async function generate(): Promise<void> {
           files,
           prompt,
           source.output,
-          source.kind
+          source.kind,
+          source.agent
         );
       }
     } else {
@@ -232,7 +234,8 @@ async function handleFileKindGeneration(source: GenerationSource) {
       source.output,
       source.outputExt,
       source.outputName,
-      source.kind
+      source.kind,
+      source.agent
     );
   } else {
     await handleSingleOutputGeneration(
@@ -240,7 +243,8 @@ async function handleFileKindGeneration(source: GenerationSource) {
       files,
       prompt,
       source.output,
-      source.kind
+      source.kind,
+      source.agent
     );
   }
 }
@@ -252,7 +256,8 @@ export async function handleMultiOutputGeneration(
   output: string,
   outputExt = "mdx",
   outputName?: string,
-  kind?: string
+  kind?: string,
+  agent?: string
 ) {
   // get the hash of the prompt
   const promptHash = crypto.createHash("md5").update(prompt).digest("hex");
@@ -276,7 +281,7 @@ export async function handleMultiOutputGeneration(
     // summarize the file
     console.log("Summarizing", file);
     const summary = prompt
-      ? await summarizeFile(file, prompt, model)
+      ? await summarizeFile(file, prompt, model, agent)
       : fileContent;
 
     // write the summary to the output file
@@ -311,7 +316,8 @@ export async function handleSingleOutputGeneration(
   files: string[],
   prompt: string,
   outputFile: string,
-  kind: string
+  kind?: string,
+  agent?: string
 ) {
   const hashes = await getHashes();
   const promptHash = crypto.createHash("md5").update(prompt).digest("hex");
@@ -325,7 +331,7 @@ export async function handleSingleOutputGeneration(
 
   console.log("Summarizing", files.length, "files");
   const summary = prompt
-    ? await summarizeFiles(files, prompt, model)
+    ? await summarizeFiles(files, prompt, model, agent)
     : (await Promise.all(files.map(convertToText))).join("\n\n");
 
   const fileHash = crypto.createHash("md5").update(summary).digest("hex");
