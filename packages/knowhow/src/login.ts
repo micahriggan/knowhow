@@ -1,6 +1,7 @@
 import axios from "axios";
 import fs from "fs";
 import path from "path";
+import { chmod } from "fs/promises";
 import { ask } from "./utils";
 
 const API_URL = process.env.KNOWHOW_API_URL;
@@ -23,6 +24,7 @@ export async function login(): Promise<void> {
       fs.mkdirSync(configDir, { recursive: true });
     }
     fs.writeFileSync(jwtFile, jwt);
+    fs.chmodSync(jwtFile, 0o600);
     console.log("JWT updated successfully.");
   }
 
@@ -54,7 +56,8 @@ export async function login(): Promise<void> {
       );
     }
     console.log(
-      "Error: Unable to fetch user information. Please check your JWT and try again.", error
+      "Error: Unable to fetch user information. Please check your JWT and try again.",
+      error
     );
   }
 }
@@ -64,6 +67,7 @@ export async function loadJwt(): Promise<string> {
   if (!fs.existsSync(jwtFile)) {
     throw new Error("Error: JWT file not found.");
   }
+
   const jwt = fs.readFileSync(jwtFile, "utf-8").trim();
 
   if (!jwt) {
