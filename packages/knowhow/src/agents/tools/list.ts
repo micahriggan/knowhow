@@ -394,7 +394,7 @@ export const includedTools = [
             required: ["model", "messages"],
           },
         },
-        required: ["provider", "options"],
+        required: ["provider"],
       },
       returns: {
         type: "object",

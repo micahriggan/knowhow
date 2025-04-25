@@ -15,6 +15,15 @@ export class ToolsService {
     return this.tools.filter((tool) => names.includes(tool.function.name));
   }
 
+  copyToolsFrom(toolNames: string[], toolsService: ToolsService) {
+    const tools = toolsService.getToolsByNames(toolNames);
+    this.addTools(tools);
+
+    for (const name of toolNames) {
+      this.setFunction(name, toolsService.getFunction(name));
+    }
+  }
+
   getToolNames() {
     return this.tools.map((tool) => tool.function.name);
   }

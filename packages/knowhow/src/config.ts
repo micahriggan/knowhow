@@ -3,7 +3,7 @@ import * as path from "path";
 import gitignoreToGlob from "gitignore-to-glob";
 import { Prompts } from "./prompts";
 import { promisify } from "util";
-import { Config, Language, AssistantConfig, Providers } from "./types";
+import { Config, Language, AssistantConfig } from "./types";
 import { mkdir, writeFile, readFile, fileExists } from "./utils";
 
 export async function init() {

@@ -1,5 +1,5 @@
 import { EventEmitter } from "events";
-import { Message, Tool, ToolCall } from "../../clients/types";
+import { Message, OutputMessage, Tool, ToolCall } from "../../clients/types";
 import { IAgent } from "../interface";
 import { ToolsService, Tools } from "../../services/Tools";
 import {
@@ -31,8 +31,8 @@ export abstract class BaseAgent implements IAgent {
   protected requiredToolNames = ["finalAnswer"];
   protected totalCostUsd = 0;
   protected currentThread = 0;
-  protected threads = [];
-  protected summaries = [];
+  protected threads = [] as Message[][];
+  protected summaries = [] as OutputMessage[];
 
   public agentEvents = new EventEmitter();
   public eventTypes = {
@@ -147,6 +147,10 @@ export abstract class BaseAgent implements IAgent {
 
   getThreads() {
     return this.threads;
+  }
+
+  getSummaries() {
+    return this.summaries;
   }
 
   abstract getInitialMessages(userInput: string): Promise<Message[]>;
@@ -388,7 +392,7 @@ export abstract class BaseAgent implements IAgent {
         );
         messages.push({
           role: "user",
-          content: `Friendly reminder: workflow continues until you call on of ${this.requiredToolNames}.`,
+          content: `<Workflow>workflow continues until you call on of ${this.requiredToolNames}. Any continuation messages should be enclosed in workflow tags to hide intermediate work from users.</Workflow>`,
         });
       }
 

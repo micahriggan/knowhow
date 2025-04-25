@@ -118,6 +118,8 @@ export type Language = {
 export type ChatInteraction = {
   input: string;
   output: string;
+  summaries: string[];
+  lastThread: string[]
 };
 
 export const Providers = {

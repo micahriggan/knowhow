@@ -7,6 +7,7 @@ import { Tool } from "../clients";
 import { getConfig } from "../config";
 import { ToolsService } from "./Tools";
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { StdioServerParameters } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { MCPWebSocketTransport } from "./McpWebsocketTransport";
 
@@ -174,10 +175,17 @@ export class McpService {
     const realName = this.parseToolName(toolName);
     return async (args: any) => {
       console.log("Calling tool", realName, "with args", args);
-      const tool = await client.callTool({
-        name: realName,
-        arguments: args,
-      });
+      const tool = await client.callTool(
+        {
+          name: realName,
+          arguments: args,
+        },
+        CallToolResultSchema,
+        {
+          timeout: 10 * 60 * 1000,
+          maxTotalTimeout: 10 * 60 * 1000,
+        }
+      );
       return tool;
     };
   }

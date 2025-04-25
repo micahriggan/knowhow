@@ -19,6 +19,7 @@ import { IAgent } from "./agents/interface";
 import { Clients, Message } from "./clients";
 import { recordAudio, voiceToText } from "./microphone";
 import { Models } from "./ai";
+import { BaseAgent } from "./agents";
 
 enum ChatFlags {
   agent = "agent",
@@ -181,10 +182,15 @@ export async function formatChatInput(
   chatHistory: ChatInteraction[] = []
 ) {
   const pluginText = await Plugins.callMany(plugins, input);
-  const historyMessage = `PREVIOUS CHAT INTERACTIONS: \n ${JSON.stringify(
-    chatHistory
-  )}\n`;
-  const fullPrompt = `${historyMessage} \n ${input} \n ${pluginText}`;
+  const historyMessage = `<PreviousChats>
+  Use this to gain insights and historical context, but work exclusively on the current request
+  ${JSON.stringify(chatHistory)}
+    </PreviousChats>`;
+  const fullPrompt = `
+    ${historyMessage} \n
+    <CurrentRequest>${input}</CurrentRequest>
+    <PluginContext> ${pluginText} </PluginContext>
+  `;
   return fullPrompt;
 }
 
@@ -193,7 +199,7 @@ export async function chatLoop<E extends GptQuestionEmbedding>(
   embeddings: Embeddable<E>[],
   plugins: string[] = []
 ) {
-  let activeAgent = Agents.getAgent("Developer");
+  let activeAgent = Agents.getAgent("Developer") as BaseAgent;
   let provider = "openai" as keyof typeof Clients.clients;
   let model = ChatModelDefaults[provider];
   const providers = Object.keys(Clients.clients);
@@ -230,7 +236,7 @@ export async function chatLoop<E extends GptQuestionEmbedding>(
             "Which agent would you like to use: ",
             agents
           );
-          activeAgent = Agents.getAgent(selected);
+          activeAgent = Agents.getAgent(selected) as BaseAgent;
           break;
         case ChatFlags.agent:
           Flags.flip(ChatFlags.agent);
@@ -290,9 +296,13 @@ export async function chatLoop<E extends GptQuestionEmbedding>(
             plugins,
             chatHistory
           );
-          const interaction = { input, output: "" } as ChatInteraction;
+          const interaction = {
+            input,
+            output: "",
+          } as ChatInteraction;
           if (Flags.enabled("agent")) {
             results = await activeAgent.call(formattedPrompt);
+            updateInteractionForAgent(interaction, activeAgent);
           } else {
             results = await askAI(formattedPrompt, provider, model);
           }
@@ -308,4 +318,17 @@ export async function chatLoop<E extends GptQuestionEmbedding>(
       input = await getInput(promptText(), commands, chatHistory);
     }
   }
+}
+
+function updateInteractionForAgent(
+  interaction: ChatInteraction,
+  agent: BaseAgent
+) {
+  /*
+   *interaction.summaries = agent.getSummaries().map((s) => s.content);
+   *const threads = agent.getThreads();
+   *interaction.lastThread = threads.length
+   *  ? threads[threads.length - 1].map((t) => JSON.stringify(t.content))
+   *  : [];
+   */
 }

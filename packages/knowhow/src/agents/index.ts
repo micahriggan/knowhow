@@ -5,3 +5,4 @@ export * from "./patcher/patcher";
 export * from "./researcher/researcher";
 
 export * as tools from "./tools";
+export { includedTools } from "./tools/list";

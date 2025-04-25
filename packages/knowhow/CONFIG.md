@@ -28,11 +28,14 @@ Here is an overview of examples from various `knowhow.json` configuration files 
   ],
 
   // Generate embeddings from a series of files on your machine
+  // Remote knowhow with the kb id allows you to leverage knowhow upload
   "embedSources": [
     {
       "input": ".knowhow/docs/**/*.mdx",
       "output": ".knowhow/embeddings",
-      "chunkSize": 2000
+      "chunkSize": 2000,
+      "remoteType": "knowhow",
+      "remoteId": "141d9c4d-1589-4ccc-bf39-031f4259b89f"
     }
   ],
 
@@ -59,6 +62,60 @@ Here is an overview of examples from various `knowhow.json` configuration files 
     }
   ]
 }
+```
+
+## Video Download Support
+```json
+  "embedSources": [
+    {
+      "input": "https://www.youtube.com/shorts/BYuMBK5Ll-s",
+      "output": ".knowhow/embeddings/video.json",
+      "chunkSize": 2000,
+      "kind": "download"
+    }
+  ],
+```
+
+## MCP Setup
+
+```json
+  "mcps": [
+    {
+      "name": "browser",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-puppeteer"]
+    }
+  ],
+```
+
+## Custom Models Via LMS Studio
+```json
+  "modelProviders": [
+    {
+      "url": "http://localhost:1234",
+      "provider": "lms"
+    }
+  ],
+```
+
+## Agent Tasks: rename all video files in a folder
+```
+  "sources": [
+    {
+      "input": ".knowhow/downloads/**/*.webm",
+      "output": ".knowhow/organized/",
+      "prompt": "FSOrganizer",
+      "agent": "Developer"
+    }
+  ],
+```
+
+Prompt Example:
+
+```
+We have this file, we want to generate a nice name for it, please copy the file to .knowhow/org/{better file name}
+
+ {text}
 ```
 
 ## knowhow generate: meeting transcripts
@@ -142,7 +199,7 @@ These embeddings are leveraged by the chat in `knowhow chat` or by the agents to
 
 Any plugin that implements the embedding function, can generate embeddings if you set the `kind` field to the plugin name. The `remote` field is optional, and if set, the embeddings will be uploaded to the specified S3 bucket via `knowhow upload`.
 
-You can download remote embeddings via `knowhow download` and use them in your local environment. 
+You can download remote embeddings via `knowhow download` and use them in your local environment.
 
 For downloads we support the following remote options:
 - s3
