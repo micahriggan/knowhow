@@ -62,18 +62,20 @@ async function processVideo(
 ) {
   const parsed = path.parse(filePath);
   const outputPath = `${parsed.dir}/${parsed.name}/video.json`;
+
+  console.log("Processing audio...");
   const transcriptions = await processAudio(
     filePath,
     reusePreviousTranscript,
     chunkTime
   );
+
+  console.log("Extracting keyframes...");
   const videoAnalysis = await Downloader.extractKeyframes(
     filePath,
     outputPath,
     chunkTime
   );
-
-  console.log({ transcriptions });
 
   return videoAnalysis.map((frame, index) => {
     return {
@@ -99,6 +101,7 @@ async function convertVideoToText(
   for (let i = 0; i < processed.length; i++) {
     const chunk = processed[i];
     fullString += `
+    Chunk: (${i + 1}/ ${processed.length}):
     Start Timestamp: [${i * chunkTime}s]
     Visual: ${chunk.frame.description}
     Audio: ${chunk.transcription}

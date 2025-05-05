@@ -35,9 +35,15 @@ export class AIClient {
 
       this.registerClient(modelProvider.provider, client);
 
-      const models = await client.getModels();
-      const ids = models.map((model) => model.id);
-      this.registerModels(modelProvider.provider, ids);
+      try {
+        const models = await client.getModels();
+        const ids = models.map((model) => model.id);
+        this.registerModels(modelProvider.provider, ids);
+      } catch (error) {
+        console.error(
+          `Failed to register models for provider ${modelProvider.provider}:`
+        );
+      }
     }
   }
 

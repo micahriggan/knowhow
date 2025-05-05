@@ -30,6 +30,7 @@ export async function init() {
       "linear",
       "download",
       "figma",
+      "url",
     ],
     lintCommands: {
       js: "eslint",

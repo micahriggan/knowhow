@@ -260,6 +260,10 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
       }),
     });
 
+    if (!response.content || !response.content.length) {
+      console.log("no content in Anthropic response", response);
+    }
+
     return {
       choices: response.content.map((c) => {
         if (c.type === "tool_use") {

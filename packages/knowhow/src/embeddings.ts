@@ -11,6 +11,7 @@ import {
 } from "./utils";
 import { summarizeTexts, openai, chunkText } from "./ai";
 import { Plugins } from "./plugins/plugins";
+import { md5Hash } from "./hashes";
 
 export { cosineSimilarity };
 
@@ -110,10 +111,7 @@ export async function embed(
     chunks = await chunkText(text, chunkSize);
   }
 
-  const MAX_CHUNKS = 100;
-  if (chunks.length > MAX_CHUNKS) {
-    return [];
-  }
+  const MAX_CHUNKS = 300;
 
   if (chunks.length <= MAX_CHUNKS) {
     // Only use the first few chunks
@@ -294,6 +292,19 @@ async function handleFileKind(filePath: string) {
   ];
 }
 
+async function handleTextKind(contents: string) {
+  const hash = await md5Hash(contents);
+  return [
+    {
+      id: hash,
+      text: contents,
+      metadata: {
+        date: new Date().toISOString(),
+      },
+    },
+  ];
+}
+
 export async function handleAllKinds(
   id: string,
   source: Config["embedSources"][0]
@@ -307,6 +318,8 @@ export async function handleAllKinds(
     return Plugins.embed(kind, input);
   }
   switch (kind) {
+    case "text":
+      return handleTextKind(source.input);
     case "file":
     default:
       return handleFileKind(id);

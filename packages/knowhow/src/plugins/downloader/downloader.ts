@@ -132,6 +132,12 @@ class DownloaderService {
     outputPath: string,
     interval: number = 10
   ): Promise<KeyframeInfo[]> {
+    if (fs.existsSync(outputPath)) {
+      console.log("Keyframes already exist, skipping");
+      const contents = await readFile(outputPath);
+      return JSON.parse(contents.toString()) as KeyframeInfo[];
+    }
+
     const parsed = path.parse(filePath);
     const outputDir = path.dirname(outputPath);
     const fileName = parsed.name;

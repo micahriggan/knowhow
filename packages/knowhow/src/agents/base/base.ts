@@ -32,7 +32,8 @@ export abstract class BaseAgent implements IAgent {
   protected totalCostUsd = 0;
   protected currentThread = 0;
   protected threads = [] as Message[][];
-  protected summaries = [] as OutputMessage[];
+  protected taskBreakdown = "";
+  protected summaries = [] as string[];
 
   public agentEvents = new EventEmitter();
   public eventTypes = {
@@ -49,6 +50,14 @@ export abstract class BaseAgent implements IAgent {
     public tools: ToolsService = Tools,
     public events: EventService = Events
   ) {}
+
+  newTask() {
+    this.currentThread = 0;
+    this.threads = [];
+    this.taskBreakdown = "";
+    this.summaries = [];
+    this.totalCostUsd = 0;
+  }
 
   register() {
     this.events.registerAgent(this);
@@ -314,6 +323,8 @@ export abstract class BaseAgent implements IAgent {
     try {
       const model = this.getModel();
       let messages = _messages || (await this.getInitialMessages(userInput));
+      const taskBreakdown = await this.getTaskBreakdown(messages);
+
       messages = this.formatInputMessages(messages);
       this.updateCurrentThread(messages);
 
@@ -414,23 +425,17 @@ export abstract class BaseAgent implements IAgent {
     return JSON.stringify(messages).split(" ").length;
   }
 
-  async compressMessages(
-    messages: Message[],
-    startIndex: number,
-    endIndex: number
-  ) {
-    const toCompress = messages.slice(startIndex, endIndex);
-    const toCompressPrompt = `Summarize the conversation so far:
-    1. Initial Request - what this agent was originally tasked with.
-    2. Progress - what has been tried so far,
-    3. Next Steps - what we're about to do next to continue the user's original request.
+  async getTaskBreakdown(messages: Message[]) {
+    if (this.taskBreakdown) {
+      return this.taskBreakdown;
+    }
 
-    Use the previous summaries to ensure consistency:
-    ${JSON.stringify(this.summaries)}
+    const taskPrompt = `
+    Generate a detailed task breakdown for this conversation, include a section for the following:
+    1. Task List
+    2. Completion Criteria - when the agent should stop
 
-      This summary will become the agent's only memory of the past, all other messages will be dropped: \n\n${JSON.stringify(
-        toCompress
-      )}`;
+      : \n\n${JSON.stringify(messages)}`;
 
     const model = this.getModel();
 
@@ -438,7 +443,47 @@ export abstract class BaseAgent implements IAgent {
       model,
       messages: [
         {
-          role: "assistant",
+          role: "user",
+          content: taskPrompt,
+        },
+      ],
+    });
+
+    this.adjustTotalCostUsd(response.usd_cost);
+
+    console.log(response);
+
+    this.taskBreakdown = response.choices[0].message.content;
+    return this.taskBreakdown;
+  }
+
+  async compressMessages(
+    messages: Message[],
+    startIndex: number,
+    endIndex: number
+  ) {
+    const toCompress = messages.slice(startIndex, endIndex);
+    const toCompressPrompt = `We are compressing our conversation to save memory.
+    Please summarize the conversation so far, so that we may continue the original task with a smaller context
+
+    Include the following sections:
+    1. Initial Request - what this agent was originally tasked with.
+    2. Progress - what has been tried so far,
+    3. Next Steps - what we're about to do next to continue the user's original request.
+    4. Tasks remaining - what tasks are left from the initial task breakdown.
+
+      This summary will become the agent's only memory of the past, all other messages will be dropped:
+    ${JSON.stringify(toCompress)}
+
+      Our initial task breakdown: ${this.taskBreakdown}`;
+
+    const model = this.getModel();
+
+    const response = await this.getClient().createChatCompletion({
+      model,
+      messages: [
+        {
+          role: "user",
           content: toCompressPrompt,
         },
       ],
@@ -446,14 +491,17 @@ export abstract class BaseAgent implements IAgent {
 
     this.adjustTotalCostUsd(response.usd_cost);
 
-    const summaries = response.choices.map((c) => c.message);
+    const summaries = response.choices.map((c) => c.message.content);
     this.summaries.push(...summaries);
 
     const startMessages = [
       {
         role: "user",
-        content: `We have just compressed the conversation to save memory:
+        content: `
+        Initial task breakdown:
+        ${this.taskBreakdown}
 
+        We have just compressed the conversation to save memory:
         ${JSON.stringify(summaries)}
         `,
       },

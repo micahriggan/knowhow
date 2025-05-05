@@ -10,6 +10,7 @@ import { JiraPlugin } from "./jira";
 import { NotionPlugin } from "./notion";
 import { DownloaderPlugin } from "./downloader/plugin";
 import { FigmaPlugin } from "./figma";
+import { UrlPlugin } from "./url";
 
 export class PluginService {
   plugins = {
@@ -23,6 +24,7 @@ export class PluginService {
     download: new DownloaderPlugin(),
     figma: new FigmaPlugin(),
     language: new LanguagePlugin(this),
+    url: new UrlPlugin(),
   } as Record<string, Plugin>;
 
   listPlugins() {

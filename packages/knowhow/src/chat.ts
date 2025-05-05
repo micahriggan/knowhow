@@ -183,13 +183,13 @@ export async function formatChatInput(
 ) {
   const pluginText = await Plugins.callMany(plugins, input);
   const historyMessage = `<PreviousChats>
-  Use this to gain insights and historical context, but work exclusively on the current request
+  This information is provided as historical context and is likely not related to the current task:
   ${JSON.stringify(chatHistory)}
     </PreviousChats>`;
   const fullPrompt = `
     ${historyMessage} \n
-    <CurrentRequest>${input}</CurrentRequest>
     <PluginContext> ${pluginText} </PluginContext>
+    <CurrentTask>${input}</CurrentTask>
   `;
   return fullPrompt;
 }
@@ -301,6 +301,7 @@ export async function chatLoop<E extends GptQuestionEmbedding>(
             output: "",
           } as ChatInteraction;
           if (Flags.enabled("agent")) {
+            activeAgent.newTask();
             results = await activeAgent.call(formattedPrompt);
             updateInteractionForAgent(interaction, activeAgent);
           } else {
