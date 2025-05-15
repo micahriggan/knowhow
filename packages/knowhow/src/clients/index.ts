@@ -37,7 +37,11 @@ export class AIClient {
     const modelProviders = config.modelProviders || [];
 
     for (const modelProvider of modelProviders) {
-      const client = new HttpClient(modelProvider.url);
+      const client = new HttpClient(modelProvider.url, modelProvider.headers);
+
+      if (modelProvider.jwtFile) {
+        client.loadJwtFile(modelProvider.jwtFile);
+      }
 
       this.registerClient(modelProvider.provider, client);
 
@@ -47,7 +51,7 @@ export class AIClient {
         this.registerModels(modelProvider.provider, ids);
       } catch (error) {
         console.error(
-          `Failed to register models for provider ${modelProvider.provider}:`
+          `Failed to register models for provider ${modelProvider.provider}:`, error.message
         );
       }
     }
@@ -186,3 +190,6 @@ export const Clients = new AIClient();
 export * from "./types";
 
 export * from "./http";
+export * from "./openai";
+export * from "./anthropic";
+export * from "./knowhow";

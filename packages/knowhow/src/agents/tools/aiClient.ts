@@ -3,6 +3,8 @@ import {
   GenericClient,
   CompletionOptions,
   CompletionResponse,
+  EmbeddingOptions,
+  EmbeddingResponse,
 } from "../../clients/types";
 
 export function createAiCompletion(
@@ -10,6 +12,13 @@ export function createAiCompletion(
   options: CompletionOptions
 ): Promise<CompletionResponse> {
   return Clients.createCompletion(provider, options);
+}
+
+export function createEmbedding(
+  provider: string,
+  options: EmbeddingOptions
+): Promise<EmbeddingResponse> {
+  return Clients.createEmbedding(provider, options);
 }
 
 export async function listModelsForProvider(

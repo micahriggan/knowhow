@@ -6,24 +6,52 @@ import {
   EmbeddingOptions,
   EmbeddingResponse,
 } from "./types";
+import fs from "fs";
+import path from "path";
 
 export class HttpClient implements GenericClient {
-  private baseUrl: string;
+  constructor(private baseUrl: string, private headers = {}) {}
 
-  constructor(baseUrl: string) {
+  setJwt(jwt: string) {
+    this.headers = {
+      ...this.headers,
+      Authorization: `Bearer ${jwt}`,
+    };
+  }
+
+  setBaseUrl(baseUrl: string) {
     this.baseUrl = baseUrl;
+  }
+
+  loadJwtFile(filePath: string) {
+    try {
+      const jwtFile = path.join(process.cwd(), filePath);
+      if (!fs.existsSync(jwtFile)) {
+        throw new Error(`JWT file not found: ${filePath}`);
+      }
+      const jwt = fs.readFileSync(jwtFile, "utf-8").trim();
+      this.setJwt(jwt);
+    } catch (error) {
+      console.error(`Error loading JWT file: ${error}`);
+    }
   }
 
   async createChatCompletion(
     options: CompletionOptions
   ): Promise<CompletionResponse> {
-    const response = await axios.post(`${this.baseUrl}/v1/chat/completions`, {
-      model: options.model,
-      messages: options.messages,
-      max_tokens: options.max_tokens,
-      tools: options.tools,
-      tool_choice: options.tool_choice,
-    });
+    const response = await axios.post(
+      `${this.baseUrl}/v1/chat/completions`,
+      {
+        model: options.model,
+        messages: options.messages,
+        max_tokens: options.max_tokens,
+        tools: options.tools,
+        tool_choice: options.tool_choice,
+      },
+      {
+        headers: this.headers,
+      }
+    );
 
     const data = response.data;
 
@@ -42,10 +70,16 @@ export class HttpClient implements GenericClient {
   }
 
   async createEmbedding(options: EmbeddingOptions): Promise<EmbeddingResponse> {
-    const response = await axios.post(`${this.baseUrl}/v1/embeddings`, {
-      model: options.model,
-      input: options.input,
-    });
+    const response = await axios.post(
+      `${this.baseUrl}/v1/embeddings`,
+      {
+        model: options.model,
+        input: options.input,
+      },
+      {
+        headers: this.headers,
+      }
+    );
 
     const data = response.data;
 
@@ -58,10 +92,13 @@ export class HttpClient implements GenericClient {
   }
 
   async getModels() {
-    const response = await axios.get(`${this.baseUrl}/v1/models`);
-    const data = response.data;
+    const response = await axios.get(`${this.baseUrl}/v1/models`, {
+      headers: this.headers,
+    });
 
-    return data.data.map((model: any) => ({
+    const data = response.data?.data;
+
+    return data.map((model: any) => ({
       id: model.id,
       object: model.object,
       owned_by: model.owned_by,

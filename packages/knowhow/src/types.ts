@@ -78,6 +78,8 @@ export type McpConfig = {
 export type ModelProvider = {
   url: string;
   provider: string;
+  headers?: { [key: string]: string };
+  jwtFile?: string;
 };
 
 export type AssistantConfig = {

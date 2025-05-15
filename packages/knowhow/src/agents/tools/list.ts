@@ -437,6 +437,39 @@ export const includedTools = [
     },
   },
 
+  {
+    type: "function",
+    function: {
+      name: "createEmbedding",
+      description: "Create an embedding using the knowhow ai client",
+      parameters: {
+        type: "object",
+        positional: true,
+        properties: {
+          provider: {
+            type: "string",
+            description:
+              "The AI provider to use (e.g., 'openai', 'anthropic'). Use listAllModels to figure out which provider to use if you don't know",
+          },
+          options: {
+            type: "object",
+            description: "The embedding options",
+            properties: {
+              input: { type: "string", description: "The text to embed" },
+              model: { type: "string", description: "The model to use (optional)" },
+            },
+            required: ["input"],
+          },
+        },
+        required: ["provider", "options"],
+      },
+      returns: {
+        type: "object",
+        description: "The embedding response from the AI provider",
+      },
+    },
+  },
+
   ...asana.definitions,
   ...github.definitions,
   ...language.definitions,

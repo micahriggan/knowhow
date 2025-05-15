@@ -1,9 +1,10 @@
 import axios from "axios";
 import fs from "fs";
 import path from "path";
+import { CompletionOptions, EmbeddingOptions } from "src/clients";
 import { Config } from "../types";
 
-function loadJwt(): string {
+export function loadKnowhowJwt(): string {
   const jwtFile = path.join(process.cwd(), ".knowhow", ".jwt");
   if (!fs.existsSync(jwtFile)) {
     return "";
@@ -12,14 +13,16 @@ function loadJwt(): string {
 }
 
 export class KnowhowSimpleClient {
-  jwt = loadJwt();
   headers = {};
 
-  constructor(private baseUrl) {
-    const storedJwt = loadJwt();
+  constructor(private baseUrl, private jwt = loadKnowhowJwt()) {
+    this.setJwt(jwt);
+  }
 
+  setJwt(jwt: string) {
+    this.jwt = jwt;
     this.headers = {
-      Authorization: `Bearer ${storedJwt}`,
+      Authorization: `Bearer ${this.jwt}`,
     };
   }
 
@@ -68,6 +71,31 @@ export class KnowhowSimpleClient {
 
     const presignedUrl = presignedUrlResp.data.downloadUrl;
     return presignedUrl;
+  }
+
+  createChatCompletion(options: CompletionOptions) {
+    this.checkJwt();
+    return axios.post(
+      `${this.baseUrl}/api/proxy/v1/chat/completions`,
+      options,
+      {
+        headers: this.headers,
+      }
+    );
+  }
+
+  createEmbedding(options: EmbeddingOptions) {
+    this.checkJwt();
+    return axios.post(`${this.baseUrl}/api/proxy/v1/embeddings`, options, {
+      headers: this.headers,
+    });
+  }
+
+  getModels() {
+    this.checkJwt();
+    return axios.get(`${this.baseUrl}/api/proxy/v1/models`, {
+      headers: this.headers,
+    });
   }
 }
 
