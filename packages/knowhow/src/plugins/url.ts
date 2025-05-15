@@ -28,7 +28,7 @@ export class UrlPlugin implements Plugin {
       const text = $("body").text().trim().replace(/\s+/g, " ");
 
       return {
-        id: url,
+        id: url + "-url",
         text,
         metadata: { url },
       };

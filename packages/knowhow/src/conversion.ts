@@ -55,7 +55,7 @@ export async function convertAudioToText(
   return fullString;
 }
 
-async function processVideo(
+export async function processVideo(
   filePath: string,
   reusePreviousTranscript = true,
   chunkTime = 30

@@ -12,6 +12,7 @@ import {
 import { summarizeTexts, openai, chunkText } from "./ai";
 import { Plugins } from "./plugins/plugins";
 import { md5Hash } from "./hashes";
+import { convertToText } from "./conversion";
 
 export { cosineSimilarity };
 
@@ -49,6 +50,15 @@ export async function getConfiguredEmbeddings() {
 }
 
 function getChunkId(id: string, index: number, chunkSize: number) {
+  const split = id.split("-");
+  if (
+    split.length > 1 &&
+    Number.isInteger(parseInt(split[split.length - 1], 10))
+  ) {
+    // already has chunkId
+    return id;
+  }
+
   return chunkSize ? `${id}-${index}` : id;
 }
 
@@ -106,6 +116,11 @@ export async function embed(
   minLength?: number
 ): Promise<string[]> {
   let chunks = [text];
+
+  if (!text) {
+    console.log("Skipping", id, "with blank text");
+    return [];
+  }
 
   if (chunkSize) {
     chunks = await chunkText(text, chunkSize);
@@ -283,7 +298,7 @@ async function handleFileKind(filePath: string) {
   return [
     {
       id: filePath,
-      text: await readFile(filePath, "utf8"),
+      text: await convertToText(filePath),
       metadata: {
         filepath: filePath,
         date: new Date().toISOString(),
@@ -346,6 +361,23 @@ export function pruneEmbedding(
     }
   }
   return embeddings;
+}
+
+export function pruneVector(embeddings: Embeddable[]) {
+  for (const entry of embeddings) {
+    delete entry.vector;
+  }
+}
+
+export function pruneMetadata(embeddings: Embeddable[], characterLimit = 5000) {
+  for (const entry of embeddings) {
+    for (const key of Object.keys(entry.metadata)) {
+      // Remove large metadata to prevent context from being too large
+      if (JSON.stringify(entry.metadata[key]).length > characterLimit) {
+        delete entry.metadata[key];
+      }
+    }
+  }
 }
 
 export async function queryEmbedding<E>(

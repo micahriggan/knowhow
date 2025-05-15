@@ -330,7 +330,7 @@ export abstract class BaseAgent implements IAgent {
 
       const startIndex = 0;
       const endIndex = messages.length;
-      const compressThreshold = 5000;
+      const compressThreshold = 10000;
 
       const response = await this.getClient().createChatCompletion({
         model,

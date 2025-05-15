@@ -1,4 +1,10 @@
-import { getConfiguredEmbeddings, queryEmbedding } from "../embeddings";
+import {
+  getConfiguredEmbeddings,
+  queryEmbedding,
+  pruneVector,
+  pruneMetadata,
+} from "../embeddings";
+
 import { Plugin } from "./types";
 
 export class EmbeddingPlugin implements Plugin {
@@ -10,13 +16,15 @@ export class EmbeddingPlugin implements Plugin {
     const count = 7;
     const embeddings = await getConfiguredEmbeddings();
     const results = await queryEmbedding(userPrompt, embeddings);
-    const context = results
-      .map((r) => ({ ...r, vector: undefined }))
-      .slice(0, count);
+    const context = results.slice(0, count);
+
+    pruneVector(context);
+    pruneMetadata(context);
 
     for (const entry of context) {
       console.log(`EMBEDDING PLUGIN: Reading entry ${entry.id}`);
     }
+
     const contextLength = JSON.stringify(context).split(" ").length;
     console.log(
       `EMBEDDING PLUGIN: Found ${context.length} entries. Loading ${contextLength} words`

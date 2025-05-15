@@ -1,6 +1,7 @@
+import fs from "fs";
 import { Plugin } from "../types";
 import { MinimalEmbedding } from "../../types";
-import { convertToText } from "../../conversion";
+import { convertToText, processVideo } from "../../conversion";
 import { Downloader } from "./downloader";
 
 export class DownloaderPlugin implements Plugin {
@@ -47,13 +48,36 @@ export class DownloaderPlugin implements Plugin {
       const downloadDir = ".knowhow/downloads/";
       const fileInfo = await Downloader.download(url, downloadDir);
       const filePath = `${downloadDir}${fileInfo.id}.${fileInfo.ext}`;
-      const text = await convertToText(filePath);
+      const processed = await processVideo(filePath);
 
-      embeddings.push({
-        id: url,
-        text,
-        metadata: {},
-      });
+      let index = 0;
+      for (const chunk of processed) {
+        if (chunk.transcription) {
+          embeddings.push({
+            id: `${url}-audio-${index}`,
+            text: chunk.transcription,
+            metadata: {
+              url,
+              description: chunk.frame.description,
+              timestamp: `${chunk.frame.timestamp}s`,
+              image: fs.readFileSync(chunk.frame.path, "base64"),
+            },
+          });
+        }
+
+        if (chunk.frame.description) {
+          embeddings.push({
+            id: `${url}-video-${index}`,
+            text: chunk.frame.description,
+            metadata: {
+              url,
+              timestamp: `${chunk.frame.timestamp}s`,
+            },
+          });
+        }
+
+        index++;
+      }
     }
 
     return embeddings;
