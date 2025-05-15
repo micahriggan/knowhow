@@ -1,3 +1,4 @@
+import { getConfig } from "../config";
 import {
   getConfiguredEmbeddings,
   queryEmbedding,
@@ -15,7 +16,12 @@ export class EmbeddingPlugin implements Plugin {
   async call(userPrompt: string): Promise<string> {
     const count = 7;
     const embeddings = await getConfiguredEmbeddings();
-    const results = await queryEmbedding(userPrompt, embeddings);
+    const config = await getConfig();
+    const results = await queryEmbedding(
+      userPrompt,
+      embeddings,
+      config.embeddingModel
+    );
     const context = results.slice(0, count);
 
     pruneVector(context);

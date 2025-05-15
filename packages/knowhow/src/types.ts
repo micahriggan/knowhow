@@ -44,6 +44,7 @@ export type Config = {
 
   sources: GenerationSource[];
   embedSources: EmbedSource[];
+  embeddingModel: string;
 
   plugins: string[];
   modules: string[];
@@ -119,7 +120,7 @@ export type ChatInteraction = {
   input: string;
   output: string;
   summaries: string[];
-  lastThread: string[]
+  lastThread: string[];
 };
 
 export const Providers = {
@@ -152,6 +153,10 @@ export const Models = {
     GPT_4o_Mini_Search: "gpt-4o-mini-search-preview-2025-03-11",
     GPT_4o_Search: "gpt-4o-search-preview-2025-03-11",
     Computer_Use: "computer-use-preview-2025-03-11",
+
+    EmbeddingAda2: "text-embedding-ada-002",
+    EmbeddingLarge3: "text-embedding-3-large",
+    EmbeddingSmall3: "text-embedding-3-small",
   },
 };
 
@@ -161,4 +166,10 @@ export const OpenAiReasoningModels = [
   Models.openai.o3_Mini,
   Models.openai.o3,
   Models.openai.o4_Mini,
+];
+
+export const OpenAiEmbeddingModels = [
+  Models.openai.EmbeddingAda2,
+  Models.openai.EmbeddingLarge3,
+  Models.openai.EmbeddingSmall3,
 ];

@@ -20,6 +20,7 @@ import { Clients, Message } from "./clients";
 import { recordAudio, voiceToText } from "./microphone";
 import { Models } from "./ai";
 import { BaseAgent } from "./agents";
+import { getConfig } from "./config";
 
 enum ChatFlags {
   agent = "agent",
@@ -45,6 +46,7 @@ export async function askEmbedding<E>(promptText: string) {
   let answer: EmbeddingBase<any> | undefined;
   let results = new Array<EmbeddingBase>();
   let embedMap = await getConfiguredEmbeddingMap();
+  const config = await getConfig();
   const files = Object.keys(embedMap);
 
   while (input !== "exit") {
@@ -69,7 +71,11 @@ export async function askEmbedding<E>(promptText: string) {
         embedMap = { ...{ [embeddingName]: embedMap[embeddingName] } };
         break;
       default:
-        results = await queryEmbedding(input, embeddings);
+        results = await queryEmbedding(
+          input,
+          embeddings,
+          config.embeddingModel
+        );
         answer = results.shift();
         break;
     }
@@ -86,35 +92,6 @@ export async function askEmbedding<E>(promptText: string) {
 
     input = await ask(promptText + ": ");
   }
-}
-
-// https://arxiv.org/abs/2212.10496
-export async function queryEmbeddingHyde<E extends EmbeddingBase>(
-  query: string,
-  embeddings: E[]
-) {
-  const generatePrompt = `
-Given this question
-
-  ${query}
-
-Generate an article or document that answers the question.
-`;
-
-  const response = await openai.completions.create({
-    prompt: generatePrompt,
-    model: "text-davinci-003",
-    max_tokens: 100,
-    temperature: 0,
-    top_p: 1,
-    presence_penalty: 0,
-    frequency_penalty: 0,
-    best_of: 1,
-    n: 1,
-    stream: false,
-  });
-  const fakeDoc = response.choices[0].text;
-  return queryEmbedding(fakeDoc, embeddings);
 }
 
 const ChatModelDefaults = {

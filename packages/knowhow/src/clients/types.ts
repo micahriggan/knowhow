@@ -65,7 +65,27 @@ export interface CompletionResponse {
   usd_cost?: number;
 }
 
+export interface EmbeddingOptions {
+  input: string;
+  model?: string;
+}
+
+export interface EmbeddingResponse {
+  data: {
+    object: string;
+    embedding: number[];
+    index: number;
+  }[];
+  model: string;
+  usage: {
+    prompt_tokens: number;
+    total_tokens: number;
+  };
+  usd_cost?: number;
+}
+
 export interface GenericClient {
   createChatCompletion(options: CompletionOptions): Promise<CompletionResponse>;
+  createEmbedding(options: EmbeddingOptions): Promise<EmbeddingResponse>;
   getModels(): Promise<{ id: string }[]>;
 }

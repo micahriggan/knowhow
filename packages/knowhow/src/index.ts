@@ -40,6 +40,7 @@ import { AwsS3 } from "./services/S3";
 import { GitHub } from "./services/GitHub";
 import { knowhowMcpClient } from "./services/Mcp";
 import { knowhowApiClient } from "./services/KnowhowClient";
+import { Models } from "./types";
 
 export * as clients from "./clients";
 export * as agents from "./agents";
@@ -55,8 +56,9 @@ export async function embed() {
   const config = await getConfig();
   const ignorePattern = await getIgnorePattern();
 
+  const defaultModel = config.embeddingModel || Models.openai.EmbeddingAda2;
   for (const source of config.embedSources) {
-    await embedSource(source, ignorePattern);
+    await embedSource(defaultModel, source, ignorePattern);
   }
 }
 
@@ -134,43 +136,6 @@ export async function upload() {
     }
   }
 }
-
-/*
- *export async function uploadOpenAi() {
- *  const config = await getConfig();
- *  const ignorePattern = await getIgnorePattern();
- *  const assistantsConfig = await getAssistantsConfig();
- *  for (const assistant of config.assistants) {
- *    if (!assistant.model) {
- *      // Skip non openai assistants
- *      continue;
- *    }
- *    if (!assistant.id) {
- *      const fileIds = [];
- *      for (const globPath of assistant.files) {
- *        const files = await glob.sync(globPath, { ignore: ignorePattern });
- *        for (const file of files) {
- *          if (!assistantsConfig.files[file]) {
- *            const uploaded = await uploadToOpenAi(file);
- *            assistantsConfig.files[file] = uploaded.id;
- *            await updateAssistants(assistantsConfig);
- *          }
- *          fileIds.push(assistantsConfig.files[file]);
- *        }
- *      }
- *
- *      const toCreate = {
- *        ...assistant,
- *        files: fileIds,
- *      };
- *      const createdAssistant = await createAssistant(toCreate);
- *      assistant.id = createdAssistant.id;
- *      await updateConfig(config);
- *    }
- *    console.log(`Assistant ${assistant.id} is ready`);
- *  }
- *}
- */
 
 export async function generate(): Promise<void> {
   const config = await getConfig();

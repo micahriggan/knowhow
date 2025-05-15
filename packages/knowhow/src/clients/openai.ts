@@ -1,6 +1,12 @@
 import OpenAI from "openai";
 import { getConfigSync } from "../config";
-import { GenericClient, CompletionOptions, CompletionResponse } from "./types";
+import {
+  GenericClient,
+  CompletionOptions,
+  CompletionResponse,
+  EmbeddingOptions,
+  EmbeddingResponse,
+} from "./types";
 import {
   ChatCompletionMessageParam,
   ChatCompletionToolMessageParam,
@@ -165,12 +171,30 @@ export class GenericOpenAiClient extends OpenAI implements GenericClient {
         cached_input: 0,
         output: 12.0,
       },
+
+      [Models.openai.EmbeddingAda2]: {
+        input: 0.1,
+        cached_input: 0,
+        output: 0,
+      },
+      [Models.openai.EmbeddingLarge3]: {
+        input: 0.13,
+        cached_input: 0,
+        output: 0,
+      },
+      [Models.openai.EmbeddingLarge3]: {
+        input: 0.02,
+        cached_input: 0,
+        output: 0,
+      },
     };
   }
 
   calculateCost(
     model: string,
-    usage: OpenAI.ChatCompletion["usage"]
+    usage:
+      | OpenAI.ChatCompletion["usage"]
+      | OpenAI.CreateEmbeddingResponse["usage"]
   ): number | undefined {
     const pricing = this.pricesPerMillion()[model];
 
@@ -179,13 +203,17 @@ export class GenericOpenAiClient extends OpenAI implements GenericClient {
       return undefined;
     }
 
-    const cachedInputTokens = usage.prompt_tokens_details.cached_tokens;
+    const cachedInputTokens =
+      ("prompt_tokens_details" in usage &&
+        usage.prompt_tokens_details?.cached_tokens) ||
+      0;
     const cachedInputCost = (cachedInputTokens * pricing.cached_input) / 1e6;
 
     const inputTokens = usage.prompt_tokens;
     const inputCost = ((inputTokens - cachedInputCost) * pricing.input) / 1e6;
 
-    const outputTokens = usage.completion_tokens;
+    const outputTokens =
+      ("completion_tokens" in usage && usage?.completion_tokens) || 0;
     const outputCost = (outputTokens * pricing.output) / 1e6;
 
     const total = cachedInputCost + inputCost + outputCost;
@@ -202,5 +230,19 @@ export class GenericOpenAiClient extends OpenAI implements GenericClient {
         owned_by: m.owned_by,
       };
     });
+  }
+
+  async createEmbedding(options: EmbeddingOptions): Promise<EmbeddingResponse> {
+    const openAiEmbedding = await this.embeddings.create({
+      input: options.input,
+      model: options.model,
+    });
+
+    return {
+      data: openAiEmbedding.data,
+      model: options.model,
+      usage: openAiEmbedding.usage,
+      usd_cost: this.calculateCost(options.model, openAiEmbedding.usage),
+    };
   }
 }

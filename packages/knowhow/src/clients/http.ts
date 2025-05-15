@@ -1,5 +1,11 @@
 import axios from "axios";
-import { GenericClient, CompletionOptions, CompletionResponse } from "./types";
+import {
+  GenericClient,
+  CompletionOptions,
+  CompletionResponse,
+  EmbeddingOptions,
+  EmbeddingResponse,
+} from "./types";
 
 export class HttpClient implements GenericClient {
   private baseUrl: string;
@@ -30,6 +36,22 @@ export class HttpClient implements GenericClient {
         },
       })),
       model: data.model,
+      usage: data.usage,
+      usd_cost: data.usd_cost,
+    };
+  }
+
+  async createEmbedding(options: EmbeddingOptions): Promise<EmbeddingResponse> {
+    const response = await axios.post(`${this.baseUrl}/v1/embeddings`, {
+      model: options.model,
+      input: options.input,
+    });
+
+    const data = response.data;
+
+    return {
+      data: data.data,
+      model: options.model,
       usage: data.usage,
       usd_cost: data.usd_cost,
     };

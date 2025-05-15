@@ -1,4 +1,10 @@
-import { CompletionOptions, CompletionResponse, GenericClient } from "./types";
+import {
+  CompletionOptions,
+  CompletionResponse,
+  EmbeddingOptions,
+  EmbeddingResponse,
+  GenericClient,
+} from "./types";
 import { GenericOpenAiClient } from "./openai";
 import { GenericAnthropicClient } from "./anthropic";
 import { HttpClient } from "./http";
@@ -76,6 +82,15 @@ export class AIClient {
       }
     }
 
+    const providers = Object.keys(this.clientModels);
+    const foundProvider = providers.find((p) =>
+      this.providerHasModel(p, model)
+    );
+
+    if (foundProvider) {
+      return { provider: foundProvider, model };
+    }
+
     return { provider, model };
   }
 
@@ -122,6 +137,35 @@ export class AIClient {
 
     const client = this.getClient(provider);
     return client.createChatCompletion(options);
+  }
+
+  async createEmbedding(
+    provider: string,
+    options: EmbeddingOptions
+  ): Promise<EmbeddingResponse> {
+    const detected = this.detectProviderModel(provider, options.model);
+
+    provider = detected.provider;
+    options.model = detected.model;
+
+    if (!this.clients[provider]) {
+      throw new Error(
+        `Provider ${provider} not registered. Available providers: ${Object.keys(
+          this.clients
+        )}`
+      );
+    }
+
+    const hasModel = this.providerHasModel(provider, options.model);
+
+    if (!hasModel) {
+      throw new Error(
+        `Model ${options.model} not registered for provider ${provider}.`
+      );
+    }
+
+    const client = this.getClient(provider);
+    return client.createEmbedding(options);
   }
 
   getRegisteredModels(provider: string): string[] {

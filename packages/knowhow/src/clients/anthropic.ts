@@ -6,6 +6,8 @@ import {
   CompletionResponse,
   Tool,
   Message,
+  EmbeddingOptions,
+  EmbeddingResponse,
 } from "./types";
 
 type MessageParam = Anthropic.MessageParam;
@@ -347,5 +349,9 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
     return models.data.map((m) => ({
       id: m.id,
     }));
+  }
+
+  async createEmbedding(options: EmbeddingOptions): Promise<EmbeddingResponse> {
+    throw new Error("Provider does not support embeddings");
   }
 }

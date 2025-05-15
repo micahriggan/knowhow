@@ -1,7 +1,7 @@
 import glob from "glob";
 import * as path from "path";
 import { getConfig, loadPrompt } from "./config";
-import { Config, Hashes, Embeddable, EmbeddingBase } from "./types";
+import { Config, Hashes, Embeddable, EmbeddingBase, Models } from "./types";
 import {
   readFile,
   writeFile,
@@ -13,6 +13,7 @@ import { summarizeTexts, openai, chunkText } from "./ai";
 import { Plugins } from "./plugins/plugins";
 import { md5Hash } from "./hashes";
 import { convertToText } from "./conversion";
+import { Clients } from "./clients";
 
 export { cosineSimilarity };
 
@@ -63,6 +64,7 @@ function getChunkId(id: string, index: number, chunkSize: number) {
 }
 
 export async function embedSource(
+  model: Config["embeddingModel"],
   source: Config["embedSources"][0],
   ignorePattern: string[]
 ) {
@@ -95,7 +97,7 @@ export async function embedSource(
       await Promise.all(batch);
       batch = [];
     }
-    batch.push(embedKind(file, source, embeddings, shouldSave));
+    batch.push(embedKind(model, file, source, embeddings, shouldSave));
   }
   if (batch.length > 0) {
     await Promise.all(batch);
@@ -106,6 +108,7 @@ export async function embedSource(
 }
 
 export async function embed(
+  model: string,
   id: string,
   text: string,
   metadata: any,
@@ -162,11 +165,12 @@ export async function embed(
     let vector = [];
     if (!uploadMode) {
       console.log("Embedding", chunkId);
-      const openAiEmbedding = await openai.embeddings.create({
+      const providerEmbeddings = await Clients.createEmbedding("", {
         input: textOfChunk,
-        model: "text-embedding-ada-002",
+        model: model || Models.openai.EmbeddingAda2,
       });
-      vector = openAiEmbedding.data[0].embedding;
+
+      vector = providerEmbeddings.data[0].embedding;
     }
 
     const embeddable: Embeddable = {
@@ -203,6 +207,7 @@ export async function isEmbeddingFile(inputFile: string) {
 }
 
 export async function embedJson(
+  model: string,
   inputFile: string,
   source: Config["embedSources"][0]
 ) {
@@ -225,6 +230,7 @@ export async function embedJson(
     console.log("Embedding", row.id);
     batch.push(
       embed(
+        model,
         row.id,
         row.text,
         row.metadata,
@@ -255,6 +261,7 @@ export async function embedJson(
 }
 
 export async function embedKind(
+  model: Config["embeddingModel"],
   id: string,
   source: Config["embedSources"][0],
   embeddings = [] as Embeddable[],
@@ -269,7 +276,7 @@ export async function embedKind(
 
   if (id.endsWith(".json") && (await isEmbeddingFile(id))) {
     console.log("Embedding JSON", id);
-    return embedJson(id, source);
+    return embedJson(model, id, source);
   }
 
   const toEmbed = await handleAllKinds(id, source);
@@ -278,6 +285,7 @@ export async function embedKind(
   for (const row of toEmbed) {
     const { id: rowId, text, metadata } = row;
     const embedded = await embed(
+      model,
       rowId,
       text,
       metadata,
@@ -382,13 +390,14 @@ export function pruneMetadata(embeddings: Embeddable[], characterLimit = 5000) {
 
 export async function queryEmbedding<E>(
   query: string,
-  embeddings: Embeddable<E>[]
+  embeddings: Embeddable<E>[],
+  model = Models.openai.EmbeddingAda2
 ) {
-  const openAiEmbedding = await openai.embeddings.create({
+  const providerEmbeddings = await Clients.createEmbedding("", {
     input: query,
-    model: "text-embedding-ada-002",
+    model,
   });
-  const queryVector = openAiEmbedding.data[0].embedding;
+  const queryVector = providerEmbeddings.data[0].embedding;
   const results = new Array<EmbeddingBase<E>>();
   for (const embedding of embeddings) {
     const similarity = cosineSimilarity(embedding.vector, queryVector);
