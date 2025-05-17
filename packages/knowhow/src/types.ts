@@ -160,6 +160,20 @@ export const Models = {
     EmbeddingLarge3: "text-embedding-3-large",
     EmbeddingSmall3: "text-embedding-3-small",
   },
+  google: {
+    Gemini_25_Flash_Preview: "gemini-2.5-flash-preview-04-17",
+    Gemini_25_Pro_Preview: "gemini-2.5-pro-preview-05-06",
+    Gemini_20_Flash: "gemini-2.0-flash",
+    Gemini_20_Flash_Preview_Image_Generation: "gemini-2.0-flash-preview-image-generation",
+    Gemini_20_Flash_Lite: "gemini-2.0-flash-lite",
+    Gemini_15_Flash: "gemini-1.5-flash",
+    Gemini_15_Flash_8B: "gemini-1.5-flash-8b",
+    Gemini_15_Pro: "gemini-1.5-pro",
+    Gemini_Embedding: "gemini-embedding-exp",
+    Imagen_3: "imagen-3.0-generate-002",
+    Veo_2: "veo-2.0-generate-001",
+    Gemini_20_Flash_Live: "gemini-2.0-flash-live-001",
+  },
 };
 
 export const OpenAiReasoningModels = [
@@ -174,4 +188,28 @@ export const OpenAiEmbeddingModels = [
   Models.openai.EmbeddingAda2,
   Models.openai.EmbeddingLarge3,
   Models.openai.EmbeddingSmall3,
+];
+
+
+export const GoogleReasoningModels = [
+  Models.google.Gemini_25_Flash_Preview,
+  Models.google.Gemini_25_Pro_Preview,
+  Models.google.Gemini_20_Flash,
+  Models.google.Gemini_20_Flash_Lite,
+  Models.google.Gemini_15_Flash,
+  Models.google.Gemini_15_Flash_8B,
+  Models.google.Gemini_15_Pro,
+];
+
+export const GoogleImageModels = [
+  Models.google.Gemini_20_Flash_Preview_Image_Generation,
+  Models.google.Imagen_3,
+];
+
+export const GoogleVideoModels = [
+  Models.google.Veo_2,
+];
+
+export const GoogleEmbeddingModels = [
+  Models.google.Gemini_Embedding,
 ];

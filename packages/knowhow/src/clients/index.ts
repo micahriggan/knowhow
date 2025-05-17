@@ -7,6 +7,7 @@ import {
 } from "./types";
 import { GenericOpenAiClient } from "./openai";
 import { GenericAnthropicClient } from "./anthropic";
+import { GenericGeminiClient } from "./gemini";
 import { HttpClient } from "./http";
 import { Models } from "../types";
 import { getConfig } from "../config";
@@ -15,11 +16,13 @@ export class AIClient {
   clients = {
     openai: new GenericOpenAiClient(),
     anthropic: new GenericAnthropicClient(),
+    gemini: new GenericGeminiClient(),
   };
 
   clientModels = {
     openai: Object.values(Models.openai),
     anthropic: Object.values(Models.anthropic),
+    gemini: Object.values(Models.google),
   };
 
   getClient(provider: string): GenericClient {
@@ -51,7 +54,8 @@ export class AIClient {
         this.registerModels(modelProvider.provider, ids);
       } catch (error) {
         console.error(
-          `Failed to register models for provider ${modelProvider.provider}:`, error.message
+          `Failed to register models for provider ${modelProvider.provider}:`,
+          error.message
         );
       }
     }
@@ -193,3 +197,5 @@ export * from "./http";
 export * from "./openai";
 export * from "./anthropic";
 export * from "./knowhow";
+export * from "./gemini";
+export * from "./gemini";
