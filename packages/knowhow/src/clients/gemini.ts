@@ -137,7 +137,7 @@ export class GenericGeminiClient extends GoogleGenAI implements GenericClient {
 
         if (parts.length > 0) {
           googleContents.push({
-            role: msg.role,
+            role: msg.role === "user" ? "user" : "model",
             parts,
           });
         }
