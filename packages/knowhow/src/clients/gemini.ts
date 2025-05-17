@@ -9,6 +9,7 @@ import {
   ToolConfig,
   UsageMetadata,
 } from "@google/genai";
+import { Models } from "../types";
 
 import {
   GenericClient,
@@ -23,24 +24,17 @@ import {
   OutputMessage, // Your generic OutputMessage type
 } from "./types"; // Assuming your types are in a file named types.ts
 
-// You might need to import getConfigSync if used for baseUrl
-// import { getConfigSync } from "../config";
-// const config = getConfigSync();
-
-// Helper function to determine mime type for images
 function getMimeTypeFromUrl(url: string): string {
-  // Basic inference, could be improved
   if (url.endsWith(".png")) return "image/png";
   if (url.endsWith(".gif")) return "image/gif";
   if (url.endsWith(".webp")) return "image/webp";
-  // Default to jpeg
   return "image/jpeg";
 }
 
 export class GenericGeminiClient extends GoogleGenAI implements GenericClient {
   constructor() {
     super({
-      apiKey: process.env.GOOGLE_API_KEY,
+      apiKey: process.env.GEMINI_API_KEY,
     });
   }
 
@@ -337,7 +331,9 @@ export class GenericGeminiClient extends GoogleGenAI implements GenericClient {
         }) || []; // Handle case with no candidates
 
       const usage = response.usageMetadata;
-      const usdCost = this.calculateCost(options.model, usage);
+      const usdCost = usage
+        ? this.calculateCost(options.model, usage)
+        : undefined;
 
       return {
         choices,
@@ -351,40 +347,85 @@ export class GenericGeminiClient extends GoogleGenAI implements GenericClient {
     }
   }
 
-  // Placeholder pricing method - replace with actual pricing info if available
   pricesPerMillion(): { [key: string]: any } {
-    // Google GenAI pricing info was not provided in the text.
-    // Implement this based on Google's current pricing for the models you support.
-    // Example structure (replace with actual data):
-    // return {
-    //     'models/gemini-pro': { input: 0.5, output: 1.5 },
-    //     'models/gemini-1.5-flash-latest': { input: 0.35, output: 1.05 },
-    //     // ... add other models
-    // };
-    console.warn("Google GenAI pricing not implemented.");
-    return {}; // Return empty object as pricing is not available
+    return {
+      [Models.google.Gemini_25_Flash_Preview]: {
+        input: 0.15,
+        output: 0.6,
+        thinking_output: 3.5,
+        context_caching: 0.0375,
+      },
+      [Models.google.Gemini_25_Pro_Preview]: {
+        input: 1.25,
+        output: 10.0,
+        context_caching: 0.31,
+      },
+      [Models.google.Gemini_20_Flash]: {
+        input: 0.1,
+        output: 0.4,
+        context_caching: 0.025,
+      },
+      [Models.google.Gemini_20_Flash_Preview_Image_Generation]: {
+        input: 0.1,
+        output: 0.4,
+        image_generation: 0.039,
+      },
+      [Models.google.Gemini_20_Flash_Lite]: {
+        input: 0.075,
+        output: 0.3,
+      },
+      [Models.google.Gemini_15_Flash]: {
+        input: 0.075,
+        output: 0.3,
+        context_caching: 0.01875,
+      },
+      [Models.google.Gemini_15_Flash_8B]: {
+        input: 0.0375,
+        output: 0.15,
+        context_caching: 0.01,
+      },
+      [Models.google.Gemini_15_Pro]: {
+        input: 1.25,
+        output: 5.0,
+        context_caching: 0.3125,
+      },
+      [Models.google.Imagen_3]: {
+        image_generation: 0.03,
+      },
+      [Models.google.Veo_2]: {
+        video_generation: 0.35,
+      },
+      [Models.google.Gemini_Embedding]: {
+        input: 0, // Free of charge
+        output: 0, // Free of charge
+      },
+    };
   }
 
-  // Placeholder cost calculation method - replace with actual logic
-  calculateCost(
-    model: string,
-    usage: UsageMetadata | undefined // Use Google's UsageMetadata type
-  ): number | undefined {
-    console.warn(
-      "Google GenAI cost calculation not implemented due to missing pricing info."
-    );
-    // The structure of usage for Google is UsageMetadata { promptTokenCount, candidatesTokenCount, totalTokenCount }
-    // Need pricing per token for input and output for the specific model.
-    // const pricing = this.pricesPerMillion()[model];
-    // if (!pricing || !usage) {
-    //     return undefined;
-    // }
+  calculateCost(model: string, usage: UsageMetadata): number | undefined {
+    const pricing = this.pricesPerMillion()[model];
+    if (!pricing || !usage) {
+      return 0;
+    }
 
-    // const inputCost = (usage.promptTokenCount * pricing.input) / 1e6;
-    // const outputCost = (usage.candidatesTokenCount * pricing.output) / 1e6; // Google uses candidatesTokenCount for output
-    // return inputCost + outputCost;
+    let cost = 0;
 
-    return undefined; // Return undefined as cost calculation is not implemented
+    if ("promptTokenCount" in usage && usage.promptTokenCount) {
+      cost += (usage.promptTokenCount * pricing.input) / 1e6;
+    }
+
+    if ("responseTokenCount" in usage && usage.responseTokenCount) {
+      cost += (usage.responseTokenCount * pricing.output) / 1e6;
+    }
+
+    if (
+      "cachedContentTokenCount" in usage &&
+      usage.cachedContentTokenCount &&
+      pricing.context_caching
+    ) {
+      cost += (usage.cachedContentTokenCount * pricing.context_caching) / 1e6;
+    }
+    return cost;
   }
 
   async getModels() {
@@ -394,7 +435,7 @@ export class GenericGeminiClient extends GoogleGenAI implements GenericClient {
         id: m.name!,
       }));
     } catch (error) {
-      console.error("Error listing Google GenAI models:", error);
+      console.error("Error fetching Google GenAI models:", error);
       throw error;
     }
   }
@@ -404,20 +445,12 @@ export class GenericGeminiClient extends GoogleGenAI implements GenericClient {
       console.warn(
         "Embedding model not specified, using default 'text-embedding-004'."
       );
-      // Use a default embedding model if none is provided, as per Google docs example
-      options.model = "text-embedding-004";
     }
-
-    const contents = options.input;
-    console.log("Calling Google GenAI embedContent with:", {
-      model: options.model,
-      contents,
-    });
 
     try {
       const googleEmbedding = await this.models.embedContent({
         model: options.model,
-        contents,
+        contents: options.input,
       });
 
       console.log(
@@ -431,7 +464,7 @@ export class GenericGeminiClient extends GoogleGenAI implements GenericClient {
         index, // Use array index
       }));
 
-      const usage: Partial<UsageMetadata> = {
+      const usage = {
         promptTokenCount: googleEmbedding.metadata.billableCharacterCount || 0,
         totalTokenCount: googleEmbedding.metadata.billableCharacterCount || 0,
       };

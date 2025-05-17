@@ -16,13 +16,13 @@ export class AIClient {
   clients = {
     openai: new GenericOpenAiClient(),
     anthropic: new GenericAnthropicClient(),
-    gemini: new GenericGeminiClient(),
+    google: new GenericGeminiClient(),
   };
 
   clientModels = {
     openai: Object.values(Models.openai),
     anthropic: Object.values(Models.anthropic),
-    gemini: Object.values(Models.google),
+    google: Object.values(Models.google),
   };
 
   getClient(provider: string): GenericClient {

@@ -125,11 +125,6 @@ export type ChatInteraction = {
   lastThread: string[];
 };
 
-export const Providers = {
-  anthropic: "anthropic",
-  openai: "openai",
-} as { [key in keyof typeof Models]: keyof typeof Models };
-
 export const Models = {
   anthropic: {
     Sonnet: "claude-3-5-sonnet-20240620",
@@ -164,7 +159,8 @@ export const Models = {
     Gemini_25_Flash_Preview: "gemini-2.5-flash-preview-04-17",
     Gemini_25_Pro_Preview: "gemini-2.5-pro-preview-05-06",
     Gemini_20_Flash: "gemini-2.0-flash",
-    Gemini_20_Flash_Preview_Image_Generation: "gemini-2.0-flash-preview-image-generation",
+    Gemini_20_Flash_Preview_Image_Generation:
+      "gemini-2.0-flash-preview-image-generation",
     Gemini_20_Flash_Lite: "gemini-2.0-flash-lite",
     Gemini_15_Flash: "gemini-1.5-flash",
     Gemini_15_Flash_8B: "gemini-1.5-flash-8b",
@@ -175,6 +171,11 @@ export const Models = {
     Gemini_20_Flash_Live: "gemini-2.0-flash-live-001",
   },
 };
+
+export const Providers = Object.keys(Models).reduce((obj, key) => {
+  obj[key] = key;
+  return obj;
+}, {}) as { [key in keyof typeof Models]: keyof typeof Models };
 
 export const OpenAiReasoningModels = [
   Models.openai.o1,
@@ -189,7 +190,6 @@ export const OpenAiEmbeddingModels = [
   Models.openai.EmbeddingLarge3,
   Models.openai.EmbeddingSmall3,
 ];
-
 
 export const GoogleReasoningModels = [
   Models.google.Gemini_25_Flash_Preview,
@@ -206,10 +206,6 @@ export const GoogleImageModels = [
   Models.google.Imagen_3,
 ];
 
-export const GoogleVideoModels = [
-  Models.google.Veo_2,
-];
+export const GoogleVideoModels = [Models.google.Veo_2];
 
-export const GoogleEmbeddingModels = [
-  Models.google.Gemini_Embedding,
-];
+export const GoogleEmbeddingModels = [Models.google.Gemini_Embedding];
