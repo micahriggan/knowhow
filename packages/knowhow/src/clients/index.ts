@@ -13,25 +13,62 @@ import { Models } from "../types";
 import { getConfig } from "../config";
 import { GenericXAIClient } from "./xai";
 
+function envCheck(key: string): boolean {
+  const value = process.env[key];
+  if (!value) {
+    return false;
+  }
+  return true;
+}
+
 export class AIClient {
   clients = {
-    openai: new GenericOpenAiClient(),
-    anthropic: new GenericAnthropicClient(),
-    google: new GenericGeminiClient(),
-    xai: new GenericXAIClient(),
+    ...(envCheck("OPENAI_KEY") && { openai: new GenericOpenAiClient() }),
+
+    ...(envCheck("ANTHROPIC_API_KEY") && {
+      anthropic: new GenericAnthropicClient(),
+    }),
+
+    ...(envCheck("GEMINI_API_KEY") && { google: new GenericGeminiClient() }),
+    ...(envCheck("XAI_API_KEY") && { xai: new GenericXAIClient() }),
   };
 
   clientModels = {
-    openai: Object.values(Models.openai),
-    anthropic: Object.values(Models.anthropic),
-    google: Object.values(Models.google),
-    xai: Object.values(Models.xai),
+    ...(envCheck("OPENAI_KEY") && { openai: Object.values(Models.openai) }),
+    ...(envCheck("ANTHROPIC_API_KEY") && {
+      anthropic: Object.values(Models.anthropic),
+    }),
+    ...(envCheck("GEMINI_API_KEY") && { google: Object.values(Models.google) }),
+    ...(envCheck("XAI_API_KEY") && { xai: Object.values(Models.xai) }),
   };
 
-  getClient(provider: string): GenericClient {
-    const Client = this.clients[provider];
-    if (!Client) throw new Error("Invalid provider");
-    return Client;
+  getClient(provider: string, model?: string): GenericClient {
+    if (this.clients[provider]) {
+      return this.clients[provider];
+    }
+
+    const detected = this.detectProviderModel(provider, model);
+
+    provider = detected.provider;
+    model = detected.model;
+
+    if (!this.clients[provider]) {
+      throw new Error(
+        `Provider ${provider} not registered. Available providers: ${Object.keys(
+          this.clients
+        )}`
+      );
+    }
+
+    const hasModel = this.providerHasModel(provider, model);
+
+    if (!hasModel) {
+      throw new Error(
+        `Model ${model} not registered for provider ${provider}.`
+      );
+    }
+
+    return this.clients[provider];
   }
 
   registerClient(provider: string, client: GenericClient) {
@@ -109,44 +146,7 @@ export class AIClient {
     provider: string,
     options: CompletionOptions
   ): Promise<CompletionResponse> {
-    const detected = this.detectProviderModel(provider, options.model);
-
-    provider = detected.provider;
-    options.model = detected.model;
-
-    if (!this.clients[provider]) {
-      throw new Error(
-        `Provider ${provider} not registered. Available providers: ${Object.keys(
-          this.clients
-        )}`
-      );
-    }
-
-    const hasModel = this.providerHasModel(provider, options.model);
-
-    if (!hasModel) {
-      const doesHave = Object.keys(this.clientModels).filter((key) =>
-        this.providerHasModel(key, options.model)
-      );
-
-      if (doesHave.length) {
-        throw new Error(
-          `Model ${options.model} not registered for provider ${provider}. ${doesHave} has model ${options.model}`
-        );
-      } else {
-        throw new Error(
-          `Model ${
-            options.model
-          } not registered for any provider. ${JSON.stringify(
-            this.clientModels,
-            null,
-            2
-          )} are the available models`
-        );
-      }
-    }
-
-    const client = this.getClient(provider);
+    const client = this.getClient(provider, options.model);
     return client.createChatCompletion(options);
   }
 
@@ -154,28 +154,7 @@ export class AIClient {
     provider: string,
     options: EmbeddingOptions
   ): Promise<EmbeddingResponse> {
-    const detected = this.detectProviderModel(provider, options.model);
-
-    provider = detected.provider;
-    options.model = detected.model;
-
-    if (!this.clients[provider]) {
-      throw new Error(
-        `Provider ${provider} not registered. Available providers: ${Object.keys(
-          this.clients
-        )}`
-      );
-    }
-
-    const hasModel = this.providerHasModel(provider, options.model);
-
-    if (!hasModel) {
-      throw new Error(
-        `Model ${options.model} not registered for provider ${provider}.`
-      );
-    }
-
-    const client = this.getClient(provider);
+    const client = this.getClient(provider, options.model);
     return client.createEmbedding(options);
   }
 
@@ -201,4 +180,4 @@ export * from "./openai";
 export * from "./anthropic";
 export * from "./knowhow";
 export * from "./gemini";
-export * from "./gemini";
+export * from "./xai";

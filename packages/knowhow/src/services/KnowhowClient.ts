@@ -1,7 +1,12 @@
 import axios from "axios";
 import fs from "fs";
 import path from "path";
-import { CompletionOptions, EmbeddingOptions } from "src/clients";
+import {
+  CompletionOptions,
+  CompletionResponse,
+  EmbeddingOptions,
+  EmbeddingResponse,
+} from "src/clients";
 import { Config } from "../types";
 
 export function loadKnowhowJwt(): string {
@@ -75,7 +80,7 @@ export class KnowhowSimpleClient {
 
   createChatCompletion(options: CompletionOptions) {
     this.checkJwt();
-    return axios.post(
+    return axios.post<CompletionResponse>(
       `${this.baseUrl}/api/proxy/v1/chat/completions`,
       options,
       {
@@ -86,9 +91,13 @@ export class KnowhowSimpleClient {
 
   createEmbedding(options: EmbeddingOptions) {
     this.checkJwt();
-    return axios.post(`${this.baseUrl}/api/proxy/v1/embeddings`, options, {
-      headers: this.headers,
-    });
+    return axios.post<EmbeddingResponse>(
+      `${this.baseUrl}/api/proxy/v1/embeddings`,
+      options,
+      {
+        headers: this.headers,
+      }
+    );
   }
 
   getModels() {

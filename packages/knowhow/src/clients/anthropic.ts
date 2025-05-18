@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { wait } from "../utils";
 import { Models } from "../types";
 import {
   GenericClient,
@@ -243,63 +244,71 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
     console.log(JSON.stringify({ claudeMessages }, null, 2));
 
     const tools = this.transformTools(options.tools);
-    const response = await this.messages.create({
-      model: options.model,
-      messages: claudeMessages,
-      system: systemMessage
-        ? [
-            {
-              text: systemMessage,
-              // cache_control: { type: "ephemeral" },
-              type: "text",
-            },
-          ]
-        : undefined,
-      max_tokens: options.max_tokens || 4096,
-      ...(tools.length && {
-        tool_choice: { type: "auto" },
-        tools,
-      }),
-    });
+    try {
+      const response = await this.messages.create({
+        model: options.model,
+        messages: claudeMessages,
+        system: systemMessage
+          ? [
+              {
+                text: systemMessage,
+                // cache_control: { type: "ephemeral" },
+                type: "text",
+              },
+            ]
+          : undefined,
+        max_tokens: options.max_tokens || 4096,
+        ...(tools.length && {
+          tool_choice: { type: "auto" },
+          tools,
+        }),
+      });
 
-    if (!response.content || !response.content.length) {
-      console.log("no content in Anthropic response", response);
-    }
+      if (!response.content || !response.content.length) {
+        console.log("no content in Anthropic response", response);
+      }
 
-    return {
-      choices: response.content.map((c) => {
-        if (c.type === "tool_use") {
-          return {
-            message: {
-              role: "assistant",
-              content: "",
-              tool_calls: [
-                {
-                  id: c.id,
-                  type: "function",
-                  function: {
-                    name: c.name,
-                    arguments: JSON.stringify(c.input),
+      return {
+        choices: response.content.map((c) => {
+          if (c.type === "tool_use") {
+            return {
+              message: {
+                role: "assistant",
+                content: "",
+                tool_calls: [
+                  {
+                    id: c.id,
+                    type: "function",
+                    function: {
+                      name: c.name,
+                      arguments: JSON.stringify(c.input),
+                    },
                   },
-                },
-              ],
-            },
-          };
-        } else {
-          return {
-            message: {
-              role: "assistant",
-              content: "text" in c ? c.text : c.type,
-              tool_calls: [],
-            },
-          };
-        }
-      }),
+                ],
+              },
+            };
+          } else {
+            return {
+              message: {
+                role: "assistant",
+                content: "text" in c ? c.text : c.type,
+                tool_calls: [],
+              },
+            };
+          }
+        }),
 
-      model: options.model,
-      usage: response.usage,
-      usd_cost: this.calculateCost(options.model, response.usage),
-    };
+        model: options.model,
+        usage: response.usage,
+        usd_cost: this.calculateCost(options.model, response.usage),
+      };
+    } catch (err) {
+      if ("headers" in err && err.headers["x-should-retry"] === "true") {
+        console.log("Retrying failed request");
+        await wait(500);
+        return this.createChatCompletion(options);
+      }
+    }
   }
 
   pricesPerMillion() {

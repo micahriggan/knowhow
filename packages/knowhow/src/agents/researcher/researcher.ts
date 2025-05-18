@@ -8,7 +8,7 @@ export class ResearcherAgent extends BaseAgent {
 
   constructor() {
     super();
-    this.setModel(Models.openai.GPT_4o);
+    this.setModel(Models.google.Gemini_25_Flash_Preview);
     this.disableTool("patchFile");
     this.setEasyFinalAnswer(true);
   }

@@ -125,7 +125,6 @@ The user has asked:
 
   const response = await Clients.createCompletion(provider, {
     messages: thread,
-    max_tokens: 2500,
     model,
   });
 

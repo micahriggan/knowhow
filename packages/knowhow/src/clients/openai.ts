@@ -57,6 +57,7 @@ export class GenericOpenAiClient extends OpenAI implements GenericClient {
 
     console.log(JSON.stringify({ response }, null, 2));
     const usdCost = this.calculateCost(options.model, response.usage);
+
     return {
       choices: response.choices.map((choice) => ({
         message: {
