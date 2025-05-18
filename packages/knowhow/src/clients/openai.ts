@@ -171,7 +171,11 @@ export class GenericOpenAiClient extends OpenAI implements GenericClient {
         cached_input: 0,
         output: 12.0,
       },
-
+      [Models.openai.Codex_Mini]: {
+        input: 1.5,
+        cached_input: 0.375,
+        output: 6.0,
+      },
       [Models.openai.EmbeddingAda2]: {
         input: 0.1,
         cached_input: 0,

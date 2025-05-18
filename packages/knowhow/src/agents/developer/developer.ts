@@ -15,7 +15,7 @@ export class DeveloperAgent extends BaseAgent {
 
     this.setModelPreferences([
       {
-        model: Models.openai.o3_Mini,
+        model: Models.openai.GPT_4o,
         provider: "openai",
       },
     ]);

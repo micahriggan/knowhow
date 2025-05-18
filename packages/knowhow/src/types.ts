@@ -158,7 +158,7 @@ export const Models = {
     GPT_4o_Mini_Search: "gpt-4o-mini-search-preview-2025-03-11",
     GPT_4o_Search: "gpt-4o-search-preview-2025-03-11",
     Computer_Use: "computer-use-preview-2025-03-11",
-
+    Codex_Mini: "codex-mini-latest",
     EmbeddingAda2: "text-embedding-ada-002",
     EmbeddingLarge3: "text-embedding-3-large",
     EmbeddingSmall3: "text-embedding-3-small",
@@ -198,6 +198,7 @@ export const OpenAiEmbeddingModels = [
   Models.openai.EmbeddingLarge3,
   Models.openai.EmbeddingSmall3,
 ];
+export const OpenAiResponseOnlyModels = [Models.openai.Codex_Mini];
 
 export const GoogleReasoningModels = [
   Models.google.Gemini_25_Flash_Preview,
@@ -208,6 +209,7 @@ export const GoogleReasoningModels = [
   Models.google.Gemini_15_Flash_8B,
   Models.google.Gemini_15_Pro,
 ];
+
 
 export const GoogleImageModels = [
   Models.google.Gemini_20_Flash_Preview_Image_Generation,
