@@ -130,6 +130,14 @@ export const Models = {
     Sonnet: "claude-3-5-sonnet-20240620",
     Sonnet3_7: "claude-3-7-sonnet-20250219",
   },
+  xai: {
+    Grok3Beta: "grok-3-beta",
+    Grok3MiniBeta: "grok-3-mini-beta",
+    Grok3FastBeta: "grok-3-fast-beta",
+    Grok3MiniFastBeta: "grok-3-mini-fast-beta",
+    Grok21212: "grok-2-1212",
+    Grok2Vision1212: "grok-2-vision-1212",
+  },
   openai: {
     GPT_41: "gpt-4.1-2025-04-14",
     GPT_41_Mini: "gpt-4.1-mini-2025-04-14",

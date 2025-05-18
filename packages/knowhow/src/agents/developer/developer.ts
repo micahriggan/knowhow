@@ -15,7 +15,7 @@ export class DeveloperAgent extends BaseAgent {
 
     this.setModelPreferences([
       {
-        model: Models.openai.GPT_4o,
+        model: Models.openai.o3_Mini,
         provider: "openai",
       },
     ]);
@@ -49,19 +49,13 @@ export class DeveloperAgent extends BaseAgent {
         - For making modifications to files / code
         - Great for big files
 
-        [Vimmer - Deprecated DO NOT USE]
-        - For making modifications to code / files, when patching is not working
-        - For making modifications to files, with guidance from quickfix / compiler errors
-        - For making refactors using vim commands that would be difficult to do without IDE type plugins
-        [Vimmer Deprecated: Use Patcher instead]
-
-
         # Thought process
         1. Is the user asking you a question about the codebase or files? Foreward the question to the Researcher.
         2. Do you need to make changes to files?
           2.a Do we have enough information to know exactly what to modify? If not, ask the Researcher.
           2.b If we know what to modify, ask Patcher to make the changes with all the context required.
         3. If the agent you call has declared it has completed a task, you may need to check it's modifications to see if there's some follow up work required.
+        4. If the user is asking for a general task, like webbrowsing or terminal commands, or general questions you may accomplish this yourself.
         `,
       },
       {

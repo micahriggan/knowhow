@@ -11,18 +11,21 @@ import { GenericGeminiClient } from "./gemini";
 import { HttpClient } from "./http";
 import { Models } from "../types";
 import { getConfig } from "../config";
+import { GenericXAIClient } from "./xai";
 
 export class AIClient {
   clients = {
     openai: new GenericOpenAiClient(),
     anthropic: new GenericAnthropicClient(),
     google: new GenericGeminiClient(),
+    xai: new GenericXAIClient(),
   };
 
   clientModels = {
     openai: Object.values(Models.openai),
     anthropic: Object.values(Models.anthropic),
     google: Object.values(Models.google),
+    xai: Object.values(Models.xai),
   };
 
   getClient(provider: string): GenericClient {
