@@ -42,9 +42,9 @@ export class AIClient {
     ...(envCheck("XAI_API_KEY") && { xai: Object.values(Models.xai) }),
   };
 
-  getClient(provider: string, model?: string): GenericClient {
+  getClient(provider: string, model?: string) {
     if (this.clients[provider]) {
-      return this.clients[provider];
+      return { client: this.clients[provider], provider, model };
     }
 
     const detected = this.detectProviderModel(provider, model);
@@ -54,7 +54,7 @@ export class AIClient {
 
     if (!this.clients[provider]) {
       throw new Error(
-        `Provider ${provider} not registered. Available providers: ${Object.keys(
+        `Provider ${provider} for model ${model} not registered. Available providers: ${Object.keys(
           this.clients
         )}`
       );
@@ -68,7 +68,7 @@ export class AIClient {
       );
     }
 
-    return this.clients[provider];
+    return { client: this.clients[provider], provider, model };
   }
 
   registerClient(provider: string, client: GenericClient) {
@@ -146,16 +146,16 @@ export class AIClient {
     provider: string,
     options: CompletionOptions
   ): Promise<CompletionResponse> {
-    const client = this.getClient(provider, options.model);
-    return client.createChatCompletion(options);
+    const { client, model } = this.getClient(provider, options.model);
+    return client.createChatCompletion({ ...options, model });
   }
 
   async createEmbedding(
     provider: string,
     options: EmbeddingOptions
   ): Promise<EmbeddingResponse> {
-    const client = this.getClient(provider, options.model);
-    return client.createEmbedding(options);
+    const { client, model } = this.getClient(provider, options.model);
+    return client.createEmbedding({ ...options, model });
   }
 
   getRegisteredModels(provider: string): string[] {

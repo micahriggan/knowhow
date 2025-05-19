@@ -1,5 +1,11 @@
 import { EventEmitter } from "events";
-import { Message, OutputMessage, Tool, ToolCall } from "../../clients/types";
+import {
+  GenericClient,
+  Message,
+  OutputMessage,
+  Tool,
+  ToolCall,
+} from "../../clients/types";
 import { IAgent } from "../interface";
 import { ToolsService, Tools } from "../../services/Tools";
 import {
@@ -25,6 +31,7 @@ export abstract class BaseAgent implements IAgent {
   private lastHealthCheckTime: number = 0;
   protected provider = "openai";
   protected modelName: string = Models.openai.GPT_4o;
+  protected client: null | GenericClient = null;
   protected modelPreferences: ModelPreference[] = [];
   protected currentModelPreferenceIndex = 0;
   protected easyFinalAnswer = false;
@@ -101,7 +108,14 @@ export abstract class BaseAgent implements IAgent {
   }
 
   getClient() {
-    return Clients.getClient(this.provider);
+    if (!this.client) {
+      this.client = Clients.getClient(this.provider)?.client;
+    }
+    return this.client;
+  }
+
+  setClient(client: GenericClient) {
+    this.client = client;
   }
 
   setEasyFinalAnswer(value: boolean) {
