@@ -284,6 +284,13 @@ export class GenericGeminiClient extends GoogleGenAI implements GenericClient {
         }
       }
 
+      if (response?.promptFeedback?.blockReason) {
+        // lame
+        throw new Error(
+          `Google GenAI blocked the response due to: ${response.promptFeedback.blockReason}`
+        );
+      }
+
       // Map Google response to generic CompletionResponse
       const choices: CompletionResponse["choices"] =
         response.candidates?.map((candidate) => {
@@ -301,7 +308,12 @@ export class GenericGeminiClient extends GoogleGenAI implements GenericClient {
             toolCalls = [];
           }
 
-          candidate.content.parts.forEach((part) => {
+          if (!candidate?.content?.parts) {
+            console.warn("No content parts in candidate:", candidate);
+            return { message };
+          }
+
+          candidate?.content?.parts?.forEach((part) => {
             if ("text" in part && typeof part.text === "string") {
               textContent += part.text; // Concatenate text parts
             } else if ("functionCall" in part && part.functionCall) {
