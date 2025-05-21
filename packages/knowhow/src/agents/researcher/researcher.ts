@@ -8,9 +8,10 @@ export class ResearcherAgent extends BaseAgent {
 
   constructor() {
     super();
-    this.setModel(Models.google.Gemini_25_Flash_Preview);
+    this.setModel(Models.google.Gemini_20_Flash);
+    this.setProvider("google");
+
     this.disableTool("patchFile");
-    this.setEasyFinalAnswer(true);
   }
 
   async getInitialMessages(userInput: string) {

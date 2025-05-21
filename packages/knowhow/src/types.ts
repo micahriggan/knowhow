@@ -164,7 +164,7 @@ export const Models = {
     EmbeddingSmall3: "text-embedding-3-small",
   },
   google: {
-    Gemini_25_Flash_Preview: "gemini-2.5-flash-preview-04-17",
+    Gemini_25_Flash_Preview: "gemini-2.5-flash-preview-05-20",
     Gemini_25_Pro_Preview: "gemini-2.5-pro-preview-05-06",
     Gemini_20_Flash: "gemini-2.0-flash",
     Gemini_20_Flash_Preview_Image_Generation:

@@ -6,6 +6,7 @@ const pluginNames = Plugins.listPlugins().join(", ");
 import * as github from "./github/definitions";
 import * as asana from "./asana/definitions";
 import * as language from "./language/definitions";
+import { googleSearchDefinition } from './googleSearch';
 import { Agents } from "../../services/AgentService";
 
 export const includedTools = [
@@ -470,6 +471,7 @@ export const includedTools = [
     },
   },
 
+  googleSearchDefinition,
   ...asana.definitions,
   ...github.definitions,
   ...language.definitions,

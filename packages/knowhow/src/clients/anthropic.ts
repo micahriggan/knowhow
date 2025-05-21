@@ -304,7 +304,7 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
       };
     } catch (err) {
       if ("headers" in err && err.headers["x-should-retry"] === "true") {
-        console.log("Retrying failed request");
+        console.warn("Retrying failed request", err);
         await wait(500);
         return this.createChatCompletion(options);
       }

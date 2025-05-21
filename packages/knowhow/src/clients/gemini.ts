@@ -9,6 +9,7 @@ import {
   ToolConfig,
   UsageMetadata,
 } from "@google/genai";
+import { wait } from "../utils";
 import { Models } from "../types";
 
 import {
@@ -17,12 +18,12 @@ import {
   CompletionResponse,
   EmbeddingOptions,
   EmbeddingResponse,
-  Tool, // Your generic Tool type
-  Message, // Your generic Message type
-  MessageContent, // Your generic MessageContent type
-  ToolCall, // Your generic ToolCall type
-  OutputMessage, // Your generic OutputMessage type
-} from "./types"; // Assuming your types are in a file named types.ts
+  Tool,
+  Message,
+  MessageContent,
+  ToolCall,
+  OutputMessage,
+} from "./types";
 
 function getMimeTypeFromUrl(url: string): string {
   if (url.endsWith(".png")) return "image/png";
@@ -65,7 +66,7 @@ export class GenericGeminiClient extends GoogleGenAI implements GenericClient {
           return {
             fileData: {
               uri: part.image_url.url,
-              mimeType, // Basic inference
+              mimeType,
             },
           };
         }
@@ -114,7 +115,9 @@ export class GenericGeminiClient extends GoogleGenAI implements GenericClient {
               .join("\n");
         }
       } else if (msg.role === "user" || msg.role === "assistant") {
-        const parts = this.transformContentParts(msg.content);
+        const parts = msg.content
+          ? this.transformContentParts(msg.content)
+          : [];
 
         // Add tool_use parts if the assistant message has tool_calls
         if (
@@ -180,13 +183,6 @@ export class GenericGeminiClient extends GoogleGenAI implements GenericClient {
               functionResponse: {
                 name: functionName, // Google API requires the function name here
                 response: {
-                  // The structure of the response object here depends on what your tool function actually returns.
-                  // If your tool returns a string, put it under a key, e.g., 'result'.
-                  // If your tool returns an object, you can pass that object.
-                  // Based on the Anthropic adapter example, `content` is used directly.
-                  // Let's mirror that and put it under a 'content' key in the response object,
-                  // or just the string directly if the API allows (checking docs: functionResponse requires an object 'response').
-                  // Let's put it under a 'result' key as in the Google docs example step 3/4.
                   result: toolOutputContent,
                 },
               },
@@ -251,81 +247,79 @@ export class GenericGeminiClient extends GoogleGenAI implements GenericClient {
     const { systemInstruction, contents } = this.transformMessages(
       options.messages
     );
-    const tools = this.transformTools(options.tools);
-
-    // Map tool_choice
-    let toolConfig: ToolConfig | undefined;
-    if (tools) {
-      // Only include toolConfig if tools are provided
-      toolConfig = {
-        functionCallingConfig: {
-          mode:
-            options.tool_choice === "none"
-              ? FunctionCallingConfigMode.NONE
-              : FunctionCallingConfigMode.AUTO,
-        },
-      };
-    }
 
     console.log("Calling Google GenAI generateContent with:", {
       model: options.model,
-      contents,
+      contents: JSON.stringify(contents, null, 2),
       systemInstruction,
-      tools,
-      toolConfig,
+      tools: options?.tools?.length,
     });
 
     try {
+      await wait(2000);
       const response = await this.models.generateContent({
         model: options.model,
         contents,
         config: {
           systemInstruction,
-          toolConfig,
+          tools: this.transformTools(options.tools),
           maxOutputTokens: options.max_tokens,
         },
       });
 
-      console.log(JSON.stringify({ googleResponse: response }, null, 2));
+      let toolCalls: ToolCall[] = [];
+
+      if (response.functionCalls) {
+        for (const call of response.functionCalls) {
+          toolCalls.push({
+            id:
+              call.id ||
+              `fc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            type: "function",
+            function: {
+              name: call.name,
+              arguments: JSON.stringify(call.args || {}),
+            },
+          });
+        }
+      }
 
       // Map Google response to generic CompletionResponse
       const choices: CompletionResponse["choices"] =
         response.candidates?.map((candidate) => {
           const message: OutputMessage = {
-            role:
-              (candidate.content.role as OutputMessage["role"]) || "assistant",
+            role: candidate.content.role === "model" ? "assistant" : "user",
             content: "", // Initialize content
-            tool_calls: [], // Initialize tool calls
+            tool_calls: [...toolCalls], // Initialize tool calls
           };
 
           // Collect text and tool_use parts
           let textContent = "";
-          const toolCalls: ToolCall[] = [];
+
+          // after the first message uses the top level tool calls we should empty it
+          if (toolCalls.length) {
+            toolCalls = [];
+          }
 
           candidate.content.parts.forEach((part) => {
             if ("text" in part && typeof part.text === "string") {
               textContent += part.text; // Concatenate text parts
             } else if ("functionCall" in part && part.functionCall) {
-              toolCalls.push({
+              message.tool_calls.push({
                 id:
                   part.functionCall.id ||
                   `fc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                 type: "function",
                 function: {
                   name: part.functionCall.name,
-                  arguments: JSON.stringify(part.functionCall.args || {}), // Stringify the args object
+                  arguments: JSON.stringify(part.functionCall.args || {}),
                 },
               });
             }
-            // Ignore other part types like functionResponse, toolCode, toolOutput in the *output* message
+            toolCalls = [];
           });
 
           message.content = textContent || null;
-          if (toolCalls.length > 0) {
-            message.tool_calls = toolCalls;
-          } else {
-            delete message.tool_calls;
-          }
 
           return { message };
         }) || []; // Handle case with no candidates

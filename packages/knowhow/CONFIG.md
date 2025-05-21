@@ -40,7 +40,7 @@ Here is an overview of examples from various `knowhow.json` configuration files 
   ],
 
   // Define aditional agents you can interact with via chat
-  "assistants": [
+  "agents": [
     {
       "name": "linter",
       "description": "Clean up your code",

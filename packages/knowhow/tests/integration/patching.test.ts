@@ -32,7 +32,10 @@ describe("Patcher", () => {
   beforeAll(async () => {
     Agents.registerAgent(Patcher);
     Tools.addTools(includedTools);
-    Tools.addFunctions(allTools.addInternalTools(allTools));
+    const toolFunctions = Object.entries(allTools)
+      .filter(([_, value]) => typeof value === 'function')
+      .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
+    Tools.addFunctions(toolFunctions);
   });
 
   test("should be able to apply actual patch", async () => {

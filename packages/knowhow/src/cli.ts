@@ -11,7 +11,7 @@ import { Vimmer } from "./agents/vim/vim";
 import { Developer } from "./agents/developer/developer";
 import { Tools } from "./services";
 import { includedTools } from "./agents/tools/list";
-import * as allTools from "./agents/tools";
+import * as allTools from "./agents/tools/index";
 import { Mcp } from "./services/Mcp";
 import { login } from "./login";
 import { worker } from "./worker";
@@ -23,8 +23,13 @@ async function main() {
   Agents.registerAgent(Researcher);
   Agents.registerAgent(Patcher);
   Agents.registerAgent(Developer);
+  Agents.loadAgentsFromConfig();
   Tools.addTools(includedTools);
-  Tools.addFunctions(allTools.addInternalTools(allTools));
+
+  const toolFunctions = Object.entries(allTools)
+    .filter(([_, value]) => typeof value === 'function')
+    .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
+  Tools.addFunctions(toolFunctions);
 
   await Mcp.connectToConfigured(Tools);
   await Clients.registerConfiguredModels();

@@ -9,7 +9,6 @@ export class AgentService {
 
   constructor() {
     this.wireUp();
-    this.loadAgentsFromConfig();
   }
 
   public wireUp() {
@@ -80,10 +79,10 @@ export class AgentService {
 
   public loadAgentsFromConfig() {
     const config = getConfigSync();
-    const assistants = config.agents || [];
+    const agents = config.agents || [];
 
-    for (const assistant of assistants) {
-      this.registerAgent(new ConfigAgent(assistant));
+    for (const agent of agents) {
+      this.registerAgent(new ConfigAgent(agent));
     }
   }
 
