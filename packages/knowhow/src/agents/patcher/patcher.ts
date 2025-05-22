@@ -81,7 +81,7 @@ export class PatchingAgent extends BaseAgent {
     this.disableTool("openFileInVim");
 
     this.setModelPreferences([
-      { model: Models.anthropic.Sonnet, provider: "anthropic" },
+      { model: Models.anthropic.Sonnet4, provider: "anthropic" },
       {
         model: Models.openai.GPT_41,
         provider: "openai",

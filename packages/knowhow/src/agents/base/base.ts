@@ -353,7 +353,11 @@ export abstract class BaseAgent implements IAgent {
         tool_choice: "auto",
       });
 
-      this.adjustTotalCostUsd(response.usd_cost);
+      if (response?.usd_cost === undefined) {
+        console.warn("Response cost is undefined", response);
+      }
+
+      this.adjustTotalCostUsd(response?.usd_cost);
       this.logMessages(response.choices.map((c) => c.message));
 
       const firstMessage = response.choices[0].message;
@@ -517,6 +521,8 @@ export abstract class BaseAgent implements IAgent {
 
         We have just compressed the conversation to save memory:
         ${JSON.stringify(summaries)}
+
+        Please continue the task from where we left off
         `,
       },
     ] as Message[];

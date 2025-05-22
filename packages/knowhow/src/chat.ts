@@ -96,7 +96,7 @@ export async function askEmbedding<E>(promptText: string) {
 
 const ChatModelDefaults = {
   openai: Models.openai.GPT_4o,
-  anthropic: Models.anthropic.Sonnet,
+  anthropic: Models.anthropic.Sonnet4,
 };
 export async function askAI<E extends EmbeddingBase>(
   query: string,

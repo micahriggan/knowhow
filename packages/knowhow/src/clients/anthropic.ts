@@ -313,17 +313,47 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
 
   pricesPerMillion() {
     return {
+      [Models.anthropic.Opus4]: {
+        input: 15.0,
+        cache_write: 18.75,
+        cache_hit: 1.5,
+        output: 75.0,
+      },
+      [Models.anthropic.Sonnet4]: {
+        input: 3.0,
+        cache_write: 3.75,
+        cache_hit: 0.3,
+        output: 15.0,
+      },
       [Models.anthropic.Sonnet3_7]: {
         input: 3.0,
         cache_write: 3.75,
         cache_hit: 0.3,
         output: 15.0,
       },
-      [Models.anthropic.Sonnet]: {
+      [Models.anthropic.Sonnet3_5]: {
         input: 3.0,
         cache_write: 3.75,
         cache_hit: 0.3,
         output: 15.0,
+      },
+      [Models.anthropic.Haiku3_5]: {
+        input: 0.80,
+        cache_write: 1.25,
+        cache_hit: 0.1,
+        output: 4.0,
+      },
+      [Models.anthropic.Opus3]: {
+        input: 15.0,
+        cache_write: 18.75,
+        cache_hit: 1.5,
+        output: 75.0,
+      },
+      [Models.anthropic.Haiku3]: {
+        input: 0.25,
+        cache_write: 0.3,
+        cache_hit: 0.03,
+        output: 1.25,
       },
     };
   }

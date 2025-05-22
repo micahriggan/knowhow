@@ -127,8 +127,13 @@ export type ChatInteraction = {
 
 export const Models = {
   anthropic: {
-    Sonnet: "claude-3-5-sonnet-20240620",
+    Opus4: "claude-opus-4-20250514",
+    Sonnet4: "claude-sonnet-4-20250514",
     Sonnet3_7: "claude-3-7-sonnet-20250219",
+    Sonnet3_5: "claude-3-5-sonnet-20241022",
+    Haiku3_5: "claude-3-5-haiku-20241022",
+    Opus3: "claude-3-opus-20240229",
+    Haiku3: "claude-3-haiku-20240307",
   },
   xai: {
     Grok3Beta: "grok-3-beta",
@@ -209,7 +214,6 @@ export const GoogleReasoningModels = [
   Models.google.Gemini_15_Flash_8B,
   Models.google.Gemini_15_Pro,
 ];
-
 
 export const GoogleImageModels = [
   Models.google.Gemini_20_Flash_Preview_Image_Generation,

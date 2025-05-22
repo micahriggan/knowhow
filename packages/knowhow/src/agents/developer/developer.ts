@@ -15,8 +15,8 @@ export class DeveloperAgent extends BaseAgent {
 
     this.setModelPreferences([
       {
-        model: Models.google.Gemini_25_Flash_Preview,
-        provider: "openai",
+        model: Models.google.Gemini_20_Flash,
+        provider: "google",
       },
     ]);
   }

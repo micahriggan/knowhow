@@ -15,7 +15,7 @@ export class VimAgent extends BaseAgent {
     super();
     // this.disableTool("patchFile");
     this.setModelPreferences([
-      { model: Models.anthropic.Sonnet, provider: "anthropic" },
+      { model: Models.anthropic.Sonnet4, provider: "anthropic" },
     ]);
   }
 

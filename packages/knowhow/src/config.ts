@@ -1,103 +1,135 @@
 import * as fs from "fs";
 import * as path from "path";
+import * as os from "os";
 import gitignoreToGlob from "gitignore-to-glob";
 import { Prompts } from "./prompts";
 import { promisify } from "util";
 import { Config, Language, AssistantConfig, Models } from "./types";
 import { mkdir, writeFile, readFile, fileExists } from "./utils";
 
-export async function init() {
-  // create the folder structure
-  await mkdir(".knowhow", { recursive: true });
-  await mkdir(".knowhow/prompts", { recursive: true });
-  await mkdir(".knowhow/docs", { recursive: true });
-  await mkdir(".knowhow/embeddings", { recursive: true });
-
-  // Copy the template prompts
-  await copyTemplates();
-
-  // create knowhow.json
-  const config = {
-    promptsDir: ".knowhow/prompts",
-    modules: [],
-    plugins: [
-      "embeddings",
-      "language",
-      "vim",
-      "github",
-      "asana",
-      "jira",
-      "linear",
-      "download",
-      "figma",
-      "url",
-    ],
-    lintCommands: {
-      js: "eslint",
-      ts: "tslint",
+const defaultConfig = {
+  promptsDir: ".knowhow/prompts",
+  modules: [],
+  plugins: [
+    "embeddings",
+    "language",
+    "vim",
+    "github",
+    "asana",
+    "jira",
+    "linear",
+    "download",
+    "figma",
+    "url",
+  ],
+  lintCommands: {
+    js: "eslint",
+    ts: "tslint",
+  },
+  sources: [
+    {
+      input: "src/**/*.mdx",
+      output: ".knowhow/docs/",
+      prompt: "BasicCodeDocumenter",
     },
+    {
+      input: ".knowhow/docs/**/*.mdx",
+      output: ".knowhow/docs/README.mdx",
+      prompt: "BasicProjectDocumenter",
+    },
+  ],
+  embedSources: [
+    {
+      input: ".knowhow/docs/**/*.mdx",
+      output: ".knowhow/embeddings/docs.json",
+      prompt: "BasicEmbeddingExplainer",
+      chunkSize: 2000,
+    },
+  ],
+  embeddingModel: Models.openai.EmbeddingAda2,
+
+  agents: [
+    {
+      name: "Example agent",
+      description:
+        "You can define agents in the config. They will have access to all tools.",
+      instructions: "Reply to the user saying 'Hello, world!'",
+      model: "gpt-4o-2024-08-06",
+      provider: "openai",
+    },
+  ],
+  mcps: [
+    {
+      name: "browser",
+      command: "npx",
+      args: ["-y", "@playwright/mcp@latest", "--browser", "chrome"],
+    },
+  ],
+
+  modelProviders: [{ url: "http://localhost:1234", provider: "lms" }],
+} as Config;
+
+const defaultLanguage = {
+  "knowhow config": {
     sources: [
       {
-        input: "src/**/*.mdx",
-        output: ".knowhow/docs/",
-        prompt: "BasicCodeDocumenter",
-      },
-      {
-        input: ".knowhow/docs/**/*.mdx",
-        output: ".knowhow/docs/README.mdx",
-        prompt: "BasicProjectDocumenter",
+        kind: "file",
+        data: [".knowhow/knowhow.json"],
       },
     ],
-    embedSources: [
-      {
-        input: ".knowhow/docs/**/*.mdx",
-        output: ".knowhow/embeddings/docs.json",
-        prompt: "BasicEmbeddingExplainer",
-        chunkSize: 500,
-      },
-    ],
-    embeddingModel: Models.openai.EmbeddingAda2,
+  },
+} as Language;
 
-    agents: [
-      {
-        name: "Example agent",
-        description:
-          "You can define agents in the config. They will have access to all tools.",
-        instructions: "Reply to the user saying 'Hello, world!'",
-        model: "gpt-4o-2024-08-06",
-        provider: "openai",
-      },
-    ],
-    mcps: [
-      {
-        name: "browser",
-        command: "npx",
-        args: ["-y", "@modelcontextprotocol/server-puppeteer"],
-      },
-    ],
+const globalTemplateFolders = ["prompts", "docs", "embeddings"];
+const globalTemplateFiles = {
+  "knowhow.json": JSON.stringify(defaultConfig, null, 2),
+  "language.json": JSON.stringify(defaultLanguage, null, 2),
+  ".ignore": "",
+  ".hashes.json": "{}",
+  ".jwt": "",
+};
 
-    modelProviders: [{ url: "http://localhost:1234", provider: "lms" }],
-  } as Config;
-  await updateConfig(config);
+for (const prompt of Prompts) {
+  const promptName = Object.keys(prompt)[0];
+  const fileName = "prompts/" + promptName + ".mdx";
+  globalTemplateFiles[fileName] = prompt[promptName];
+}
 
-  const assistants = {
-    files: {},
-  } as AssistantConfig;
+function getGlobalConfigDir() {
+  return path.join(os.homedir(), ".knowhow");
+}
 
-  const language = {
-    "knowhow config": {
-      sources: [
-        {
-          kind: "file",
-          data: [".knowhow/knowhow.json"],
-        },
-      ],
-    },
-  } as Language;
+async function ensureGlobalConfigDir() {
+  const globalConfigDir = getGlobalConfigDir();
+  await mkdir(globalConfigDir, { recursive: true });
 
-  await writeFile(".knowhow/language.json", JSON.stringify(language, null, 2));
-  await writeFile(".knowhow/.hashes.json", "{}");
-  await writeFile(".knowhow/.ignore", "");
+  for (const folder of globalTemplateFolders) {
+    const folderPath = path.join(globalConfigDir, folder);
+    await mkdir(folderPath, { recursive: true });
+    fs.chmodSync(folderPath, 0o600);
+  }
+
+  for (const file of Object.keys(globalTemplateFiles)) {
+    const filePath = path.join(globalConfigDir, file);
+    if (!fs.existsSync(filePath)) {
+      await writeFile(filePath, globalTemplateFiles[file]);
+      fs.chmodSync(filePath, 0o600);
+    }
+  }
+  return globalConfigDir;
+}
+
+export async function init() {
+  const globalConfigDir = await ensureGlobalConfigDir();
+
+  // create the folder structure
+  await mkdir(".knowhow", { recursive: true });
+  for (const folder of globalTemplateFolders) {
+    await mkdir(path.join(".knowhow", folder), { recursive: true });
+  }
+
+  // Copy the template prompts
+  await copyTemplates(globalConfigDir);
 }
 
 export async function getLanguageConfig() {
@@ -113,11 +145,26 @@ export async function updateConfig(config: Config) {
   await writeFile(".knowhow/knowhow.json", JSON.stringify(config, null, 2));
 }
 
-async function copyTemplates() {
-  for (const prompt of Prompts) {
-    const promptName = Object.keys(prompt)[0];
-    const promptPath = path.join(".knowhow/prompts", promptName + ".mdx");
-    await writeFile(promptPath, prompt[promptName]);
+async function copyTemplates(globalConfigDir: string) {
+  for (const folder of globalTemplateFolders) {
+    const src = path.join(globalConfigDir, folder);
+    const dest = path.join(".knowhow", folder);
+    // Copy all the template folders, skipping files that already exist
+    await fs.promises.cp(src, dest, {
+      recursive: true,
+      filter: (source, destination) => {
+        return fs.existsSync(dest) ? false : true;
+      },
+    });
+  }
+
+  // Copy the template files, skipping files that already exist
+  for (const file of Object.keys(globalTemplateFiles)) {
+    const src = path.join(globalConfigDir, file);
+    const dest = path.join(".knowhow", file);
+    if (!fs.existsSync(dest)) {
+      await fs.promises.copyFile(src, dest);
+    }
   }
 }
 
