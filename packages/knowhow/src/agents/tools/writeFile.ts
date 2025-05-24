@@ -16,6 +16,10 @@ export async function writeFileChunk(
   isContinuing: boolean,
   isDone: boolean
 ) {
+  if (!filePath || content === undefined) {
+    return "File path and content are both required.";
+  }
+
   if (!isContinuing) {
     fs.writeFileSync(filePath, content);
   }
