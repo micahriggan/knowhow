@@ -307,6 +307,9 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
         console.warn("Retrying failed request", err);
         await wait(2500);
         return this.createChatCompletion(options);
+      } else {
+        console.error("Error in createChatCompletion", err);
+        throw err;
       }
     }
   }
@@ -338,7 +341,7 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
         output: 15.0,
       },
       [Models.anthropic.Haiku3_5]: {
-        input: 0.80,
+        input: 0.8,
         cache_write: 1.25,
         cache_hit: 0.1,
         output: 4.0,

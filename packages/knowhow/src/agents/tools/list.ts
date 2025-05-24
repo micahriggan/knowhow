@@ -472,6 +472,42 @@ export const includedTools = [
   },
 
   googleSearchDefinition,
+  {
+    type: "function",
+    function: {
+      name: "loadWebpage",
+      description:
+        "Load a webpage using a stealth browser to avoid bot detection. Can return either text content with console logs or a screenshot.",
+      parameters: {
+        type: "object",
+        positional: true,
+        properties: {
+          url: {
+            type: "string",
+            description: "The URL of the webpage to load",
+          },
+          mode: {
+            type: "string",
+            description: "The mode for content extraction: 'text' for text content with console logs, 'screenshot' for a base64 encoded screenshot",
+            enum: ["text", "screenshot"],
+          },
+          waitForSelector: {
+            type: "string",
+            description: "Optional CSS selector to wait for before extracting content",
+          },
+          timeout: {
+            type: "number",
+            description: "Timeout in milliseconds for page loading (default: 30000)",
+          },
+        },
+        required: ["url"],
+      },
+      returns: {
+        type: "string",
+        description: "The webpage content as text with console logs, or a base64 encoded screenshot",
+      },
+    },
+  },
   ...asana.definitions,
   ...github.definitions,
   ...language.definitions,

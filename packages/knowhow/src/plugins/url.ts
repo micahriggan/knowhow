@@ -2,6 +2,7 @@ import { Plugin } from "./types";
 import { MinimalEmbedding } from "../types";
 import axios from "axios";
 import * as cheerio from "cheerio";
+import loadWebpage from "../agents/tools/loadWebpage";
 
 export class UrlPlugin implements Plugin {
   async embed(userPrompt: string): Promise<MinimalEmbedding[]> {
@@ -17,15 +18,9 @@ export class UrlPlugin implements Plugin {
 
   async fetchAndParseUrl(url: string): Promise<MinimalEmbedding | null> {
     try {
-      const response = await axios.get(url);
-      const html = response.data;
-      const $ = cheerio.load(html);
+      const text = await loadWebpage(url);
 
-      // Remove script and style elements
-      $("script, style").remove();
-
-      // Get the text content
-      const text = $("body").text().trim().replace(/\s+/g, " ");
+      console.log(`URL PLUGIN: Fetched content from ${url}:`, text);
 
       return {
         id: url + "-url",

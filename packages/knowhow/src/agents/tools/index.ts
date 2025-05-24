@@ -21,3 +21,4 @@ export * from "./language";
 export * from "./askHuman";
 export * from "./aiClient";
 export * from "./googleSearch";
+export * from "./loadWebpage";
