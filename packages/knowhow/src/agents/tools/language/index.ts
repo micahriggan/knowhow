@@ -1,10 +1,10 @@
-import { Plugins } from "../../../plugins/plugins";
+import { services } from "../../../services";
 import { getLanguageConfig, updateLanguageConfig } from "../../../config";
 import { IDatasource } from "../../../types";
 
 export async function addLanguageTerm(term: string, sources: IDatasource[]) {
   const language = await getLanguageConfig();
-  language[term] = { sources };
+  language[term] = { events: [], sources };
   await updateLanguageConfig(language);
 }
 
@@ -14,6 +14,7 @@ export async function getAllLanguageTerms() {
 }
 
 export async function lookupLanguageTerm(term: string) {
+  const { Plugins } = services();
   const language = await getLanguageConfig();
   return Plugins.call("language", term);
 }

@@ -2,7 +2,7 @@ import pdf from "pdf-parse";
 import * as fs from "fs";
 import * as path from "path";
 import { readFile, fileExists } from "./utils";
-import { Downloader } from "./plugins/downloader/downloader";
+import { services } from "./services";
 
 export async function processAudio(
   filePath: string,
@@ -16,9 +16,12 @@ export async function processAudio(
   if (exists && reusePreviousTranscript) {
     console.log(`Transcription ${outputPath} already exists, skipping`);
     const fileContent = await readFile(outputPath, "utf8");
-    return outputPath.endsWith("txt") ? fileContent : JSON.parse(fileContent);
+    return outputPath.endsWith("txt")
+      ? fileContent.split("\n")
+      : JSON.parse(fileContent);
   }
 
+  const { Downloader } = services();
   const chunks = await Downloader.chunk(
     filePath,
     parsed.dir,
@@ -71,9 +74,11 @@ export async function processVideo(
   );
 
   console.log("Extracting keyframes...");
+  const { Downloader } = services();
   const videoAnalysis = await Downloader.extractKeyframes(
     filePath,
     outputPath,
+    reusePreviousTranscript,
     chunkTime
   );
 

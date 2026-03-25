@@ -1,4 +1,4 @@
-import glob from "glob";
+import { globSync } from "glob";
 import { getConfiguredEmbeddings } from "../../embeddings";
 import { execCommand } from "./execCommand";
 import { getIgnorePattern } from "../../config";
@@ -9,25 +9,27 @@ export async function fileSearch(searchTerm) {
   const pattern = `./**/*${searchTermLower}*`;
   const ignore = await getIgnorePattern();
   console.log({ pattern, ignore });
-  const files = await glob.sync(pattern, {
+  const globFiles = globSync(pattern, {
     ignore,
+    nocase: true,
   });
 
-  if (files.length === 0) {
-    const embeddings = await getConfiguredEmbeddings();
-    const results = embeddings.filter((embedding) =>
-      embedding.id.toLowerCase().includes(searchTermLower)
-    );
+  const embeddings = await getConfiguredEmbeddings();
+  
+  // Ensure embeddings is always an array
+  const embeddingsArray = Array.isArray(embeddings) ? embeddings : [];
+  
+  const embeddingFiles = embeddingsArray.filter((embedding) =>
+    embedding.id.toLowerCase().includes(searchTermLower)
+  );
 
-    // ids are filepath.txt-part
-    const ids = toUniqueArray(
-      results.map((r) => {
-        const parts = r.id.split("-");
-        return parts.slice(0, -1).join("-");
-      })
-    );
-    files.push(...ids);
-  }
+  // ids are filepath.txt-part
+  const embeddingIds = embeddingFiles.map((r) => {
+    const parts = r.id.split("-");
+    return parts.slice(0, -1).join("-");
+  });
 
-  return JSON.stringify(files);
+  const allFiles = toUniqueArray([...globFiles, ...embeddingIds]);
+
+  return allFiles;
 }

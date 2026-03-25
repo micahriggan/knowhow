@@ -1,4 +1,13 @@
-import { Config, Embeddable, EmbeddingBase, Models } from "../types";
+import * as path from "path";
+import { globSync } from "glob";
+
+import {
+  Config,
+  Embeddable,
+  EmbeddingBase,
+  EmbeddingModels,
+  Models,
+} from "../types";
 import {
   readFile,
   writeFile,
@@ -7,10 +16,8 @@ import {
   cosineSimilarity,
 } from "../utils";
 import { summarizeTexts, chunkText } from "../ai";
-import { Plugins } from "../plugins/plugins";
 import { Clients, GenericClient } from "../clients";
-import * as path from "path";
-import glob from "glob";
+import { PluginService } from "..//plugins/plugins";
 
 export type CreateEmbeddingOptions = {
   provider?: string;
@@ -25,13 +32,21 @@ export type EmbedOptions = {
   minLength?: number;
 };
 
+interface EmbeddingServiceContext {
+  config: Config;
+  embeddingClient?: GenericClient;
+  plugins: PluginService;
+}
+
 export class EmbeddingService {
   private config: Config;
   private embeddingClient: GenericClient;
+  private plugins: PluginService;
 
-  constructor(config: Config, embeddingClient: GenericClient) {
-    this.config = config;
-    this.embeddingClient = embeddingClient;
+  constructor(protected context: EmbeddingServiceContext) {
+    this.config = context.config;
+    this.embeddingClient = context.embeddingClient;
+    this.plugins = context.plugins;
   }
 
   setEmbeddingClient(client: GenericClient) {
@@ -96,7 +111,7 @@ export class EmbeddingService {
     }
 
     console.log("Embedding", source.input, "to", source.output);
-    let files = await glob.sync(source.input, { ignore: ignorePattern });
+    let files = await globSync(source.input, { ignore: ignorePattern });
 
     if (source.kind && files.length === 0) {
       files = [source.input];
@@ -187,9 +202,9 @@ export class EmbeddingService {
     const contents = "";
     const ids = [];
 
-    if (Plugins.isPlugin(kind)) {
+    if (this.plugins.isPlugin(kind)) {
       console.log("Embedding with plugin", kind);
-      return Plugins.embed(kind, input);
+      return this.plugins.embed(kind, input);
     }
     switch (kind) {
       case "text":
@@ -262,7 +277,7 @@ export class EmbeddingService {
         console.log("Embedding", chunkId);
         const providerEmbeddings = await this.createEmbedding({
           input: textOfChunk,
-          model: model || Models.openai.EmbeddingAda2,
+          model: model || EmbeddingModels.openai.EmbeddingAda2,
         });
 
         vector = providerEmbeddings.data[0].embedding;
@@ -305,7 +320,7 @@ export class EmbeddingService {
   async queryEmbedding<E>(
     query: string,
     embeddings: Embeddable<E>[],
-    model = Models.openai.EmbeddingAda2
+    model = EmbeddingModels.openai.EmbeddingAda2
   ): Promise<EmbeddingBase<E>[]> {
     // Implementation of queryEmbedding method
     const providerEmbeddings = await this.createEmbedding({

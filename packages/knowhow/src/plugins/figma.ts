@@ -1,8 +1,9 @@
 import { Client } from "figma-js";
 import qs from "qs"; // Assumed to be installed
+import { PluginBase, PluginMeta } from "./PluginBase";
+import { PluginContext } from "./types";
 import { Plugin } from "./types";
 import { MinimalEmbedding } from "../types";
-import { askGptVision } from "../ai";
 
 interface Node {}
 
@@ -30,13 +31,30 @@ interface FigmaApiResponse {
   nodes: Record<string, FigmaNodeData>;
 }
 
-export class FigmaPlugin implements Plugin {
+export class FigmaPlugin extends PluginBase implements Plugin {
   private figmaToken: string;
   private client: ReturnType<typeof Client>;
 
-  constructor() {
+  static readonly meta: PluginMeta = {
+    key: "figma",
+    name: "Figma Plugin",
+    requires: ["FIGMA_API_KEY"],
+  };
+
+  meta = FigmaPlugin.meta;
+
+  constructor(context: PluginContext = {}) {
+    super(context);
+    if (!this.isEnabled()) return;
+
     this.figmaToken = process.env.FIGMA_API_KEY;
-    this.client = Client({ personalAccessToken: this.figmaToken });
+    this.client = this.figmaToken
+      ? Client({ personalAccessToken: this.figmaToken })
+      : null;
+  }
+
+  customEnableCheck(): boolean {
+    return !!this.figmaToken && !!this.client;
   }
 
   async loadFigmaData(url: string) {
@@ -46,11 +64,11 @@ export class FigmaPlugin implements Plugin {
       return null;
     }
     try {
-      console.log("Fetching figma data", { fileId, nodeIds });
+      this.log(`Fetching figma data: ${JSON.stringify({ fileId, nodeIds })}`);
       const response = await this.client.fileImages(fileId, { ids: nodeIds });
       return { id: fileId, ...response.data };
     } catch (error) {
-      console.error("Error fetching Figma file data:", error);
+      this.log(`Error fetching Figma file data: ${error}`, "error");
       return null;
     }
   }
@@ -119,13 +137,16 @@ export class FigmaPlugin implements Plugin {
     const responses = [];
     for (const data of figmaDataFiltered) {
       for (const nodeId in data.images) {
+        if (!data.images.hasOwnProperty(nodeId)) continue;
+
         const imageUrl = data.images[nodeId];
+        // Lazy import to break circular dependency
+        const { askGptVision } = await import("../ai");
         const imageDescription = await askGptVision(
           imageUrl,
           `Describe the image with relavant information for this user question: ${userPrompt}`
         );
-
-        console.log("FIGMA PLUGIN: Image description", imageDescription);
+        this.log(`Image description: ${imageDescription.choices[0].message.content}`);
         responses.push({ nodeId, imageDescription });
       }
     }

@@ -29,7 +29,13 @@ export class MCPWebSocketTransport implements Transport {
         }
         console.log("MCPW Message received", JSON.stringify(parsed));
         const message = JSONRPCMessageSchema.parse(parsed);
-        this.onmessage?.(message);
+        // Process message asynchronously to avoid blocking the WebSocket
+        // event loop while a long-running tool call is in progress.
+        // Without this, all subsequent messages are queued until the
+        // current tool call completes.
+        setImmediate(() => {
+          this.onmessage?.(message);
+        });
       } catch (error) {
         this.onerror?.(error as Error);
       }
@@ -48,13 +54,27 @@ export class MCPWebSocketTransport implements Transport {
     return new Promise((resolve, reject) => {
       const json = JSON.stringify(message);
       console.log("MCPWs sending", json);
-      this._socket.send(json, (error?: Error) => {
-        if (error) {
-          this.onerror?.(error);
-          return reject(error);
-        }
-        resolve();
-      });
+
+      if (this._socket.readyState !== WebSocket.OPEN) {
+        return reject(
+          new Error(
+            `WebSocket is not open: readyState ${this._socket.readyState}`
+          )
+        );
+      }
+
+      try {
+        this._socket.send(json, (error?: Error) => {
+          if (error) {
+            this.onerror?.(error);
+            return reject(error);
+          }
+          resolve();
+        });
+      } catch (error) {
+        this.onerror?.(error as Error);
+        reject(error);
+      }
     });
   }
 

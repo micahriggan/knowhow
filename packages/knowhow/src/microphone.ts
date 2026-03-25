@@ -1,9 +1,7 @@
 import { exec } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
-import { openai } from "./ai";
 import { execAsync, ask } from "./utils";
-import { Downloader } from "./plugins/downloader/downloader";
 import { convertToText, convertAudioToText } from "./conversion";
 
 interface MicrophoneConfig {
@@ -79,7 +77,7 @@ export async function recordAudio() {
   const filePath = "/tmp/knowhow.wav";
   const audioFile = fs.createWriteStream(filePath, { encoding: "binary" });
   const defaultMic = getDefaultMic();
-  const hasSox = await execAsync("which sox");
+  const hasSox = await execAsync("which sox").catch(() => false);
 
   if (!hasSox && !defaultMic) {
     console.error("Sox is required to record audio");
@@ -119,18 +117,25 @@ sudo apt-get install sox libsox-fmt-all
 }
 
 export async function voiceToText() {
-  const input = await ask(
-    "Press Enter to Start Recording, or exit to quit...: "
-  );
-
-  if (input === "exit") {
-    return "voice";
+  // Allow user to type commands to exit voice mode or press Enter to record
+  const startInput = await ask("Press Enter to Start Recording (or type a command to exit): ", []);
+  
+  // If user typed anything other than empty string, return it (e.g., /voice, /exit, etc.)
+  if (startInput.trim() !== "") {
+    return startInput;
   }
-
+  
   const recording = await recordAudio();
   console.log("Recording audio...");
-  await ask("Press Enter to Stop...");
+  
+  const stopInput = await ask("Press Enter to Stop Recording (or type a command to cancel): ", []);
   recording.stop();
   console.log("Stopped recording");
+  
+  // If user typed anything during recording, return it instead of transcribing
+  if (stopInput.trim() !== "") {
+    return stopInput;
+  }
+  
   return convertAudioToText("/tmp/knowhow.wav", false);
 }

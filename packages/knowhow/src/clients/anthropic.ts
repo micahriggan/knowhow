@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { wait } from "../utils";
+import { AnthropicTextPricing } from "./pricing";
 import { Models } from "../types";
 import {
   GenericClient,
@@ -9,15 +10,31 @@ import {
   Message,
   EmbeddingOptions,
   EmbeddingResponse,
+  AudioTranscriptionOptions,
+  AudioTranscriptionResponse,
+  AudioGenerationOptions,
+  AudioGenerationResponse,
+  ImageGenerationOptions,
+  ImageGenerationResponse,
+  VideoGenerationOptions,
+  VideoGenerationResponse,
 } from "./types";
 
 type MessageParam = Anthropic.MessageParam;
 type Usage = Anthropic.Usage;
 
-export class GenericAnthropicClient extends Anthropic implements GenericClient {
-  constructor() {
-    super({
-      apiKey: process.env.ANTHROPIC_API_KEY,
+export class GenericAnthropicClient implements GenericClient {
+  private client: Anthropic;
+  private apiKey?: string;
+
+  constructor(apiKey?: string) {
+    this.setKey(apiKey || process.env.ANTHROPIC_API_KEY || "");
+  }
+
+  setKey(apiKey: string) {
+    this.apiKey = apiKey;
+    this.client = new Anthropic({
+      apiKey: apiKey || process.env.ANTHROPIC_API_KEY,
     });
   }
 
@@ -26,8 +43,53 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
 
     if (lastTool) {
       lastTool.cache_control = { type: "ephemeral" };
-      console.log("caching last tool");
     }
+  }
+
+  /**
+   * Clean JSON Schema for Anthropic API compatibility.
+   * Removes unsupported fields like additionalProperties, $ref, $defs, positional.
+   */
+  private cleanSchemaForAnthropic(schema: any): any {
+    if (!schema || typeof schema !== 'object') {
+      return schema;
+    }
+
+    // Handle arrays
+    if (Array.isArray(schema)) {
+      return schema.map(item => this.cleanSchemaForAnthropic(item));
+    }
+
+    const cleaned: any = {};
+
+    for (const key in schema) {
+      if (!Object.prototype.hasOwnProperty.call(schema, key)) {
+        continue;
+      }
+
+      // Skip unsupported properties
+      if (
+        key === 'additionalProperties' ||
+        key === '$ref' ||
+        key === '$defs' ||
+        key === 'positional'
+      ) {
+        continue;
+      }
+
+      const value = schema[key];
+
+      // Recursively clean nested objects
+      if (typeof value === 'object' && value !== null) {
+        cleaned[key] = this.cleanSchemaForAnthropic(value);
+      }
+      // Copy primitive values as-is
+      else {
+        cleaned[key] = value;
+      }
+    }
+
+    return cleaned;
   }
 
   transformTools(tools?: Tool[]): Anthropic.Tool[] {
@@ -37,11 +99,7 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
     const transformed = tools.map((tool) => ({
       name: tool.function.name || "",
       description: tool.function.description || "",
-      input_schema: {
-        properties: tool.function.parameters.properties,
-        type: "object" as const,
-        required: tool.function.parameters.required || [],
-      },
+      input_schema: this.cleanSchemaForAnthropic(tool.function.parameters) as any,
     }));
 
     this.handleToolCaching(transformed);
@@ -122,27 +180,24 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
   handleMessageCaching(groupedMessages: MessageParam[]) {
     this.handleClearingCache(groupedMessages);
 
-    const hasTwoUserMesages =
-      groupedMessages.filter((m) => m.role === "user").length >= 2;
+    // find the last two messages and mark them as ephemeral
+    const lastTwoUserMessages = groupedMessages
+      .filter((m) => m.role === "user")
+      .slice(-2);
 
-    const firstUserMessage = groupedMessages.find((m) => m.role === "user");
-    if (firstUserMessage) {
-      console.log("caching first user message");
-      this.cacheLastContent(firstUserMessage);
-    }
-
-    if (hasTwoUserMesages) {
-      // find the last two messages and mark them as ephemeral
-      const lastTwoUserMessages = groupedMessages
-        .filter((m) => m.role === "user")
-        .slice(-2);
-
-      for (const m of lastTwoUserMessages) {
-        if (Array.isArray(m.content)) {
-          console.log("caching user message");
-          this.cacheLastContent(m);
-        }
+    for (const m of lastTwoUserMessages) {
+      if (Array.isArray(m.content)) {
+        this.cacheLastContent(m);
       }
+    }
+  }
+
+  tryParse(str: string): any {
+    try {
+      return JSON.parse(str);
+    } catch (e) {
+      console.error("Invalid JSON from tool call", str);
+      return {};
     }
   }
 
@@ -168,10 +223,58 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
                   type: "tool_use",
                   id: msg.tool_call_id,
                   name: toolCall.function.name,
-                  input: JSON.parse(toolCall.function.arguments),
+                  input: this.tryParse(toolCall.function.arguments),
                 },
               ],
             });
+          }
+
+          // Convert tool message content to appropriate format
+          let toolResultContent:
+            | string
+            | (Anthropic.TextBlockParam | Anthropic.ImageBlockParam)[];
+
+          if (typeof msg.content === "string") {
+            toolResultContent = msg.content;
+          } else if (Array.isArray(msg.content)) {
+            // Transform image_url format to Anthropic's image format
+            toolResultContent = msg.content.map(
+              (item): Anthropic.TextBlockParam | Anthropic.ImageBlockParam => {
+                if (item.type === "image_url") {
+                  const url = item.image_url.url;
+                  const isDataUrl = url.startsWith("data:");
+                  const isHttpUrl = url.startsWith("http");
+                  if (isHttpUrl) {
+                    return {
+                      type: "image" as const,
+                      source: {
+                        type: "url" as const,
+                        url,
+                      },
+                    } as Anthropic.ImageBlockParam;
+                  } else {
+                    const base64Data = isDataUrl ? url.split(",")[1] : url;
+                    const mediaType = isDataUrl
+                      ? url.match(/data:([^;]+);/)?.[1] || "image/jpeg"
+                      : "image/jpeg";
+                    return {
+                      type: "image" as const,
+                      source: {
+                        type: "base64" as const,
+                        media_type: mediaType as any,
+                        data: base64Data,
+                      },
+                    };
+                  }
+                } else if (item.type === "text") {
+                  return { type: "text" as const, text: item.text };
+                }
+                // Fallback for unknown types
+                return { type: "text" as const, text: String(item) };
+              }
+            ) as (Anthropic.TextBlockParam | Anthropic.ImageBlockParam)[];
+          } else {
+            toolResultContent = String(msg.content);
           }
 
           toolMessages.push({
@@ -179,7 +282,7 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
             content: [
               {
                 type: "tool_result",
-                content: msg.content as string,
+                content: toolResultContent,
                 tool_use_id: msg.tool_call_id,
               },
             ],
@@ -215,15 +318,24 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
       }
       if (typeof e === "object" && e.type === "image_url") {
         const isUrl = e.image_url.url.startsWith("http");
-        return {
-          type: "image",
-          source: {
-            data: isUrl ? e.image_url.url : undefined,
-            media_type: "image/jpeg",
-            type: isUrl ? ("url" as const) : ("base64" as const),
-            url: isUrl ? e.image_url.url : undefined,
-          },
-        };
+        if (isUrl) {
+          return {
+            type: "image",
+            source: {
+              type: "url" as const,
+              url: e.image_url.url,
+            },
+          } as Anthropic.ContentBlockParam;
+        } else {
+          return {
+            type: "image",
+            source: {
+              type: "base64" as const,
+              media_type: "image/jpeg",
+              data: e.image_url.url,
+            },
+          } as Anthropic.ContentBlockParam;
+        }
       }
     };
 
@@ -241,23 +353,22 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
       .join("\n");
 
     const claudeMessages = this.transformMessages(options.messages);
-    console.log(JSON.stringify({ claudeMessages }, null, 2));
 
     const tools = this.transformTools(options.tools);
     try {
-      const response = await this.messages.create({
+      const response = await this.client.messages.create({
         model: options.model,
         messages: claudeMessages,
         system: systemMessage
           ? [
               {
                 text: systemMessage,
-                // cache_control: { type: "ephemeral" },
+                cache_control: { type: "ephemeral" },
                 type: "text",
               },
             ]
           : undefined,
-        max_tokens: options.max_tokens || 4096,
+        max_tokens: options.max_tokens || 8000,
         ...(tools.length && {
           tool_choice: { type: "auto" },
           tools,
@@ -315,79 +426,48 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
   }
 
   pricesPerMillion() {
-    return {
-      [Models.anthropic.Opus4]: {
-        input: 15.0,
-        cache_write: 18.75,
-        cache_hit: 1.5,
-        output: 75.0,
-      },
-      [Models.anthropic.Sonnet4]: {
-        input: 3.0,
-        cache_write: 3.75,
-        cache_hit: 0.3,
-        output: 15.0,
-      },
-      [Models.anthropic.Sonnet3_7]: {
-        input: 3.0,
-        cache_write: 3.75,
-        cache_hit: 0.3,
-        output: 15.0,
-      },
-      [Models.anthropic.Sonnet3_5]: {
-        input: 3.0,
-        cache_write: 3.75,
-        cache_hit: 0.3,
-        output: 15.0,
-      },
-      [Models.anthropic.Haiku3_5]: {
-        input: 0.8,
-        cache_write: 1.25,
-        cache_hit: 0.1,
-        output: 4.0,
-      },
-      [Models.anthropic.Opus3]: {
-        input: 15.0,
-        cache_write: 18.75,
-        cache_hit: 1.5,
-        output: 75.0,
-      },
-      [Models.anthropic.Haiku3]: {
-        input: 0.25,
-        cache_write: 0.3,
-        cache_hit: 0.03,
-        output: 1.25,
-      },
-    };
+    return AnthropicTextPricing;
   }
 
   calculateCost(model: string, usage: Usage): number | undefined {
-    const pricing = this.pricesPerMillion()[model];
-    console.log({ pricing });
+    const rawP = this.pricesPerMillion()[model];
+    // Fall back to pricing file for unknown/newer models
+    const fallback = AnthropicTextPricing[model as keyof typeof AnthropicTextPricing];
+    const p: any = rawP || fallback || undefined;
+    if (!p) return undefined;
 
-    if (!pricing) {
-      return undefined;
-    }
+    const inputTokens = usage.input_tokens ?? 0;
+    const cacheWriteTokens = usage.cache_creation_input_tokens ?? 0;
+    const cacheReadTokens = usage.cache_read_input_tokens ?? 0;
+    const outputTokens = usage.output_tokens ?? 0;
 
-    const cachedInputTokens = usage.cache_creation_input_tokens;
-    const cachedInputCost = (cachedInputTokens * pricing.cache_write) / 1e6;
+    const totalInputTokens = inputTokens + cacheWriteTokens + cacheReadTokens;
 
-    const cachedReadTokens = usage.cache_read_input_tokens;
-    const cachedReadCost = (cachedReadTokens * pricing.cache_hit) / 1e6;
+    const useLongContextTier = totalInputTokens > 200_000 && !!p.input_gt_200k;
+    const inputRate = useLongContextTier
+      ? (p.input_gt_200k as number)
+      : p.input;
+    const outputRate =
+      useLongContextTier && p.output_gt_200k ? p.output_gt_200k : p.output;
 
-    const inputTokens = usage.input_tokens;
-    const inputCost = ((inputTokens - cachedInputCost) * pricing.input) / 1e6;
+    // Prefer modeling cache pricing as multipliers, but if you keep absolute numbers,
+    // you MUST scale them when usingLongContextTier.
+    //
+    // Anthropic docs describe cache read/write as multipliers of the base input rate. :contentReference[oaicite:7]{index=7}
+    // If your `cache_write` + `cache_hit` are absolute $/MTok at base tier, scale them:
+    const cacheWriteRate = (p.cache_write / p.input) * inputRate; // preserves your multiplier
+    const cacheReadRate = (p.cache_hit / p.input) * inputRate; // preserves your multiplier
 
-    const outputTokens = usage.output_tokens;
-    const outputCost = (outputTokens * pricing.output) / 1e6;
+    const nonCachedInputCost = (inputTokens * inputRate) / 1e6;
+    const cacheWriteCost = (cacheWriteTokens * cacheWriteRate) / 1e6;
+    const cacheReadCost = (cacheReadTokens * cacheReadRate) / 1e6;
+    const outputCost = (outputTokens * outputRate) / 1e6;
 
-    const total = cachedInputCost + inputCost + outputCost;
-    console.log({ total });
-    return total;
+    return nonCachedInputCost + cacheWriteCost + cacheReadCost + outputCost;
   }
 
   async getModels() {
-    const models = await this.models.list();
+    const models = await this.client.models.list();
     return models.data.map((m) => ({
       id: m.id,
     }));
@@ -395,5 +475,31 @@ export class GenericAnthropicClient extends Anthropic implements GenericClient {
 
   async createEmbedding(options: EmbeddingOptions): Promise<EmbeddingResponse> {
     throw new Error("Provider does not support embeddings");
+  }
+
+  async createAudioTranscription(
+    options: AudioTranscriptionOptions
+  ): Promise<AudioTranscriptionResponse> {
+    throw new Error("Anthropic does not support audio transcription");
+  }
+
+  async createAudioGeneration(
+    options: AudioGenerationOptions
+  ): Promise<AudioGenerationResponse> {
+    throw new Error("Anthropic does not support audio generation");
+  }
+
+  async createImageGeneration(
+    options: ImageGenerationOptions
+  ): Promise<ImageGenerationResponse> {
+    throw new Error("Anthropic does not support image generation");
+  }
+
+  async createVideoGeneration(
+    options: VideoGenerationOptions
+  ): Promise<VideoGenerationResponse> {
+    throw new Error(
+      "Video generation is not supported by the Anthropic provider."
+    );
   }
 }

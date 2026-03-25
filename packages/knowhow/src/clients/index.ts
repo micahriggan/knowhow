@@ -4,14 +4,30 @@ import {
   EmbeddingOptions,
   EmbeddingResponse,
   GenericClient,
+  AudioTranscriptionOptions,
+  AudioTranscriptionResponse,
+  AudioGenerationOptions,
+  AudioGenerationResponse,
+  ImageGenerationOptions,
+  ImageGenerationResponse,
+  VideoGenerationOptions,
+  VideoGenerationResponse,
+  VideoStatusOptions,
+  VideoStatusResponse,
+  FileUploadOptions,
+  FileUploadResponse,
+  FileDownloadOptions,
+  FileDownloadResponse,
 } from "./types";
 import { GenericOpenAiClient } from "./openai";
 import { GenericAnthropicClient } from "./anthropic";
 import { GenericGeminiClient } from "./gemini";
 import { HttpClient } from "./http";
-import { Models } from "../types";
+import { EmbeddingModels, Models } from "../types";
 import { getConfig } from "../config";
 import { GenericXAIClient } from "./xai";
+import { KnowhowGenericClient } from "./knowhow";
+import { loadKnowhowJwt } from "../services/KnowhowClient";
 
 function envCheck(key: string): boolean {
   const value = process.env[key];
@@ -31,20 +47,47 @@ export class AIClient {
 
     ...(envCheck("GEMINI_API_KEY") && { google: new GenericGeminiClient() }),
     ...(envCheck("XAI_API_KEY") && { xai: new GenericXAIClient() }),
+    ...(loadKnowhowJwt() && { knowhow: new KnowhowGenericClient() }),
   };
 
-  clientModels = {
-    ...(envCheck("OPENAI_KEY") && { openai: Object.values(Models.openai) }),
+  completionModels = {
+    ...(envCheck("OPENAI_KEY") && {
+      openai: Object.values(Models.openai),
+    }),
     ...(envCheck("ANTHROPIC_API_KEY") && {
       anthropic: Object.values(Models.anthropic),
     }),
-    ...(envCheck("GEMINI_API_KEY") && { google: Object.values(Models.google) }),
+    ...(envCheck("GEMINI_API_KEY") && {
+      google: Object.values(Models.google),
+    }),
     ...(envCheck("XAI_API_KEY") && { xai: Object.values(Models.xai) }),
   };
 
+  embeddingModels = {
+    ...(envCheck("OPENAI_KEY") && {
+      openai: Object.values(EmbeddingModels.openai),
+    }),
+    ...(envCheck("GEMINI_API_KEY") && {
+      google: Object.values(EmbeddingModels.google),
+    }),
+  };
+
+  clientModels = {
+    ...(envCheck("OPENAI_KEY") && {
+      openai: [...this.completionModels.openai, ...this.embeddingModels.openai],
+    }),
+    ...(envCheck("ANTHROPIC_API_KEY") && {
+      anthropic: [...this.completionModels.anthropic],
+    }),
+    ...(envCheck("GEMINI_API_KEY") && {
+      google: [...this.completionModels.google, ...this.embeddingModels.google],
+    }),
+    ...(envCheck("XAI_API_KEY") && { xai: this.completionModels.xai }),
+  };
+
   getClient(provider: string, model?: string) {
-    if (this.clients[provider]) {
-      return { client: this.clients[provider], provider, model };
+    if (provider && !model) {
+      return { client: this.clients[provider], provider, model: undefined };
     }
 
     const detected = this.detectProviderModel(provider, model);
@@ -75,6 +118,12 @@ export class AIClient {
     this.clients[provider] = client;
   }
 
+  setKey(provider: string, apiKey: string) {
+    const { client } = this.getClient(provider); // Ensure provider is registered
+    client.setKey(apiKey);
+    this.clients[provider].setKey(apiKey);
+  }
+
   async registerConfiguredModels() {
     const config = await getConfig();
     const modelProviders = config.modelProviders || [];
@@ -89,9 +138,7 @@ export class AIClient {
       this.registerClient(modelProvider.provider, client);
 
       try {
-        const models = await client.getModels();
-        const ids = models.map((model) => model.id);
-        this.registerModels(modelProvider.provider, ids);
+        await this.loadProviderModels(modelProvider.provider);
       } catch (error) {
         console.error(
           `Failed to register models for provider ${modelProvider.provider}:`,
@@ -101,43 +148,152 @@ export class AIClient {
     }
   }
 
+  async loadProviderModels(provider: string) {
+    if (!this.clients[provider]) {
+      throw new Error(`Provider ${provider} not registered.`);
+    }
+
+    try {
+      const models = await this.clients[provider].getModels();
+      const ids = models.map((model) => model.id);
+      this.registerModels(provider, ids);
+    } catch (error) {
+      console.error(
+        `Failed to load models for provider ${provider}:`,
+        error.message
+      );
+    }
+  }
+
   registerModels(provider: string, models: string[]) {
     const currentModels = this.clientModels[provider] || [];
+    const currentCompletionModels = this.completionModels[provider] || [];
     this.clientModels[provider] = Array.from<string>(
+      new Set(currentModels.concat(models))
+    );
+
+    const embeddingModels = this.embeddingModels[provider] || [];
+    this.embeddingModels[provider] = Array.from<string>(
+      new Set(embeddingModels.concat(models.filter((m) => m.includes("embed"))))
+    );
+
+    // We will assume if you register models, it's for completions
+    this.completionModels[provider] = Array.from<string>(
+      new Set(
+        currentCompletionModels.concat(
+          models.filter((m) => !m.includes("embed"))
+        )
+      )
+    );
+  }
+
+  /*
+   * Some clients support multiple providers, most clients are single provider
+   * For the mult-provider clients, we register them with this method
+   * TODO: currently registering overwrites any existing providers, but a fallback list could be useful
+   */
+  registerClientProviderModels(
+    client: GenericClient,
+    providerModels: Record<string, string[]>
+  ) {
+    for (const [provider, models] of Object.entries(providerModels)) {
+      this.registerClient(provider, client);
+      this.registerModels(provider, models);
+    }
+  }
+
+  registerEmbeddingModels(provider: string, models: string[]) {
+    const currentModels = this.clientModels[provider] || [];
+    const currentEmbeddingModels = this.embeddingModels[provider] || [];
+
+    this.clientModels[provider] = Array.from<string>(
+      new Set(currentModels.concat(models))
+    );
+
+    this.embeddingModels[provider] = Array.from<string>(
       new Set(currentModels.concat(models))
     );
   }
 
-  private providerHasModel(provider: string, model: string): boolean {
+  providerHasModel(provider: string, model: string): boolean {
     const models = this.clientModels[provider];
     if (!models) return false;
     return models.includes(model);
   }
 
-  private detectProviderModel(provider: string, model: string) {
+  findModel(modelPrefix: string) {
+    for (const provider of Object.keys(this.clientModels)) {
+      const models = this.clientModels[provider] as string[];
+      const foundModel = models.find((m) => m.startsWith(modelPrefix));
+      if (foundModel) {
+        return { provider, model: foundModel };
+      }
+
+      // Handle the case when model prefix is gpt-5 and the provider is knowhow, and the actual model is openai/gpt-5
+      const inferredFound = models.find((m) => {
+        const split = m.split("/");
+        if (split.length < 2) return false;
+        const inferredModel = split.slice(1).join("/");
+        return (
+          m === modelPrefix ||
+          inferredModel === modelPrefix ||
+          inferredModel.startsWith(modelPrefix)
+        );
+      });
+      if (inferredFound) {
+        return { provider, model: inferredFound };
+      }
+    }
+
+    // We didn't find the model, but it contains a slash, maybe it's prefixed with a provider
+    if (modelPrefix.includes("/")) {
+      const split = modelPrefix.split("/");
+      return this.findModel(split.slice(1).join("/"));
+    }
+
+    return undefined;
+  }
+
+  // detects these formats
+  // "openai", "gpt-5"
+  // "knowhow", "openai/gpt-5"
+  // "", "openai/gpt-5"
+  // "", openai/gpt-5
+  // "", "knowhow/openai/gpt-5"
+  //
+  detectProviderModel(provider: string, model?: string) {
     if (this.providerHasModel(provider, model)) {
       return { provider, model };
     }
 
-    if (model.includes("/")) {
+    if (model?.includes("/")) {
       const split = model.split("/");
 
       const inferredProvider = split[0];
       const inferredModel = split.slice(1).join("/");
 
+      // Exact match
       if (this.providerHasModel(inferredProvider, inferredModel)) {
         return { provider: inferredProvider, model: inferredModel };
       }
+
+      // Starts with match
+      const foundBySplit = this.findModel(inferredModel);
+      if (foundBySplit) {
+        return foundBySplit;
+      }
     }
 
-    const providers = Object.keys(this.clientModels);
-    const foundProvider = providers.find((p) =>
-      this.providerHasModel(p, model)
-    );
-
-    if (foundProvider) {
-      return { provider: foundProvider, model };
+    const foundByModel = this.findModel(model);
+    if (foundByModel) {
+      return foundByModel;
     }
+
+    console.log("unable to find", {
+      provider,
+      model,
+      all: this.listAllModels(),
+    });
 
     return { provider, model };
   }
@@ -147,6 +303,13 @@ export class AIClient {
     options: CompletionOptions
   ): Promise<CompletionResponse> {
     const { client, model } = this.getClient(provider, options.model);
+    if (!model || !client) {
+      throw new Error(
+        `provider: ${provider} does not have ${
+          options.model
+        } model registered. Try using ${JSON.stringify(this.listAllModels())}`
+      );
+    }
     return client.createChatCompletion({ ...options, model });
   }
 
@@ -155,7 +318,125 @@ export class AIClient {
     options: EmbeddingOptions
   ): Promise<EmbeddingResponse> {
     const { client, model } = this.getClient(provider, options.model);
+    if (!model || !client) {
+      throw new Error(
+        `provider: ${provider} does not have ${
+          options.model
+        } model registered. Try using ${JSON.stringify(this.listAllModels())}`
+      );
+    }
     return client.createEmbedding({ ...options, model });
+  }
+
+  async createAudioTranscription(
+    provider: string,
+    options: AudioTranscriptionOptions
+  ): Promise<AudioTranscriptionResponse> {
+    const { client } = this.getClient(provider, options.model);
+    if (!client || !client.createAudioTranscription) {
+      throw new Error(
+        `Provider ${provider} does not support audio transcription.`
+      );
+    }
+    return client.createAudioTranscription(options);
+  }
+
+  async createAudioGeneration(
+    provider: string,
+    options: AudioGenerationOptions
+  ): Promise<AudioGenerationResponse> {
+    const { client, model } = this.getClient(provider, options.model);
+    if (!client || !client.createAudioGeneration) {
+      throw new Error(
+        `Provider ${provider} does not support audio generation.`
+      );
+    }
+    if (!model) {
+      throw new Error(
+        `Model ${options.model} not registered for provider ${provider}.`
+      );
+    }
+    return client.createAudioGeneration({ ...options, model });
+  }
+
+  async createImageGeneration(
+    provider: string,
+    options: ImageGenerationOptions
+  ): Promise<ImageGenerationResponse> {
+    const { client, model } = this.getClient(provider, options.model);
+    if (!client || !client.createImageGeneration) {
+      throw new Error(
+        `Provider ${provider} does not support image generation.`
+      );
+    }
+    if (!model) {
+      throw new Error(
+        `Model ${options.model} not registered for provider ${provider}.`
+      );
+    }
+    return client.createImageGeneration({ ...options, model });
+  }
+
+  async createVideoGeneration(
+    provider: string,
+    options: VideoGenerationOptions
+  ): Promise<VideoGenerationResponse> {
+    const { client, model } = this.getClient(provider, options.model);
+    if (!client || !client.createVideoGeneration) {
+      throw new Error(
+        `Provider ${provider} does not support video generation.`
+      );
+    }
+    if (!model) {
+      throw new Error(
+        `Model ${options.model} not registered for provider ${provider}.`
+      );
+    }
+    return client.createVideoGeneration({ ...options, model });
+  }
+
+  async getVideoStatus(
+    provider: string,
+    options: VideoStatusOptions
+  ): Promise<VideoStatusResponse> {
+    const { client } = this.getClient(provider, options.model);
+    if (!client || !client.getVideoStatus) {
+      throw new Error(`Provider ${provider} does not support getVideoStatus.`);
+    }
+    return client.getVideoStatus(options);
+  }
+
+  async downloadVideo(
+    provider: string,
+    options: FileDownloadOptions
+  ): Promise<FileDownloadResponse> {
+    const { client } = this.getClient(provider);
+    if (!client || !client.downloadVideo) {
+      throw new Error(`Provider ${provider} does not support downloadVideo.`);
+    }
+    return client.downloadVideo(options);
+  }
+
+  async uploadFile(
+    provider: string,
+    options: FileUploadOptions
+  ): Promise<FileUploadResponse> {
+    const { client } = this.getClient(provider);
+    if (!client || !client.uploadFile) {
+      throw new Error(`Provider ${provider} does not support uploadFile.`);
+    }
+    return client.uploadFile(options);
+  }
+
+  async downloadFile(
+    provider: string,
+    options: FileDownloadOptions
+  ): Promise<FileDownloadResponse> {
+    const { client } = this.getClient(provider);
+    if (!client || !client.downloadFile) {
+      throw new Error(`Provider ${provider} does not support downloadFile.`);
+    }
+    return client.downloadFile(options);
   }
 
   getRegisteredModels(provider: string): string[] {
@@ -164,6 +445,73 @@ export class AIClient {
 
   listAllModels() {
     return this.clientModels;
+  }
+
+  listAllModelsWithProvider() {
+    return Object.entries(this.listAllModels())
+      .map(([provider, models]) =>
+        models.map((m) => ({ id: `${provider}/${m}` }))
+      )
+      .flat();
+  }
+
+  /*
+   *
+   * some clients return models in the format "provider/model_name"
+   * this function parses those models into our {provider, model} format
+   * then creates a provider -> [models] map
+   * the models will not have the provider prefix
+   *
+   * if the client doesn't return models in that format, use knownProvider
+   * to set the provider
+   */
+  async parseProviderPrefixedModels(
+    client: GenericClient,
+    knownProvider = ""
+  ): Promise<Record<string, string[]>> {
+    const models = await client.getModels();
+    const providerModels = models
+      .map((m) => {
+        if (knownProvider) {
+          return {
+            provider: knownProvider,
+            model: m.id,
+          };
+        }
+
+        const splitModel = m.id.split("/");
+
+        if (splitModel.length < 2) {
+          console.error(`Cannot parse model format: ${m.id}`);
+        }
+
+        const provider = splitModel.length > 1 ? splitModel[0] : "";
+        const modelName = splitModel.slice(1).join("/");
+        return {
+          provider,
+          model: modelName,
+        };
+      })
+      .reduce((acc, { provider, model }) => {
+        acc[provider] = acc[provider] || [];
+        acc[provider].push(model);
+        return acc;
+      }, {});
+
+    for (const provider in providerModels) {
+      if (!providerModels[provider].length) {
+        delete providerModels[provider];
+      }
+    }
+    return providerModels;
+  }
+
+  listAllEmbeddingModels() {
+    return this.embeddingModels;
+  }
+
+  listAllCompletionModels() {
+    return this.completionModels;
   }
 
   listAllProviders() {
@@ -181,3 +529,4 @@ export * from "./anthropic";
 export * from "./knowhow";
 export * from "./gemini";
 export * from "./xai";
+export * from "./knowhowMcp";

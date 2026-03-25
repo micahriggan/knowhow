@@ -9,7 +9,7 @@ import {
   mkdir,
   splitByNewLines,
 } from "../../utils"; // Assuming these utils exist
-import { lintFile } from "./lintFile"; // Assuming this exists
+import { services, ToolsService } from "../../services";
 
 // --- Utility Functions (Keep or Simplify) ---
 
@@ -127,10 +127,10 @@ export function parseHunks(patch: string): Hunk[] {
   const hunks: Hunk[] = [];
   let currentHunkLines: string[] = [];
   let currentHeader = "";
-  let originalStart = 0,
-    originalCount = 0,
-    newStart = 0,
-    newCount = 0;
+  let originalStart = 0;
+  let originalCount = 0;
+  let newStart = 0;
+  let newCount = 0;
 
   for (const line of patchLines) {
     if (line.startsWith("@@")) {
@@ -540,6 +540,13 @@ export async function patchFile(
   filePath: string,
   patch: string
 ): Promise<string> {
+  // Get context from bound ToolsService
+  const toolService = (
+    this instanceof ToolsService ? this : services().Tools
+  ) as ToolsService;
+
+  const context = toolService.getContext();
+
   let originalContent = "";
   try {
     if (!fs.existsSync(filePath)) {
@@ -592,7 +599,7 @@ export async function patchFile(
         );
         // It might be valid that the patch had no real changes, but applyPatch failed anyway?
         // Let's return an error indicating failure.
-        return `Patch failed to apply and could not be fixed or resulted in no changes.`;
+        return `Patch failed to apply and could not be fixed or resulted in no changes. Make sure you are making small patches`;
       }
 
       updatedContent = applyPatch(originalContent, fixedPatch);
@@ -617,7 +624,7 @@ export async function patchFile(
           "Fixed patch also failed to apply."
         );
         // Try to provide more specific feedback from applyPatch if possible (library might not offer it)
-        return "Patch failed to apply even after attempting to fix it.";
+        return "Patch failed to apply even after attempting to fix it. Make sure you are making small patches.";
       } else {
         console.log("Successfully applied the *fixed* patch.");
       }
@@ -625,22 +632,49 @@ export async function patchFile(
       console.log("Successfully applied the original patch.");
     }
 
+    const eventResults: any[] = [];
+    // Emit pre-edit blocking event
+    if (context.Events) {
+      eventResults.push(
+        ...(await context.Events.emitBlocking("file:pre-edit", {
+          filePath,
+          operation: "patch",
+          patch: appliedPatch,
+          originalContent,
+          updatedContent: updatedContent as string,
+        }))
+      );
+    }
+
     // Write the updated content
     await writeFile(filePath, updatedContent as string); // Type assertion needed as applyPatch might return boolean
 
-    // Optional: Lint the result
-    let lintResult = "";
-    try {
-      lintResult = await lintFile(filePath);
-    } catch (lintError: any) {
-      console.warn("Linting failed after patching:", lintError);
-      lintResult = `Linting after patch failed: ${lintError.message}`;
+    // Emit post-edit blocking event to get event results
+    if (context.Events) {
+      eventResults.push(
+        ...(await context.Events.emitBlocking("file:post-edit", {
+          filePath,
+          operation: "patch",
+          patch: appliedPatch,
+          originalContent,
+          updatedContent: updatedContent as string,
+        }))
+      );
+    }
+
+    // Format event results
+    let eventResultsText = "";
+    if (eventResults && eventResults.length > 0) {
+      if (eventResults.length > 0) {
+        eventResultsText =
+          "\n\nAdditional Information:\n" +
+          JSON.stringify(eventResults, null, 2);
+      }
     }
 
     return `Patch applied successfully.${
       filePath ? ` Use readFile on ${filePath} to verify changes.` : ""
-    }
-${lintResult ? "\nLinting Result:\n" + lintResult : ""}`.trim();
+    }${eventResultsText}`.trim();
   } catch (e: any) {
     console.error(`Error in patchFile function for ${filePath}:`, e);
     // Save error only if it's not a controlled failure path that already saved

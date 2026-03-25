@@ -1,13 +1,23 @@
-import { Agents } from "../../services/AgentService";
-import { Events } from "../../services/EventService";
-import { Plugins } from "../../plugins/plugins";
 import { getConfig } from "../../config";
+import { services, ToolsService } from "../../services";
+import { getEnabledPlugins } from "../../types";
 
 export async function agentCall(agentName: string, userInput: string) {
   return new Promise(async (resolve, reject) => {
     const config = await getConfig();
-    const pluginText = await Plugins.callMany(config.plugins, userInput);
-    const fullPrompt = `${userInput} \n ${pluginText}`;
+    const toolService = (
+      this instanceof ToolsService ? this : services().Tools
+    ) as ToolsService;
+
+    const { Events, Plugins } = toolService.getContext();
+
+    let fullPrompt = `${userInput}`;
+    const enabledPlugins = getEnabledPlugins(config.plugins);
+    if (enabledPlugins?.length) {
+      const pluginText = await Plugins.callMany(enabledPlugins, userInput);
+      fullPrompt += `\n ${pluginText}`;
+    }
+
     Events.emit("agents:call", {
       name: agentName,
       query: fullPrompt,

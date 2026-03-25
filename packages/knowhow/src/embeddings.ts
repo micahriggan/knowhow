@@ -1,16 +1,24 @@
-import glob from "glob";
+import { globSync } from "glob";
 import * as path from "path";
 import { getConfig, loadPrompt } from "./config";
-import { Config, Hashes, Embeddable, EmbeddingBase, Models } from "./types";
+import {
+  Config,
+  Hashes,
+  Embeddable,
+  EmbeddingBase,
+  Models,
+  EmbeddingModels,
+} from "./types";
 import {
   readFile,
   writeFile,
   fileExists,
   fileStat,
   cosineSimilarity,
+  takeFirstNWords,
 } from "./utils";
-import { summarizeTexts, openai, chunkText } from "./ai";
-import { Plugins } from "./plugins/plugins";
+import { summarizeTexts, chunkText } from "./ai";
+import { services } from "./services";
 import { md5Hash } from "./hashes";
 import { convertToText } from "./conversion";
 import { Clients } from "./clients";
@@ -19,14 +27,23 @@ export { cosineSimilarity };
 
 export async function loadEmbedding(filePath: string) {
   if (await fileExists(filePath)) {
-    return JSON.parse(await readFile(filePath, "utf8")) as Embeddable[];
+    try {
+      const parsed = JSON.parse(
+        await readFile(filePath, "utf8")
+      ) as Embeddable[];
+      return parsed;
+    } catch (e) {
+      console.error("Error loading embedding file", filePath, e);
+      return [];
+    }
   }
   return [];
 }
 
 export async function getConfiguredEmbeddingMap() {
   const config = await getConfig();
-  const files = Array.from(new Set(config.embedSources.map((s) => s.output)));
+  const embedSources = config.embedSources || [];
+  const files = Array.from(new Set(embedSources.map((s) => s.output)));
   const embeddings: { [filePath: string]: Embeddable[] } = {};
   for (const file of files) {
     if (!embeddings[file]) {
@@ -41,7 +58,8 @@ export async function getConfiguredEmbeddingMap() {
 
 export async function getConfiguredEmbeddings() {
   const config = await getConfig();
-  const files = Array.from(new Set(config.embedSources.map((s) => s.output)));
+  const embedSources = config.embedSources || [];
+  const files = Array.from(new Set(embedSources.map((s) => s.output)));
   const embeddings: Embeddable[] = [];
   for (const file of files) {
     const fileEmbeddings = await loadEmbedding(file);
@@ -63,6 +81,46 @@ function getChunkId(id: string, index: number, chunkSize: number) {
   return chunkSize ? `${id}-${index}` : id;
 }
 
+function parseIdFromChunk(chunkName: string) {
+  const split = chunkName.split("-");
+  if (
+    split.length > 1 &&
+    Number.isInteger(parseInt(split[split.length - 1], 10))
+  ) {
+    // already has chunkId
+    return split.slice(0, -1).join("-");
+  }
+  return chunkName;
+}
+
+export async function detectDeletedEmbeddingFiles(
+  source: Config["embedSources"][0],
+  ignorePattern: string[],
+  embeddings: Embeddable[]
+) {
+  if (source.kind !== "file") {
+    return;
+  }
+  const inputs = (await globSync(source.input, {
+    ignore: ignorePattern,
+  })) as string[];
+
+  for (const embedding of embeddings) {
+    const id = parseIdFromChunk(embedding.id);
+    const dirName = path.dirname(id);
+    const exists = await fileExists(path.resolve(id));
+
+    const hasSomeFilesInDir = inputs.some((input) => input.startsWith(dirName));
+    if (hasSomeFilesInDir && !exists) {
+      console.log("Detected deleted embedding file", embedding.id);
+      const index = embeddings.findIndex((e) => e.id === embedding.id);
+      if (index !== -1) {
+        embeddings.splice(index, 1);
+      }
+    }
+  }
+}
+
 export async function embedSource(
   model: Config["embeddingModel"],
   source: Config["embedSources"][0],
@@ -73,37 +131,44 @@ export async function embedSource(
     return;
   }
 
-  console.log("Embedding", source.input, "to", source.output);
-  let files = await glob.sync(source.input, { ignore: ignorePattern });
+  console.log("Embedding", source.input.slice(0, 100), "... to", source.output);
+  let inputs = [];
 
-  if (source.kind && files.length === 0) {
-    files = [source.input];
+  const kind = source.kind || "file";
+
+  // Don't glob a paragraph or some other kind of input
+  if (kind === "file") {
+    inputs = await globSync(source.input, { ignore: ignorePattern });
   }
 
-  console.log(`Found ${files.length} files`);
-  if (files.length > 100) {
-    console.error(
-      "woah there, that's a lot of files. I'm not going to embed that many"
-    );
+  // It wasn't a file glob, so we need to loop through input
+  if (source.kind && inputs.length === 0) {
+    inputs = [source.input];
   }
-  console.log(files);
+
+  console.log(`Checking ${inputs.length} files`);
+  if (inputs.length > 1000) {
+    console.error("Large number of files detected. This may take a while");
+  }
   const embeddings: Embeddable[] = await loadEmbedding(source.output);
   let batch = [];
   let index = 0;
-  for (const file of files) {
+  for (const file of inputs) {
     index++;
-    const shouldSave = batch.length > 20 || index === files.length;
+    const shouldSave = batch.length > 20;
     if (shouldSave) {
       await Promise.all(batch);
+      await saveEmbedding(source.output, embeddings);
       batch = [];
     }
-    batch.push(embedKind(model, file, source, embeddings, shouldSave));
+    batch.push(embedKind(model, file, source, embeddings));
   }
   if (batch.length > 0) {
     await Promise.all(batch);
   }
 
   // Save one last time just in case
+  await detectDeletedEmbeddingFiles(source, ignorePattern, embeddings);
   await saveEmbedding(source.output, embeddings);
 }
 
@@ -149,11 +214,32 @@ export async function embed(
     }
 
     dontPrune.push(chunkId);
-    const alreadyEmbedded = embeddings.find(
-      (e) => e.id === chunkId && e.text === textOfChunk
-    );
+    const foundMany = embeddings.filter((e) => e.id === chunkId);
+    const found = foundMany.length > 0 ? foundMany[0] : null;
+    const alreadyEmbedded = found && found.text === textOfChunk;
+
+    if (foundMany.length > 1) {
+      // We have duplicates, so we need to remove them
+      console.log(`Removing ${foundMany.length} duplicates for`, chunkId);
+
+      let toDelete = embeddings.findIndex((e) => e.id === chunkId);
+      while (toDelete !== -1) {
+        // Keep removing until we find no more duplicates
+        embeddings.splice(toDelete, 1);
+        toDelete = embeddings.findIndex((e) => e.id === chunkId);
+      }
+
+      if (alreadyEmbedded) {
+        // Put back the exact match of the current chunk
+        // if this doesn't happen, we need to generate a new embedding
+        embeddings.push({
+          ...found,
+        });
+        updates.push(chunkId);
+      }
+    }
+
     if (alreadyEmbedded) {
-      console.log("Skipping", chunkId);
       continue;
     }
 
@@ -167,7 +253,7 @@ export async function embed(
       console.log("Embedding", chunkId);
       const providerEmbeddings = await Clients.createEmbedding("", {
         input: textOfChunk,
-        model: model || Models.openai.EmbeddingAda2,
+        model: model || EmbeddingModels.openai.EmbeddingAda2,
       });
 
       vector = providerEmbeddings.data[0].embedding;
@@ -219,7 +305,7 @@ export async function embedJson(
   ) as Embeddable[];
 
   const embeddings: Embeddable[] = await loadEmbedding(output);
-  let updates = [];
+  const updates = [];
   let batch = [];
 
   for (const row of sourceJson) {
@@ -248,24 +334,17 @@ export async function embedJson(
       batch = [];
     }
     updates.push(...embedded);
-
-    if (updates.length > 20) {
-      await saveEmbedding(output, embeddings);
-      updates = [];
-    }
   }
 
   // save in case we missed some
   await Promise.all(batch);
-  await saveEmbedding(output, embeddings);
 }
 
 export async function embedKind(
   model: Config["embeddingModel"],
   id: string,
   source: Config["embedSources"][0],
-  embeddings = [] as Embeddable[],
-  save = true
+  embeddings = [] as Embeddable[]
 ) {
   const { prompt, output, uploadMode, chunkSize } = source;
 
@@ -295,10 +374,6 @@ export async function embedKind(
       uploadMode
     );
     updates.push(...embedded);
-  }
-
-  if (save && updates.length > 0) {
-    await saveEmbedding(output, embeddings);
   }
 }
 
@@ -336,6 +411,8 @@ export async function handleAllKinds(
   const contents = "";
   const ids = [];
 
+  const { Plugins } = services();
+
   if (Plugins.isPlugin(kind)) {
     console.log("Embedding with plugin", kind);
     return Plugins.embed(kind, input);
@@ -351,7 +428,12 @@ export async function handleAllKinds(
 
 export async function saveEmbedding(output: string, embeddings: Embeddable[]) {
   const fileString =
-    "[" + embeddings.map((e) => JSON.stringify(e)).join(",") + "]";
+    "[" +
+    embeddings
+      .sort((a, b) => (a.id < b.id ? -1 : 1))
+      .map((e) => JSON.stringify(e))
+      .join(",") +
+    "]";
   await writeFile(output, fileString);
 }
 
@@ -391,12 +473,14 @@ export function pruneMetadata(embeddings: Embeddable[], characterLimit = 5000) {
 export async function queryEmbedding<E>(
   query: string,
   embeddings: Embeddable<E>[],
-  model = Models.openai.EmbeddingAda2
+  model = EmbeddingModels.openai.EmbeddingAda2
 ) {
   const providerEmbeddings = await Clients.createEmbedding("", {
-    input: query,
+    input: takeFirstNWords(query, 5000).slice(0, 16000),
     model,
   });
+
+  console.log(providerEmbeddings);
   const queryVector = providerEmbeddings.data[0].embedding;
   const results = new Array<EmbeddingBase<E>>();
   for (const embedding of embeddings) {

@@ -1,10 +1,23 @@
-import { Plugin } from "./types";
+import { PluginBase, PluginMeta } from "./PluginBase";
+import { Plugin, PluginContext } from "./types";
 import { MinimalEmbedding } from "../types";
 import axios from "axios";
 import * as cheerio from "cheerio";
 import loadWebpage from "../agents/tools/loadWebpage";
 
-export class UrlPlugin implements Plugin {
+export class UrlPlugin extends PluginBase implements Plugin {
+  static readonly meta: PluginMeta = {
+    key: "url",
+    name: "URL Plugin",
+    requires: [],
+  };
+
+  meta = UrlPlugin.meta;
+
+  constructor(context: PluginContext) {
+    super(context);
+  }
+
   async embed(userPrompt: string): Promise<MinimalEmbedding[]> {
     const urls = this.extractUrls(userPrompt);
     const embeddings = await Promise.all(urls.map(this.fetchAndParseUrl));
@@ -13,14 +26,16 @@ export class UrlPlugin implements Plugin {
 
   extractUrls(userPrompt: string): string[] {
     const urlRegex = /(https?:\/\/[^\s]+)/g;
-    return userPrompt.match(urlRegex) || [];
+    const urls = userPrompt.match(urlRegex) || [];
+
+    return Array.from(new Set(urls));
   }
 
   async fetchAndParseUrl(url: string): Promise<MinimalEmbedding | null> {
     try {
       const text = await loadWebpage(url);
 
-      console.log(`URL PLUGIN: Fetched content from ${url}:`, text);
+      this.log(`URL PLUGIN: Fetched content from ${url}: ${text}`);
 
       return {
         id: url + "-url",
@@ -28,7 +43,7 @@ export class UrlPlugin implements Plugin {
         metadata: { url },
       };
     } catch (error) {
-      console.error(`Error fetching or parsing URL ${url}:`, error);
+      this.log(`Error fetching or parsing URL ${url}: ${error}`, "error");
       return null;
     }
   }
@@ -37,6 +52,10 @@ export class UrlPlugin implements Plugin {
     const urls = this.extractUrls(userPrompt);
     if (urls.length === 0) {
       return "URL PLUGIN: No URLs detected.";
+    }
+
+    if (urls.length > 10) {
+      return "URL PLUGIN: Too many URLs detected. Skipping like unintentional bulk browse.";
     }
 
     const results = await Promise.all(urls.map(this.fetchAndParseUrl));

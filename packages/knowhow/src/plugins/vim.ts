@@ -1,14 +1,27 @@
-import glob from "glob";
+import { globSync } from "glob";
 import { readFile, fileExists, fileStat } from "../utils";
-import { Plugin } from "./types";
+import { PluginBase, PluginMeta } from "./PluginBase";
+import { PluginContext } from "./types";
 
-export class VimPlugin implements Plugin {
+export class VimPlugin extends PluginBase {
+  static readonly meta: PluginMeta = {
+    key: "vim",
+    name: "Vim Plugin",
+    requires: [],
+  };
+
+  meta = VimPlugin.meta;
+
+  constructor(context: PluginContext) {
+    super(context);
+  }
+
   async embed(userPrompt: string) {
     return [];
   }
 
   async getVimFiles() {
-    const vimFiles = await glob.sync("./**/*.swp", { dot: true });
+    const vimFiles = globSync("./**/*.swp", { dot: true });
     return vimFiles;
   }
 
@@ -46,13 +59,14 @@ export class VimPlugin implements Plugin {
       return { filePath, content: "DIRECTORY" };
     }
     if (stat.size > 32000) {
-      console.error(
-        `VIM PLUGIN: File ${filePath} is too large with size ${stat.size}`
+      this.log(
+        `VIM PLUGIN: File ${filePath} is too large with size ${stat.size}`,
+        "error"
       );
       return { filePath, content: "FILE TOO LARGE" };
     }
 
-    console.log(`VIM PLUGIN: Reading file ${filePath}`);
+    this.log(`VIM PLUGIN: Reading file ${filePath}`);
     const content = await readFile(filePath, "utf8");
     return { filePath, content };
   }
@@ -60,7 +74,20 @@ export class VimPlugin implements Plugin {
   async call() {
     const vimFiles = await this.getVimFiles();
     const fileContents = await Promise.all(
-      vimFiles.map((f) => this.getFileContents(f))
+      vimFiles.map(async (f) => {
+        const loaded = await this.getFileContents(f);
+
+        const preview =
+          loaded.content.length > 1000
+            ? loaded.content.slice(0, 1000) +
+              "... file trimmed, read file for full content"
+            : loaded.content;
+
+        return {
+          sourceFile: loaded.filePath,
+          content: loaded.content.slice(0, 1000),
+        };
+      })
     );
     if (fileContents.length === 0) {
       return "VIM PLUGIN: No files open in vim";

@@ -1,11 +1,22 @@
 import { LinearClient } from "@linear/sdk";
-import { Plugin } from "./types";
+import { PluginBase, PluginMeta } from "./PluginBase";
+import { PluginContext } from "./types";
 import { MinimalEmbedding } from "../types";
 
-export class LinearPlugin implements Plugin {
+export class LinearPlugin extends PluginBase {
+  static readonly meta: PluginMeta = {
+    key: "linear",
+    name: "Linear Plugin",
+    requires: ["LINEAR_API_KEY"],
+  };
+
+  meta = LinearPlugin.meta;
   linearClient: LinearClient;
 
-  constructor() {
+  constructor(context: PluginContext) {
+    super(context);
+
+    if (!this.isEnabled()) return;
     this.linearClient = new LinearClient({
       apiKey: process.env.LINEAR_API_KEY,
     });
@@ -68,7 +79,7 @@ export class LinearPlugin implements Plugin {
       const issue = await this.linearClient.issue(issueId);
       return issue;
     } catch (error) {
-      console.error("Error fetching Linear issue:", error);
+      this.log(`Error fetching Linear issue: ${error}`, "error");
       return null;
     }
   }
@@ -76,7 +87,7 @@ export class LinearPlugin implements Plugin {
   async getTaskFromUrl(url: string) {
     const issueId = this.getIdFromUrl(url);
     if (issueId) {
-      console.log(`Fetching Linear issue ${issueId}`);
+      this.log(`Fetching Linear issue ${issueId}`);
       return await this.getIssueData(issueId);
     }
     return null;
@@ -124,7 +135,7 @@ export class LinearPlugin implements Plugin {
   }
 
   async getTasksForProject(projectId: string) {
-    console.log({ projectId });
+    this.log(`Project ID: ${projectId}`);
     let tasks = await this.linearClient.issues({
       filter: {
         project: { slugId: { eq: projectId } },
@@ -150,7 +161,7 @@ export class LinearPlugin implements Plugin {
   }
 
   async getTasksForTeam(teamId: string) {
-    console.log({ teamId });
+    this.log(`Team ID: ${teamId}`);
     let tasks = await this.linearClient.issues({
       filter: {
         team: { key: { eq: teamId } },

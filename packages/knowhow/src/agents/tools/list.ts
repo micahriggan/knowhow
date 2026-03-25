@@ -1,13 +1,24 @@
 import { Tool } from "../../clients/types";
 import { ChatCompletionTool } from "openai/resources/chat";
-import { Plugins } from "../../plugins/plugins";
 
-const pluginNames = Plugins.listPlugins().join(", ");
+import { services } from "../../services";
 import * as github from "./github/definitions";
 import * as asana from "./asana/definitions";
+import * as ycmd from "./ycmd/definitions";
 import * as language from "./language/definitions";
-import { googleSearchDefinition } from './googleSearch';
-import { Agents } from "../../services/AgentService";
+import * as mcp from "./mcp/definitions";
+import { googleSearchDefinition } from "./googleSearch";
+import { executeScriptDefinition } from "./executeScript/definition";
+import { startAgentTaskDefinition } from "./startAgentTask";
+
+function getPluginNames(): string {
+  try {
+    const { Plugins } = services();
+    return Plugins.listPlugins().join(", ");
+  } catch {
+    return "";
+  }
+}
 
 export const includedTools = [
   {
@@ -39,7 +50,7 @@ export const includedTools = [
     function: {
       name: "execCommand",
       description:
-        "Execute a command in the system's command line interface. Use this to run tests and things in the terminal",
+        "Execute a command in the system's command line interface. Use this to run tests and things in the terminal. Supports timeout functionality. Use timeout: -1 to wait indefinitely. Commands ending with '&' or with continueInBackground=true will run in the background and write logs to .knowhow/processes/<command_name>.txt with PID in the first line for cleanup. You can optionally specify a custom log file name for background tasks.",
       parameters: {
         type: "object",
         positional: true,
@@ -48,23 +59,28 @@ export const includedTools = [
             type: "string",
             description: "The command to execute",
           },
+          timeout: {
+            type: "number",
+            description:
+              "Timeout in milliseconds (optional). If not provided, defaults to 5000ms. Use -1 to wait indefinitely for command completion.",
+          },
+          continueInBackground: {
+            type: "boolean",
+            description:
+              "Whether to let command continue in background on timeout (default: false). If false, command is killed on timeout.",
+          },
+          logFileName: {
+            type: "string",
+            description:
+              "Optional custom log file name for background tasks (without path or extension). If not provided, a sanitized version of the command will be used. If the file already exists, epoch seconds will be appended to ensure uniqueness.",
+          },
         },
         required: ["command"],
       },
       returns: {
-        type: "object",
-        properties: {
-          stdout: {
-            type: "string",
-            description: "The standard output of the executed command",
-          },
-          stderr: {
-            type: "string",
-            description: "The standard error output of the executed command",
-          },
-        },
+        type: "string",
         description:
-          "The result of the command execution, including any output and errors",
+          "The result of the command execution, including any output and errors. May include timeout status information.",
       },
     },
   },
@@ -97,7 +113,7 @@ export const includedTools = [
     type: "function",
     function: {
       name: "callPlugin",
-      description: `Call a specified plugin with given input. Plugins provide additional context from supported URLs or words. This is a read-only operation. Currently available plugins: ${pluginNames}`,
+      description: `Call a specified plugin with given input. Plugins provide additional context from supported URLs or words. This is a read-only operation. Currently available plugins: ${getPluginNames()}`,
       parameters: {
         type: "object",
         positional: true,
@@ -135,6 +151,16 @@ export const includedTools = [
           question: {
             type: "string",
             description: "The prompt related to the image",
+          },
+          provider: {
+            type: "string",
+            description: "The AI provider to use (default: 'openai')",
+            default: "openai",
+          },
+          model: {
+            type: "string",
+            description: "The model to use (default: 'gpt-4o')",
+            default: "gpt-4o",
           },
         },
         required: ["imageUrl", "question"],
@@ -174,7 +200,7 @@ export const includedTools = [
     function: {
       name: "readBlocks",
       description:
-        "Read specific blocks from a file based on block numbers. Blocks are numbered blocks of text, containing a few lines of content",
+        "Read specific blocks from a file based on block numbers. Blocks are numbered blocks of text, containing a few lines of content ~500 characters",
       parameters: {
         type: "object",
         positional: true,
@@ -322,7 +348,7 @@ export const includedTools = [
     function: {
       name: "writeFileChunk",
       description:
-        "Update or create files by writing in smaller chunks. Suitable for larger files, this tool allows incremental writing by calling it multiple times.",
+        "Update or create files by writing in small chunks of text. Suitable for larger files, this tool allows incremental writing by calling it multiple times.",
       parameters: {
         type: "object",
         positional: true,
@@ -361,35 +387,74 @@ export const includedTools = [
     type: "function",
     function: {
       name: "createAiCompletion",
-      description: "Create a completion using the knowhow ai client",
+      description: "Create a completion using the knowhow AI client",
       parameters: {
         type: "object",
-        positional: true,
         properties: {
           provider: {
             type: "string",
             description:
-              "The AI provider to use (e.g., 'openai', 'anthropic'). Use listAllModels to figure out which provider to use if you don't know",
+              "The AI provider to use (e.g., 'openai', 'anthropic'). Use listAllModels to discover providers.",
           },
           options: {
             type: "object",
-            description: "The completion options",
+            description: "Provider-specific completion options",
             properties: {
               model: { type: "string", description: "The model to use" },
               messages: {
                 type: "array",
-                description: "The messages for the completion",
+                description: "The chat history for the completion",
                 items: {
                   type: "object",
                   properties: {
-                    role: { type: "string" },
-                    content: { type: "string" },
+                    role: {
+                      type: "string",
+                      enum: ["system", "user", "assistant", "tool"],
+                      description: "The role of the message sender",
+                    },
+                    content: {
+                      type: "string",
+                      description: "The content of the message",
+                    },
                   },
+                  required: ["role", "content"],
                 },
+                minItems: 1,
               },
               max_tokens: {
                 type: "number",
                 description: "Maximum number of tokens to generate",
+              },
+              tools: {
+                type: "array",
+                description:
+                  "Tool definitions the model may call (non-recursive subset)",
+                items: {
+                  type: "object",
+                  properties: {
+                    type: {
+                      type: "string",
+                      enum: ["function"],
+                      description: "The type of tool",
+                    },
+                    function: {
+                      type: "object",
+                      properties: {
+                        name: { type: "string", description: "Function name" },
+                        description: {
+                          type: "string",
+                          description: "Function description",
+                        },
+                        parameters: {
+                          type: "object",
+                          description: "Function parameters schema",
+                        },
+                      },
+                      required: ["name", "parameters"],
+                    },
+                  },
+                  required: ["type", "function"],
+                },
               },
             },
             required: ["model", "messages"],
@@ -400,6 +465,43 @@ export const includedTools = [
       returns: {
         type: "object",
         description: "The completion response from the AI provider",
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "listAllCompletionModels",
+      description:
+        "List all available completion models using the knowhow ai client",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+      returns: {
+        type: "object",
+        description:
+          "A dictionary of all available completion models for each provider",
+      },
+    },
+  },
+
+  {
+    type: "function",
+    function: {
+      name: "listAllEmbeddingModels",
+      description:
+        "List all available embedding models using the knowhow ai client",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+      returns: {
+        type: "object",
+        description:
+          "A dictionary of all available embedding models for each provider",
       },
     },
   },
@@ -457,7 +559,10 @@ export const includedTools = [
             description: "The embedding options",
             properties: {
               input: { type: "string", description: "The text to embed" },
-              model: { type: "string", description: "The model to use (optional)" },
+              model: {
+                type: "string",
+                description: "The model to use (optional)",
+              },
             },
             required: ["input"],
           },
@@ -470,8 +575,6 @@ export const includedTools = [
       },
     },
   },
-
-  googleSearchDefinition,
   {
     type: "function",
     function: {
@@ -488,27 +591,214 @@ export const includedTools = [
           },
           mode: {
             type: "string",
-            description: "The mode for content extraction: 'text' for text content with console logs, 'screenshot' for a base64 encoded screenshot",
+            description:
+              "The mode for content extraction: 'text' for text content with console logs, 'screenshot' for a base64 encoded screenshot",
             enum: ["text", "screenshot"],
           },
           waitForSelector: {
             type: "string",
-            description: "Optional CSS selector to wait for before extracting content",
+            description:
+              "Optional CSS selector to wait for before extracting content",
           },
           timeout: {
             type: "number",
-            description: "Timeout in milliseconds for page loading (default: 30000)",
+            description:
+              "Timeout in milliseconds for page loading (default: 30000)",
           },
         },
         required: ["url"],
       },
       returns: {
         type: "string",
-        description: "The webpage content as text with console logs, or a base64 encoded screenshot",
+        description:
+          "The webpage content as text with console logs, or a base64 encoded screenshot",
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "stringReplace",
+      description:
+        "Replace exact string matches in multiple files. Performs global replacement of all occurrences of the find string with the replace string.",
+      parameters: {
+        type: "object",
+        positional: true,
+        properties: {
+          findString: {
+            type: "string",
+            description: "The exact string to find and replace",
+          },
+          replaceString: {
+            type: "string",
+            description: "The string to replace the found string with",
+          },
+          filePaths: {
+            type: "array",
+            items: {
+              type: "string",
+            },
+            description:
+              "Array of file paths where the replacement should be performed",
+          },
+        },
+        required: ["findString", "replaceString", "filePaths"],
+      },
+      returns: {
+        type: "string",
+        description: "A summary of the replacement results for each file",
+      },
+    },
+  },
+  executeScriptDefinition,
+  googleSearchDefinition,
+  startAgentTaskDefinition,
+  {
+    type: "function",
+    function: {
+      name: "astListPaths",
+      description:
+        "List all available simple paths in a file using tree-sitter AST parsing. Useful for understanding the structure of a file before making targeted edits.",
+      parameters: {
+        type: "object",
+        positional: true,
+        properties: {
+          filePath: {
+            type: "string",
+            description: "The path to the file to analyze",
+          },
+        },
+        required: ["filePath"],
+      },
+      returns: {
+        type: "string",
+        description:
+          "JSON object containing all available AST paths in the file",
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "astEditNode",
+      description:
+        "Update a node at a specific AST path in a file using tree-sitter parsing. Use astListPaths first to find available paths.",
+      parameters: {
+        type: "object",
+        positional: true,
+        properties: {
+          filePath: {
+            type: "string",
+            description: "The path to the file to edit",
+          },
+          path: {
+            type: "string",
+            description:
+              "The AST path to the node to update (from astListPaths)",
+          },
+          newContent: {
+            type: "string",
+            description: "The new content to replace the node with",
+          },
+        },
+        required: ["filePath", "path", "newContent"],
+      },
+      returns: {
+        type: "string",
+        description: "JSON object with edit result and updated file content",
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "astAppendNode",
+      description:
+        "Append a child node to a specific AST path in a file using tree-sitter parsing. Use astListPaths first to find available paths.",
+      parameters: {
+        type: "object",
+        positional: true,
+        properties: {
+          filePath: {
+            type: "string",
+            description: "The path to the file to edit",
+          },
+          parentPath: {
+            type: "string",
+            description: "The AST path to the parent node (from astListPaths)",
+          },
+          newContent: {
+            type: "string",
+            description: "The content of the child node to append",
+          },
+        },
+        required: ["filePath", "parentPath", "newContent"],
+      },
+      returns: {
+        type: "string",
+        description: "JSON object with append result and updated file content",
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "astDeleteNode",
+      description:
+        "Delete a node at a specific AST path in a file using tree-sitter parsing. Use astListPaths first to find available paths.",
+      parameters: {
+        type: "object",
+        positional: true,
+        properties: {
+          filePath: {
+            type: "string",
+            description: "The path to the file to edit",
+          },
+          path: {
+            type: "string",
+            description:
+              "The AST path to the node to delete (from astListPaths)",
+          },
+        },
+        required: ["filePath", "path"],
+      },
+      returns: {
+        type: "string",
+        description: "JSON object with delete result and updated file content",
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "astGetPathForLine",
+      description:
+        "Get the AST path for a specific line of text in a file using tree-sitter parsing. Useful for finding the structural location of specific code.",
+      parameters: {
+        type: "object",
+        positional: true,
+        properties: {
+          filePath: {
+            type: "string",
+            description: "The path to the file to analyze",
+          },
+          searchText: {
+            type: "string",
+            description: "The text to search for in the file",
+          },
+        },
+        required: ["filePath", "searchText"],
+      },
+      returns: {
+        type: "string",
+        description:
+          "JSON object containing AST paths and locations for the matching text",
       },
     },
   },
   ...asana.definitions,
+  ...ycmd.definitions,
   ...github.definitions,
   ...language.definitions,
+  ...mcp.definitions,
 ] as Tool[];

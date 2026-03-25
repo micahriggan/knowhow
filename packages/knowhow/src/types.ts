@@ -46,15 +46,68 @@ export type Config = {
   embedSources: EmbedSource[];
   embeddingModel: string;
 
-  plugins: string[];
+  skills?: string[];
+
+  plugins: { enabled: string[]; disabled: string[] };
+
+  chat?: {
+    /** Path to a custom root chat module (npm package or local file) */
+    rootModule?: string;
+    /** Path to a custom renderer (npm package or local file, can be .ts) */
+    renderer?: string;
+    /** Additional chat modules to load (npm packages or local files, can be .ts) */
+    modules?: string[];
+  };
+
   modules: string[];
+
+  pluginPackages?: Record<string, string>;
 
   agents: Assistant[];
   mcps: McpConfig[];
   modelProviders: ModelProvider[];
 
+  ycmd?: {
+    enabled?: boolean;
+    installPath?: string;
+    port?: number;
+    logLevel?: "debug" | "info" | "warning" | "error";
+    completionTimeout?: number;
+  };
+
+  files?: {
+    remotePath: string; // path in Knowhow FS, e.g. "/docs/readme.md" or "/configs/"
+    localPath: string; // local path to write to, e.g. "./docs/readme.md" or "./configs/"
+    direction?: "download" | "upload" | "sync"; // default: "download"
+  }[];
+
   worker?: {
     allowedTools?: string[];
+    sandbox?: boolean;
+    volumes?: string[];
+    envFile?: string;
+    auth?: {
+      required?: boolean;
+      passkey?: {
+        publicKey?: string;       // base64-encoded public key
+        credentialId?: string;    // base64-encoded credential ID
+        algorithm?: string;       // e.g. "ES256"
+      };
+      sessionDurationHours?: number;
+    };
+    commandAuth?: {
+      [toolName: string]: "always" | "session" | "never";
+    };
+    tunnel?: {
+      enabled?: boolean;
+      allowedPorts?: number[];
+      maxConcurrentStreams?: number;
+      portMapping?: {
+        [containerPort: number]: number; // containerPort -> hostPort
+      };
+      localHost?: string; // Default: "127.0.0.1", can be "host.docker.internal" for Docker
+      enableUrlRewriting?: boolean; // Enable URL rewriting for localhost URLs (default: true)
+    };
   };
 };
 
@@ -68,11 +121,14 @@ export type Assistant = {
 
 export type McpConfig = {
   name: string;
+  autoConnect?: boolean; // Default: true - connect at startup. Set to false for on-demand connection
   command?: string;
   url?: string;
   args?: string[];
   env?: { [key: string]: string };
   params?: Partial<{ socket: WebSocket }>;
+  authorization_token?: string;
+  authorization_token_file?: string;
 };
 
 export type ModelProvider = {
@@ -113,8 +169,10 @@ export interface IDatasource {
 
 export type Language = {
   [term: string]: {
+    events: string[];
     sources: IDatasource[];
     context?: string;
+    handled?: boolean;
   };
 };
 
@@ -127,7 +185,13 @@ export type ChatInteraction = {
 
 export const Models = {
   anthropic: {
+    Opus4_6: "claude-opus-4-6",
+    Sonnet4_6: "claude-sonnet-4-6",
+    Opus4_5: "claude-opus-4-5-20251101",
     Opus4: "claude-opus-4-20250514",
+    Opus4_1: "claude-opus-4-1-20250805",
+    Sonnet4_5: "claude-sonnet-4-5-20250929",
+    Haiku4_5: "claude-haiku-4-5-20251001",
     Sonnet4: "claude-sonnet-4-20250514",
     Sonnet3_7: "claude-3-7-sonnet-20250219",
     Sonnet3_5: "claude-3-5-sonnet-20241022",
@@ -136,14 +200,25 @@ export const Models = {
     Haiku3: "claude-3-haiku-20240307",
   },
   xai: {
+    Grok4_1_Fast_Reasoning: "grok-4-1-fast-reasoning",
+    Grok4_1_Fast_NonReasoning: "grok-4-1-fast-non-reasoning",
+    GrokCodeFast: "grok-code-fast-1",
+    Grok4: "grok-4-0709",
     Grok3Beta: "grok-3-beta",
     Grok3MiniBeta: "grok-3-mini-beta",
     Grok3FastBeta: "grok-3-fast-beta",
     Grok3MiniFastBeta: "grok-3-mini-fast-beta",
     Grok21212: "grok-2-1212",
     Grok2Vision1212: "grok-2-vision-1212",
+    GrokImagineImage: "grok-imagine-image",
+    GrokImagineVideo: "grok-imagine-video",
   },
   openai: {
+    GPT_5_2: "gpt-5.2",
+    GPT_5_1: "gpt-5.1",
+    GPT_5: "gpt-5",
+    GPT_5_Mini: "gpt-5-mini",
+    GPT_5_Nano: "gpt-5-nano",
     GPT_41: "gpt-4.1-2025-04-14",
     GPT_41_Mini: "gpt-4.1-mini-2025-04-14",
     GPT_41_Nano: "gpt-4.1-nano-2025-04-14",
@@ -157,33 +232,67 @@ export const Models = {
     o1: "o1-2024-12-17",
     o1_Pro: "o1-pro-2025-03-19",
     o3: "o3-2025-04-16",
+    o3_Pro: "o3-pro-2025-01-31",
     o4_Mini: "o4-mini-2025-04-16",
     o3_Mini: "o3-mini-2025-01-31",
     o1_Mini: "o1-mini-2024-09-12",
     GPT_4o_Mini_Search: "gpt-4o-mini-search-preview-2025-03-11",
     GPT_4o_Search: "gpt-4o-search-preview-2025-03-11",
-    Computer_Use: "computer-use-preview-2025-03-11",
-    Codex_Mini: "codex-mini-latest",
+
+    TTS_1: "tts-1",
+    Whisper_1: "whisper-1",
+    DALL_E_3: "dall-e-3",
+    DALL_E_2: "dall-e-2",
+    Sora: "sora",
+    Sora_2: "sora-2",
+    Sora_2_Pro: "sora-2-pro",
+    // Computer_Use: "computer-use-preview-2025-03-11",
+    // Codex_Mini: "codex-mini-latest",
+  },
+  google: {
+    Gemini_3_Preview: "gemini-3-pro-preview",
+    Gemini_25_Flash_Preview: "gemini-2.5-flash-preview-05-20",
+    Gemini_25_Pro_Preview: "gemini-2.5-pro-preview-05-06",
+    Gemini_20_Flash: "gemini-2.0-flash",
+    Gemini_20_Flash_Preview_Image_Generation:
+      "gemini-2.0-flash-exp-image-generation",
+    Gemini_20_Flash_Lite: "gemini-2.0-flash-lite",
+    Gemini_15_Flash: "gemini-1.5-flash",
+    Gemini_15_Flash_8B: "gemini-1.5-flash-8b",
+    Gemini_15_Pro: "gemini-1.5-pro",
+    Imagen_3: "imagen-4.0-generate-001",
+    Veo_2: "veo-2.0-generate-001",
+    Veo_3_1: "veo-3.1-generate-preview",
+    Gemini_20_Flash_Live: "gemini-2.0-flash-live-001",
+    Gemini_25_Flash_TTS: "gemini-2.5-flash-preview-tts",
+    Gemini_20_Flash_TTS: "gemini-2.0-flash-preview-tts",
+  },
+};
+
+export const EmbeddingModels = {
+  openai: {
     EmbeddingAda2: "text-embedding-ada-002",
     EmbeddingLarge3: "text-embedding-3-large",
     EmbeddingSmall3: "text-embedding-3-small",
   },
   google: {
-    Gemini_25_Flash_Preview: "gemini-2.5-flash-preview-05-20",
-    Gemini_25_Pro_Preview: "gemini-2.5-pro-preview-05-06",
-    Gemini_20_Flash: "gemini-2.0-flash",
-    Gemini_20_Flash_Preview_Image_Generation:
-      "gemini-2.0-flash-preview-image-generation",
-    Gemini_20_Flash_Lite: "gemini-2.0-flash-lite",
-    Gemini_15_Flash: "gemini-1.5-flash",
-    Gemini_15_Flash_8B: "gemini-1.5-flash-8b",
-    Gemini_15_Pro: "gemini-1.5-pro",
     Gemini_Embedding: "gemini-embedding-exp",
-    Imagen_3: "imagen-3.0-generate-002",
-    Veo_2: "veo-2.0-generate-001",
-    Gemini_20_Flash_Live: "gemini-2.0-flash-live-001",
   },
 };
+
+export function getEnabledPlugins(
+  plugins: Config["plugins"] | undefined
+): string[] {
+  if (!plugins) return [];
+  return plugins.enabled ?? [];
+}
+
+export function getDisabledPlugins(
+  plugins: Config["plugins"] | undefined
+): string[] {
+  if (!plugins) return [];
+  return plugins.disabled ?? [];
+}
 
 export const Providers = Object.keys(Models).reduce((obj, key) => {
   obj[key] = key;
@@ -195,15 +304,21 @@ export const OpenAiReasoningModels = [
   Models.openai.o1_Mini,
   Models.openai.o3_Mini,
   Models.openai.o3,
+  Models.openai.o3_Pro,
   Models.openai.o4_Mini,
+  Models.openai.GPT_5,
+  Models.openai.GPT_5_Mini,
+  Models.openai.GPT_5_Nano,
+  Models.openai.GPT_5_1,
+  Models.openai.GPT_5_2,
 ];
 
 export const OpenAiEmbeddingModels = [
-  Models.openai.EmbeddingAda2,
-  Models.openai.EmbeddingLarge3,
-  Models.openai.EmbeddingSmall3,
+  EmbeddingModels.openai.EmbeddingAda2,
+  EmbeddingModels.openai.EmbeddingLarge3,
+  EmbeddingModels.openai.EmbeddingSmall3,
 ];
-export const OpenAiResponseOnlyModels = [Models.openai.Codex_Mini];
+// export const OpenAiResponseOnlyModels = [Models.openai.Codex_Mini];
 
 export const GoogleReasoningModels = [
   Models.google.Gemini_25_Flash_Preview,
@@ -220,6 +335,30 @@ export const GoogleImageModels = [
   Models.google.Imagen_3,
 ];
 
-export const GoogleVideoModels = [Models.google.Veo_2];
+export const OpenAiImageModels = [
+  Models.openai.DALL_E_3,
+  Models.openai.DALL_E_2,
+];
 
-export const GoogleEmbeddingModels = [Models.google.Gemini_Embedding];
+export const OpenAiVideoModels = [
+  Models.openai.Sora,
+  Models.openai.Sora_2,
+  Models.openai.Sora_2_Pro,
+];
+
+export const OpenAiTTSModels = [Models.openai.TTS_1];
+
+export const OpenAiTranscriptionModels = [Models.openai.Whisper_1];
+
+export const XaiImageModels = [Models.xai.GrokImagineImage];
+
+export const XaiVideoModels = [Models.xai.GrokImagineVideo];
+
+export const GoogleTTSModels = [
+  Models.google.Gemini_25_Flash_TTS,
+  Models.google.Gemini_20_Flash_TTS,
+];
+
+export const GoogleVideoModels = [Models.google.Veo_2, Models.google.Veo_3_1];
+
+export const GoogleEmbeddingModels = [EmbeddingModels.google.Gemini_Embedding];

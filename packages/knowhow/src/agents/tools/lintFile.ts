@@ -9,8 +9,10 @@ export async function lintFile(filePath: string) {
     if (lintCommand.includes("$1")) {
       lintCommand = lintCommand.replace("$1", filePath);
     }
-    lintResult = await execCommand(`${lintCommand}`);
-    console.log("Lint Result:", lintResult);
+    lintResult = await execCommand(`${lintCommand}`, -1);
+    if (lintResult) {
+      console.log("Lint Result:", lintResult);
+    }
     return lintResult;
   }
   return "";

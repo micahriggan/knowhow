@@ -7,10 +7,13 @@ import { ToolsService } from "./Tools";
 import { MCPWebSocketTransport } from "./McpWebsocketTransport";
 import { WebSocket } from "ws";
 
+export type McpServerConfig = { name: string; version: string };
+
 export class McpServerService {
   server: McpServer | null = null;
   constructor(private toolsService: ToolsService) {}
   registeredTools = new Set<string>();
+  private serverConfig: McpServerConfig | null = null;
 
   createServer(name: string, version: string) {
     if (this.server) {
@@ -21,11 +24,15 @@ export class McpServerService {
       name,
       version,
     });
+    this.serverConfig = { name, version };
 
     return this;
   }
 
-  toZodSchema(properties: { [key: string]: ToolProp }): z.ZodObject<any> {
+  toZodSchema(
+    properties: { [key: string]: ToolProp },
+    required?: string[]
+  ): z.ZodObject<any> {
     const schema: Record<string, z.ZodTypeAny> = {};
     for (const [key, value] of Object.entries(properties)) {
       if (value.type === "string") {
@@ -35,19 +42,26 @@ export class McpServerService {
       } else if (value.type === "boolean") {
         schema[key] = z.boolean();
       } else if (value.type === "array" && value?.items?.properties) {
-        schema[key] = z.array(this.toZodSchema(value.items.properties));
+        schema[key] = z.array(this.toZodSchema(value.items.properties, required));
       } else if (value.type === "object" && value.properties) {
-        schema[key] = this.toZodSchema(value.properties);
+        schema[key] = this.toZodSchema(value.properties, required);
       } else {
         schema[key] = z.any();
       }
+      
+      // Make field optional if it's not in the required array
+      if (required && !required.includes(key)) {
+        schema[key] = schema[key].optional();
+      }
     }
+    
     return z.object(schema);
   }
 
   withTools(tools: Tool[]) {
     for (const tool of tools) {
       const props = tool.function.parameters.properties;
+      const required = tool.function.parameters.required;
 
       if (!props) {
         console.warn(`Tool ${tool.function.name} has no properties`);
@@ -62,7 +76,7 @@ export class McpServerService {
       console.log(`Registering tool ${tool.function.name}`);
       this.registeredTools.add(tool.function.name);
 
-      const shape = this.toZodSchema(props).shape;
+      const shape = this.toZodSchema(props, required).shape;
 
       this.server.tool(
         tool.function.name,
@@ -103,6 +117,26 @@ export class McpServerService {
     return this.createServer(name, version).withTools(
       this.toolsService.getTools()
     );
+  }
+
+  async reset() {
+    if (this.server) {
+      try {
+        await this.server.close();
+      } catch (err) {
+        console.warn("McpServerService: error closing server during reset:", err);
+      }
+      this.server = null;
+    }
+    this.registeredTools = new Set<string>();
+
+    // Recreate the server with the same config if we have it
+    if (this.serverConfig) {
+      this.server = new McpServer({
+        name: this.serverConfig.name,
+        version: this.serverConfig.version,
+      });
+    }
   }
 
   async runStdioServer() {

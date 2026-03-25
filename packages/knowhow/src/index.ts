@@ -10,10 +10,16 @@ import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 import { promisify } from "util";
-import glob from "glob";
+import { globSync } from "glob";
 
 import { Prompts } from "./prompts";
-import { Config, Hashes, Embeddable, GenerationSource } from "./types";
+import {
+  Config,
+  Hashes,
+  Embeddable,
+  GenerationSource,
+  EmbeddingModels,
+} from "./types";
 import { readFile, writeFile, fileExists } from "./utils";
 import {
   getConfig,
@@ -33,37 +39,39 @@ import {
 } from "./embeddings";
 
 import { abort } from "process";
-import { chatLoop } from "./chat";
 import { convertToText } from "./conversion";
-import { Plugins } from "./plugins/plugins";
-import { AwsS3 } from "./services/S3";
-import { GitHub } from "./services/GitHub";
 import { knowhowMcpClient } from "./services/Mcp";
-import { knowhowApiClient } from "./services/KnowhowClient";
+import { services } from "./services/";
 import { Models } from "./types";
 
 export * as clients from "./clients";
 export * as agents from "./agents";
-export * as ai from "./ai";
 export * as services from "./services";
 export * as embeddings from "./embeddings";
 export * as types from "./types";
-
-const OPENAI_KEY = process.env.OPENAI_KEY;
+export * as processors from "./processors";
+export * as ai from "./ai";
 
 export async function embed() {
   // load config
   const config = await getConfig();
   const ignorePattern = await getIgnorePattern();
 
-  const defaultModel = config.embeddingModel || Models.openai.EmbeddingAda2;
+  const defaultModel =
+    config.embeddingModel || EmbeddingModels.openai.EmbeddingAda2;
+
+  if (!config.embedSources) {
+    // No embeddings configured
+    return;
+  }
+
   for (const source of config.embedSources) {
     await embedSource(defaultModel, source, ignorePattern);
   }
 }
 
 export async function purge(globPath: string) {
-  const files = glob.sync(globPath);
+  const files = globSync(globPath);
   const embeddings = await getConfiguredEmbeddingMap();
   const config = await getConfig();
   const chunkSizes = config.embedSources.reduce((acc, source) => {
@@ -90,6 +98,7 @@ export async function purge(globPath: string) {
 
 export async function upload() {
   const config = await getConfig();
+  const { AwsS3, knowhowApiClient } = services();
 
   for (const source of config.embedSources) {
     const bucketName = source.remote;
@@ -126,6 +135,14 @@ export async function upload() {
       const url = await knowhowApiClient.getPresignedUploadUrl(source);
       console.log("Uploading to", url);
       await AwsS3.uploadToPresignedUrl(url, source.output);
+      // Sync config metadata back to the backend DB
+      await knowhowApiClient.updateEmbeddingMetadata(source.remoteId, {
+        inputGlob: source.input,
+        outputPath: source.output,
+        chunkSize: source.chunkSize,
+        remoteType: source.remoteType,
+      });
+      console.log("Synced metadata for", source.remoteId);
     } else {
       console.log(
         "Skipping upload to",
@@ -142,7 +159,7 @@ export async function generate(): Promise<void> {
   for (const source of config.sources) {
     console.log("Generating", source.input, "to", source.output);
     if (source.kind === "file" || !source.kind) {
-      const files = glob.sync(source.input);
+      const files = globSync(source.input);
       const prompt = await loadPrompt(source.prompt);
 
       if (source.output.endsWith("/")) {
@@ -174,6 +191,7 @@ export async function generate(): Promise<void> {
 }
 
 async function handleAllKindsGeneration(source: GenerationSource) {
+  const { Plugins } = services();
   const { kind, input } = source;
   if (Plugins.isPlugin(kind)) {
     const data = await Plugins.call(kind, input);
@@ -187,7 +205,7 @@ async function handleAllKindsGeneration(source: GenerationSource) {
 
 async function handleFileKindGeneration(source: GenerationSource) {
   const prompt = await loadPrompt(source.prompt);
-  const files = glob.sync(source.input);
+  const files = globSync(source.input);
   console.log("Analyzing files: ", files);
 
   if (source.output.endsWith("/")) {
@@ -243,12 +261,6 @@ export async function handleMultiOutputGeneration(
       hashes[file] = { promptHash: "", fileHash: "" };
     }
 
-    // summarize the file
-    console.log("Summarizing", file);
-    const summary = prompt
-      ? await summarizeFile(file, prompt, model, agent)
-      : fileContent;
-
     // write the summary to the output file
     const { name, ext, dir } = path.parse(file);
     const nestedFolder = inputPath ? (dir + "/").replace(inputPath, "") : "";
@@ -258,8 +270,11 @@ export async function handleMultiOutputGeneration(
       fs.mkdirSync(outputFolder, { recursive: true });
     }
 
-    outputName = outputName || name;
-    const outputFile = path.join(outputFolder, outputName + "." + outputExt);
+    const outputFileName = outputName || name;
+    const outputFile = path.join(
+      outputFolder,
+      outputFileName + "." + outputExt
+    );
     console.log({ dir, inputPath, nestedFolder, outputFile });
 
     const toCheck = [file, outputFile];
@@ -268,6 +283,12 @@ export async function handleMultiOutputGeneration(
       console.log("Skipping file", file, "because it hasn't changed");
       continue;
     }
+
+    // summarize the file
+    console.log("Summarizing", file);
+    const summary = prompt
+      ? await summarizeFile(file, prompt, model, agent)
+      : fileContent;
 
     console.log("Writing summary to", outputFile);
     await writeFile(outputFile, summary);
@@ -307,14 +328,9 @@ export async function handleSingleOutputGeneration(
   await saveAllFileHashes(filesToCheck, promptHash);
 }
 
-export async function chat() {
-  const config = await getConfig();
-  const embeddings = await getConfiguredEmbeddings();
-  await chatLoop("knowhow", embeddings, config.plugins);
-}
-
 export async function download() {
   const config = await getConfig();
+  const { AwsS3, GitHub, knowhowApiClient } = services();
 
   for (const source of config.embedSources) {
     const { remote, remoteType } = source;
@@ -368,6 +384,9 @@ export async function download() {
       const preSignedUrl = await knowhowApiClient.getPresignedDownloadUrl(
         source
       );
+      // Ensure output directory exists
+      const outputDir = path.dirname(destinationPath);
+      if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
       await AwsS3.downloadFromPresignedUrl(preSignedUrl, destinationPath);
     } else {
       console.log("Unsupported remote type for", source.output);

@@ -1,11 +1,23 @@
 import { getConfiguredEmbeddings } from "../../embeddings";
-import { execCommand } from "./execCommand";
+import { execAsync } from "./execCommand";
 
 export async function textSearch(searchTerm) {
   try {
-    const command = `ag -m 3 "${searchTerm}"`;
-    const output = await execCommand(command);
-    return output;
+    // Escape the search term for safe shell usage
+    // Replace single quotes with '\'' which closes quote, adds escaped quote, reopens quote
+    // 1) Normalize whitespace (turn newlines/tabs into spaces)
+    const normalized = String(searchTerm)
+      .replace(/\r\n?/g, "\n") // normalize CRLF/CR → LF
+      .replace(/\n/g, " ") // kill newlines
+      .replace(/\t/g, " ") // kill tabs
+      .replace(/\s+/g, " ") // collapse
+      .trim();
+
+    // 2) Escape single quotes for safe single-quoted shell arg
+    const escapedTerm = normalized.replace(/'/g, "'\\''");
+
+    const command = `ag -m 3 -Q '${escapedTerm}'`;
+    return await execAsync(command);
   } catch (err) {
     console.log(
       "Falling back to embeddings text search since ag was not available"

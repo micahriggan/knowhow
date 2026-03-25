@@ -1,6 +1,7 @@
-import glob from "glob";
-import { Plugin } from "./types";
+import { Plugin, PluginContext } from "./types";
+import { Config } from "../types";
 import { VimPlugin } from "./vim";
+import { LinterPlugin } from "./LinterPlugin";
 import { LanguagePlugin } from "./language";
 import { EmbeddingPlugin } from "./embedding";
 import { GitHubPlugin } from "./github";
@@ -11,46 +12,172 @@ import { NotionPlugin } from "./notion";
 import { DownloaderPlugin } from "./downloader/plugin";
 import { FigmaPlugin } from "./figma";
 import { UrlPlugin } from "./url";
+import { GitPlugin } from "./GitPlugin";
+import { TmuxPlugin } from "./tmux";
+import { AgentsMdPlugin } from "./AgentsMdPlugin";
+import { ExecPlugin } from "./exec";
+import { getConfig } from "../config";
+import { getDisabledPlugins } from "../types";
+import { SkillsPlugin } from "./SkillsPlugin";
+import { EventService } from "../services/EventService";
 
 export class PluginService {
-  plugins = {
-    embeddings: new EmbeddingPlugin(),
-    vim: new VimPlugin(),
-    github: new GitHubPlugin(),
-    asana: new AsanaPlugin(),
-    linear: new LinearPlugin(),
-    jira: new JiraPlugin(),
-    notion: new NotionPlugin(),
-    download: new DownloaderPlugin(),
-    figma: new FigmaPlugin(),
-    language: new LanguagePlugin(this),
-    url: new UrlPlugin(),
-  } as Record<string, Plugin>;
+  private pluginMap = new Map<string, Plugin>();
+  private events?: EventService;
+
+  constructor(context: PluginContext) {
+    this.events = context.Events;
+    context.Plugins = this;
+
+    // Register migrated PluginBase plugins
+    this.pluginMap.set("embeddings", new EmbeddingPlugin(context));
+    this.pluginMap.set("vim", new VimPlugin(context));
+    this.pluginMap.set("linter", new LinterPlugin(context));
+    this.pluginMap.set("github", new GitHubPlugin(context));
+    this.pluginMap.set("asana", new AsanaPlugin(context));
+    this.pluginMap.set("linear", new LinearPlugin(context));
+    this.pluginMap.set("jira", new JiraPlugin(context));
+    this.pluginMap.set("notion", new NotionPlugin(context));
+    this.pluginMap.set("download", new DownloaderPlugin(context));
+    this.pluginMap.set("figma", new FigmaPlugin(context));
+    this.pluginMap.set("language", new LanguagePlugin(context));
+    this.pluginMap.set("url", new UrlPlugin(context));
+    this.pluginMap.set("git", new GitPlugin(context));
+    this.pluginMap.set("tmux", new TmuxPlugin(context));
+    this.pluginMap.set("agents-md", new AgentsMdPlugin(context));
+    this.pluginMap.set("exec", new ExecPlugin(context));
+    this.pluginMap.set("skills", new SkillsPlugin(context));
+  }
+
+  /* -------- lifecycle helpers ------------------------------------ */
+
+  /**
+   * Dynamically import a package / file and register it.
+   * @param spec ESM import specifier, e.g. "my-linear-plugin" or "./plugins/foo"
+   * @returns the key under which it was stored
+   */
+  async loadPlugin(spec: string): Promise<string> {
+    const { default: PluginCtor } = await import(spec);
+    const instance: Plugin = new PluginCtor(this); // assumes default export
+    this.pluginMap.set(instance.meta.key, instance);
+    return instance.meta.key;
+  }
+
+  /**
+   * Load plugins from config's pluginPackages map.
+   * Each entry maps a plugin key to an npm package name or file path.
+   * Errors are caught and logged as warnings without crashing.
+   */
+  async loadPluginsFromConfig(config: Config): Promise<void> {
+    const pluginPackages = config.pluginPackages || {};
+    for (const [key, spec] of Object.entries(pluginPackages)) {
+      try {
+        await this.loadPlugin(spec);
+      } catch (error) {
+        this.events?.log(
+          "PluginService",
+          `Failed to load plugin "${key}" from "${spec}": ${error instanceof Error ? error.message : error}`,
+          "warn"
+        );
+      }
+    }
+  }
+
+  /** Disable a plugin by its key; returns `true` if found. */
+  disablePlugin(key: string): boolean {
+    const p = this.pluginMap.get(key);
+    if (!p) return false;
+    p.disable();
+    return true;
+  }
+
+  /** Enable a plugin by its key; returns `true` if found. */
+  enablePlugin(key: string): boolean {
+    const p = this.pluginMap.get(key);
+    if (!p) return false;
+    p.enable();
+    return true;
+  }
+
+  /* -------- existing public API (updated for compatibility) ---------------------- */
 
   listPlugins() {
-    return Object.keys(this.plugins);
+    const newPlugins = [...this.pluginMap.keys()];
+    return newPlugins;
   }
 
   isPlugin(name: string) {
-    return name in this.plugins;
+    return this.pluginMap.has(name);
   }
 
-  registerPlugin(name, plugin: Plugin) {
-    this.plugins[name] = plugin;
+  registerPlugin(name: string, plugin: Plugin) {
+    this.pluginMap.set(name, plugin);
   }
 
-  async callMany(plugins: string[], user_input?: string) {
-    const calls = plugins.map((p) => this.plugins[p].call(user_input));
-    return (await Promise.all(calls)).join("\n\n");
+  getPlugin(name: string): Plugin | undefined {
+    return this.pluginMap.get(name);
   }
 
-  async call(kind: string, user_input?: string) {
-    return this.plugins[kind].call(user_input);
+  getPlugins(): Plugin[] {
+    return Array.from(this.pluginMap.values());
   }
 
-  async embed(kind: string, user_input: string) {
-    return this.plugins[kind].embed(user_input);
+  async callMany(plugins: string[], userInput?: string) {
+    if (!plugins || plugins.length === 0) {
+      return "";
+    }
+    const calls = plugins.map(async (p) => {
+      return this.callManyForPlugin(p, userInput).catch(() => "");
+    });
+
+    const results = await Promise.all(calls);
+    return results.filter((result) => result !== "").join("\n\n");
+  }
+
+  async call(kind: string, userInput?: string) {
+    // Check new plugin system first
+    const newPlugin = this.pluginMap.get(kind);
+
+    if (!newPlugin) {
+      throw new Error(`Plugin ${kind} not found`);
+    }
+
+    const enabled = await newPlugin.isEnabled();
+    if (!enabled) {
+      this.events?.log("PluginService", `Plugin ${kind} is disabled, skipping`);
+      return "";
+    }
+    return newPlugin.call(userInput);
+  }
+
+  async callManyForPlugin(kind: string, userInput?: string) {
+    // Check new plugin system first
+    const newPlugin = this.pluginMap.get(kind);
+
+    if (!newPlugin) {
+      throw new Error(`Plugin ${kind} not found`);
+    }
+
+    const enabled = await newPlugin.isEnabled();
+    if (!enabled) {
+      this.events?.log("PluginService", `Plugin ${kind} is disabled, skipping`);
+      return "";
+    }
+    return newPlugin.callMany(userInput);
+  }
+
+  async embed(kind: string, userInput: string) {
+    // Check new plugin system first
+    const newPlugin = this.pluginMap.get(kind);
+    if (!newPlugin) {
+      throw new Error(`Plugin ${kind} not found`);
+    }
+
+    const enabled = await newPlugin.isEnabled();
+    if (!enabled) {
+      this.events?.log("PluginService", `Plugin ${kind} is disabled, skipping`);
+      return [];
+    }
+    return newPlugin.embed ? newPlugin.embed(userInput) : [];
   }
 }
-
-export const Plugins = new PluginService();

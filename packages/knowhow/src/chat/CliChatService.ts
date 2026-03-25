@@ -1,0 +1,367 @@
+/**
+ * CLI Chat Service - Core service that manages chat context, commands, and modes
+ */
+
+import {
+  ChatService,
+  ChatContext,
+  CommandResult,
+  ChatCommand,
+  ChatMode,
+  InputMethod,
+} from "./types";
+import { ChatHistory } from "./types";
+import { ask, setOnNewHistoryEntry } from "../utils/index";
+import { ChatModule } from "./types";
+import { ChatInteraction } from "../types";
+import { recordAudio, voiceToText } from "../microphone";
+import editor from "@inquirer/editor";
+import fs from "fs";
+import path from "path";
+import { services } from "../services";
+
+export class CliChatService implements ChatService {
+  private context: ChatContext;
+  private commands: ChatCommand[] = [];
+  private modes: ChatMode[] = [];
+  private chatHistory: ChatInteraction[] = [];
+  private modules: ChatModule[] = [];
+  private inputHistory: string[] = [];
+  private readonly historyFile = ".knowhow/chats/history.json";
+
+  constructor(plugins: string[] = []) {
+    this.context = {
+      debugMode: false,
+      agentMode: false,
+      currentAgent: "Patcher",
+      searchMode: false,
+      voiceMode: false,
+      multilineMode: false,
+      currentModel: "gpt-4o",
+      currentProvider: "openai",
+      chatHistory: this.chatHistory,
+      plugins,
+    };
+    this.loadInputHistory();
+
+    // Set up callback to add entries to inputHistory immediately when user presses Enter
+    // This ensures the next ask() call has the updated history for navigation
+    setOnNewHistoryEntry((entry: string) => {
+      this.addToInputHistory(entry);
+    });
+  }
+
+  getModuleByName(name: string) {
+    return this.modules.find((module) => module.name === "agent");
+  }
+
+  /**
+   * Load input history from disk for scrollback functionality
+   */
+  private loadInputHistory(): void {
+    try {
+      if (fs.existsSync(this.historyFile)) {
+        const historyData = fs.readFileSync(this.historyFile, "utf8");
+        const parsedHistory: ChatHistory = JSON.parse(historyData);
+        this.inputHistory = parsedHistory.inputs || [];
+      }
+    } catch (error) {
+      console.error("Error loading input history:", error);
+      this.inputHistory = [];
+    }
+  }
+
+  /**
+   * Save input history to disk
+   */
+  private saveInputHistory(): void {
+    try {
+      // Ensure directory exists
+      const dir = path.dirname(this.historyFile);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+
+      const inputHistory: ChatHistory = {
+        inputs: this.inputHistory,
+      };
+
+      fs.writeFileSync(this.historyFile, JSON.stringify(inputHistory, null, 2));
+    } catch (error) {
+      console.error("Error saving input history:", error);
+    }
+  }
+
+  /**
+   * Add input to history and persist it
+   */
+  private addToInputHistory(input: string): void {
+    // Don't save commands or empty inputs
+    if (!input.startsWith("/") && input.trim() !== "") {
+      this.inputHistory.push(input);
+
+      // Keep history size manageable (last 1000 inputs)
+      if (this.inputHistory.length > 1000) {
+        this.inputHistory = this.inputHistory.slice(-1000);
+      }
+
+      this.saveInputHistory();
+    }
+  }
+
+  getContext(): ChatContext {
+    return this.context;
+  }
+
+  getTools() {
+    return this.context.selectedAgent?.tools;
+  }
+
+  setContext(context: Partial<ChatContext>): void {
+    this.context = { ...this.context, ...context };
+    // Keep chatHistory reference synchronized
+    if (this.context.chatHistory !== this.chatHistory) {
+      this.context.chatHistory = this.chatHistory;
+    }
+  }
+
+  setInputMethod(method: InputMethod): void {
+    this.context.inputMethod = method;
+  }
+
+  resetInputMethod(): void {
+    delete this.context.inputMethod;
+  }
+
+  registerCommand(command: ChatCommand): void {
+    this.commands.push(command);
+  }
+
+  registerMode(mode: ChatMode): void {
+    this.modes.push(mode);
+  }
+
+  registerModule(module: ChatModule): void {
+    this.modules.push(module);
+  }
+
+  getCommands(): ChatCommand[] {
+    return this.commands;
+  }
+
+  /**
+   * Get commands available in the current mode
+   */
+  getCommandsForMode(mode: string): ChatCommand[] {
+    return this.commands.filter(
+      (cmd) => !cmd.modes || cmd.modes.length === 0 || cmd.modes.includes(mode)
+    );
+  }
+
+  getCommandsForActiveModes(): ChatCommand[] {
+    const activeModes = this.modes
+      .filter((mode) => mode.active)
+      .map((mode) => mode.name);
+    return this.commands.filter(
+      (cmd) =>
+        !cmd.modes ||
+        cmd.modes.length === 0 ||
+        cmd.modes.some((mode) => activeModes.includes(mode))
+    );
+  }
+
+  setMode(mode: string): void {
+    this.modes.forEach((m) => {
+      if (m.name !== "default" && m.name !== mode) {
+        m.active = false;
+      } else if (m.name === mode) {
+        m.active = true;
+      }
+    });
+  }
+
+  getModes(): ChatMode[] {
+    return this.modes;
+  }
+
+  getMode(name: string): ChatMode | undefined {
+    return this.modes.find((mode) => mode.name === name);
+  }
+
+  async processInput(input: string): Promise<boolean> {
+    // Note: Input is added to history via setOnNewHistoryEntry callback when user presses Enter
+    // Note: this actually sends all commands to modules if not handled by a command
+
+    // Check if input is a command
+    if (input.startsWith("/")) {
+      const [commandName, ...args] = input.slice(1).split(" ");
+      const availableCommands = this.getCommandsForActiveModes();
+      const command = availableCommands.find((cmd) => cmd.name === commandName);
+
+      if (command) {
+        const result = await command.handler(args);
+
+        // If handler returns a CommandResult and it's not handled, pass to modules
+        if (result && typeof result === "object" && "handled" in result) {
+          if (result.handled) {
+            return true;
+          }
+          // Not handled, use contents if provided or original input
+          input = result.contents || input;
+        } else {
+          // Old-style void handler, consider it handled
+          return true;
+        }
+      }
+    }
+
+    // If not a command, try delegating to modules
+    for (const module of this.modules) {
+      try {
+        const handled = await module.handleInput(input, this.context);
+        if (handled) {
+          return true;
+        }
+      } catch (error) {
+        console.error(`Error in module ${module.name}:`, error);
+      }
+    }
+
+    return false;
+  }
+
+  enableMode(name: string): void {
+    const mode = this.modes.find((m) => m.name === name);
+    if (mode) {
+      mode.active = true;
+    }
+  }
+
+  disableMode(name: string): void {
+    const mode = this.modes.find((m) => m.name === name);
+    if (mode) {
+      mode.active = false;
+    }
+  }
+
+  async getInput(
+    prompt: string = "> ",
+    options: string[] = []
+  ): Promise<string> {
+    if (this.context.inputMethod) {
+      return await this.context.inputMethod.getInput(prompt);
+    }
+
+    let value = "";
+    if (this.context.voiceMode) {
+      value = await voiceToText();
+    } else if (this.context.multilineMode) {
+      value = await editor({ message: prompt });
+      this.context.multilineMode = false; // Disable after use like original
+    } else {
+      // Use saved input history for scrollback (InputQueueManager handles reverse access)
+      const history = this.inputHistory.slice();
+      value = await ask(prompt, options, history);
+    }
+
+    return value.trim();
+  }
+
+  clearHistory(): void {
+    this.chatHistory = [];
+    this.context.chatHistory = this.chatHistory;
+  }
+
+  getChatHistory(): ChatInteraction[] {
+    return this.chatHistory;
+  }
+
+  /**
+   * Get input history for external access
+   */
+  getInputHistory(): string[] {
+    return [...this.inputHistory];
+  }
+
+  /**
+   * Clear input history
+   */
+  clearInputHistory(): void {
+    this.inputHistory = [];
+    this.saveInputHistory();
+  }
+
+  async formatChatInput(
+    input: string,
+    plugins: string[] = [],
+    chatHistory: ChatInteraction[] = []
+  ) {
+    const { Plugins } = services();
+    const pluginText = await Plugins.callMany(plugins, input);
+    const historyMessage = `<PreviousChats>
+  This information is provided as historical context and is likely not related to the current task:
+  ${JSON.stringify(chatHistory)}
+    </PreviousChats>`;
+    const fullPrompt = `
+    ${historyMessage} \n
+    <PluginContext> ${pluginText} </PluginContext>
+    <CurrentTask>${input}</CurrentTask>
+  `;
+    return fullPrompt;
+  }
+
+  async startChatLoop(): Promise<void> {
+    // Display available commands like the original
+    const availableCommands = this.getCommandsForActiveModes();
+    const commandNames = availableCommands.map((cmd) => `/${cmd.name}`);
+    console.log("Commands:", commandNames.join(", "));
+
+    while (true) {
+      // Recompute available commands each iteration so mode changes are reflected in autocomplete
+      const currentCommandNames = this.getCommandsForActiveModes().map((cmd) => `/${cmd.name}`);
+
+      // Check active modes for a promptText first, then fall back to context.promptText, then default
+      const activeModeWithPrompt = this.modes
+        .filter((m) => m.active && m.promptText)
+        .slice(-1)[0]; // last active mode with a promptText wins
+
+      let modePrompt: string | undefined;
+      if (activeModeWithPrompt?.promptText) {
+        const p = activeModeWithPrompt.promptText;
+        modePrompt = typeof p === "function" ? p() : p;
+      }
+
+      const promptText =
+        modePrompt ||
+        this.context.promptText ||
+        (this.context.agentMode && this.context.currentAgent
+          ? `\nAsk knowhow ${this.context.currentAgent}: `
+          : `\nAsk knowhow: `);
+      try {
+        // Pass command names as autocomplete options
+        const input = await this.getInput(promptText, currentCommandNames);
+
+        if (input.trim() === "") {
+          continue;
+        }
+
+        // Process the input
+        const handled = await this.processInput(input.trim());
+
+        if (!handled) {
+          // Default chat behavior - this would be handled by a chat module
+          const interaction = {
+            input,
+            output: `I didn't understand that command. Available commands: ${currentCommandNames.join(
+              ", "
+            )}`,
+          } as ChatInteraction;
+          this.chatHistory.push(interaction);
+          console.log(interaction.output);
+        }
+      } catch (error) {
+        console.error("Error in chat loop:", error);
+      }
+    }
+  }
+}

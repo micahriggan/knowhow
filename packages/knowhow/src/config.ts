@@ -4,24 +4,38 @@ import * as os from "os";
 import gitignoreToGlob from "gitignore-to-glob";
 import { Prompts } from "./prompts";
 import { promisify } from "util";
-import { Config, Language, AssistantConfig, Models } from "./types";
+import {
+  Config,
+  Language,
+  AssistantConfig,
+  Models,
+  EmbeddingModels,
+} from "./types";
 import { mkdir, writeFile, readFile, fileExists } from "./utils";
+import { applyMigrations } from "./migrations";
 
 const defaultConfig = {
   promptsDir: ".knowhow/prompts",
   modules: [],
-  plugins: [
-    "embeddings",
-    "language",
-    "vim",
-    "github",
-    "asana",
-    "jira",
-    "linear",
-    "download",
-    "figma",
-    "url",
-  ],
+  plugins: {
+    enabled: [
+      "embeddings",
+      "language",
+      "git",
+      "vim",
+      "github",
+      "asana",
+      "jira",
+      "linear",
+      "download",
+      "figma",
+      "url",
+      "tmux",
+      "agents-md",
+      "exec",
+    ],
+    disabled: [],
+  },
   lintCommands: {
     js: "eslint",
     ts: "tslint",
@@ -45,8 +59,13 @@ const defaultConfig = {
       prompt: "BasicEmbeddingExplainer",
       chunkSize: 2000,
     },
+    {
+      input: "src/**/*.ts",
+      output: ".knowhow/embeddings/code.json",
+      chunkSize: 2000,
+    },
   ],
-  embeddingModel: Models.openai.EmbeddingAda2,
+  embeddingModel: EmbeddingModels.openai.EmbeddingAda2,
 
   agents: [
     {
@@ -67,10 +86,26 @@ const defaultConfig = {
   ],
 
   modelProviders: [{ url: "http://localhost:1234", provider: "lms" }],
+
+  ycmd: {
+    enabled: false,
+    installPath: undefined, // Will default to ~/.knowhow/ycmd
+    port: 0, // 0 for auto-assign
+    logLevel: "info",
+    completionTimeout: 5000,
+  },
+
+  worker: {
+    tunnel: {
+      enabled: false,
+      allowedPorts: [],
+    },
+  },
 } as Config;
 
 const defaultLanguage = {
   "knowhow config": {
+    events: [],
     sources: [
       {
         kind: "file",
@@ -106,7 +141,7 @@ async function ensureGlobalConfigDir() {
   for (const folder of globalTemplateFolders) {
     const folderPath = path.join(globalConfigDir, folder);
     await mkdir(folderPath, { recursive: true });
-    fs.chmodSync(folderPath, 0o600);
+    fs.chmodSync(folderPath, 0o744);
   }
 
   for (const file of Object.keys(globalTemplateFiles)) {
@@ -120,9 +155,11 @@ async function ensureGlobalConfigDir() {
 }
 
 export async function init() {
+  console.log("Initializing global knowhow config at ~/.knowhow");
   const globalConfigDir = await ensureGlobalConfigDir();
 
   // create the folder structure
+  console.log("Initializing local knowhow config at ./.knowhow");
   await mkdir(".knowhow", { recursive: true });
   for (const folder of globalTemplateFolders) {
     await mkdir(path.join(".knowhow", folder), { recursive: true });
@@ -133,8 +170,19 @@ export async function init() {
 }
 
 export async function getLanguageConfig() {
-  const language = JSON.parse(await readFile(".knowhow/language.json", "utf8"));
-  return language as Language;
+  try {
+    if (!fs.existsSync(".knowhow/language.json")) {
+      return {} as Language;
+    }
+
+    const language = JSON.parse(
+      await readFile(".knowhow/language.json", "utf8")
+    );
+    return language as Language;
+  } catch (e) {
+    console.warn("Error reading .knowhow/language.json:", e);
+    return {} as Language;
+  }
 }
 
 export async function updateLanguageConfig(language: Language) {
@@ -142,6 +190,17 @@ export async function updateLanguageConfig(language: Language) {
 }
 
 export async function updateConfig(config: Config) {
+  if (!config || typeof config !== "object") {
+    throw new Error("Invalid config object");
+  }
+
+  if (fs.existsSync(".knowhow/knowhow.json")) {
+    await fs.promises.copyFile(
+      ".knowhow/knowhow.json",
+      ".knowhow/knowhow.json.bak"
+    );
+  }
+
   await writeFile(".knowhow/knowhow.json", JSON.stringify(config, null, 2));
 }
 
@@ -179,9 +238,76 @@ export function getConfigSync() {
   }
 }
 
+let loggedWarning = false;
 export async function getConfig() {
-  const config = JSON.parse(await readFile(".knowhow/knowhow.json", "utf8"));
-  return config as Config;
+  if (!fs.existsSync(".knowhow/knowhow.json")) {
+    if (!loggedWarning) {
+      loggedWarning = true;
+      if (!process.argv.includes("init")) {
+        console.warn(
+          "KnowHow config file not found. Please run `knowhow init` to create it."
+        );
+      }
+    }
+    return {} as Config;
+  }
+  try {
+    const config = await readFile(".knowhow/knowhow.json", "utf8");
+    const parsedConfig = JSON.parse(config);
+
+    return parsedConfig as Config;
+  } catch (error) {
+    console.error("Error reading .knowhow/knowhow.json:", error);
+    throw new Error("Failed to load KnowHow configuration.");
+  }
+}
+
+export async function getGlobalConfig(): Promise<Config> {
+  const globalConfigDir = getGlobalConfigDir();
+  const globalConfigPath = path.join(globalConfigDir, "knowhow.json");
+  if (!fs.existsSync(globalConfigPath)) {
+    return {} as Config;
+  }
+  try {
+    const config = await readFile(globalConfigPath, "utf8");
+    return JSON.parse(config) as Config;
+  } catch (error) {
+    console.warn("Failed to load global knowhow config:", error);
+    return {} as Config;
+  }
+}
+
+export async function migrateConfig() {
+  // Apply migrations, used to keep config structure up to date.
+  if (!fs.existsSync(".knowhow/knowhow.json")) {
+    // no config to migrate
+    return;
+  }
+  const parsedConfig = await getConfig();
+  const { modified, config: migratedConfig } = applyMigrations(parsedConfig);
+
+  // After migrations, check if any plugins from defaultConfig are missing
+  let configModified = modified;
+  if (migratedConfig.plugins) {
+    const enabled = migratedConfig.plugins.enabled || [];
+    const disabled = migratedConfig.plugins.disabled || [];
+    const missingPlugins = defaultConfig.plugins.enabled.filter(
+      (plugin) => !enabled.includes(plugin) && !disabled.includes(plugin)
+    );
+
+    if (missingPlugins.length > 0) {
+      console.log(
+        `Adding missing plugins to enabled list: ${missingPlugins.join(", ")}`
+      );
+      migratedConfig.plugins.enabled = [...enabled, ...missingPlugins];
+      configModified = true;
+    }
+  }
+
+  // If migrations were applied, save the updated config
+  if (configModified) {
+    await updateConfig(migratedConfig);
+  }
 }
 
 export async function loadPrompt(promptName: string) {

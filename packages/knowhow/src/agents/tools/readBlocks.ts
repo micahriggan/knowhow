@@ -1,4 +1,5 @@
 import * as fs from "fs";
+import { services, ToolsService } from "../../services";
 import { FileBlock } from "./types/fileblock";
 
 const BLOCK_SIZE = 500;
@@ -6,6 +7,21 @@ export async function readBlocks(
   filePath: string,
   blockNumbers: number[] = []
 ) {
+  // Get context from bound ToolsService
+  const toolService = (
+    this instanceof ToolsService ? this : services().Tools
+  ) as ToolsService;
+
+  const context = toolService.getContext();
+
+  // Emit pre-read blocking event
+  if (context.Events) {
+    await context.Events.emitBlocking("file:pre-read", {
+      filePath,
+      blockNumbers,
+    });
+  }
+
   const text = fs.readFileSync(filePath, "utf8");
 
   const lines = text.split("");
@@ -34,8 +50,34 @@ export async function readBlocks(
   }
 
   if (blockNumbers.length === 0) {
+    // Emit post-read non-blocking event
+    if (context.Events) {
+      await context.Events.emitNonBlocking("file:post-read", {
+        filePath,
+        blockNumbers,
+        content: blocks.map((block) => block.content).join(""),
+      });
+    }
+
     return blocks;
   }
 
-  return blocks.filter((block) => blockNumbers.includes(block.blockNumber));
+  const filtered = blocks.filter((block) =>
+    blockNumbers.includes(block.blockNumber)
+  );
+
+  if (filtered.length === 0) {
+    return blocks;
+  }
+
+  // Emit post-read non-blocking event
+  if (context.Events) {
+    await context.Events.emitNonBlocking("file:post-read", {
+      filePath,
+      blockNumbers,
+      content: filtered.map((block) => block.content).join(""),
+    });
+  }
+
+  return filtered;
 }

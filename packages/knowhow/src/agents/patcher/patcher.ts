@@ -1,5 +1,5 @@
 import { Message } from "../../clients/types";
-import { BaseAgent } from "../base/base";
+import { AgentContext, BaseAgent } from "../base/base";
 import { BASE_PROMPT } from "../base/prompt";
 import { Models } from "../../ai";
 
@@ -75,17 +75,13 @@ export class PatchingAgent extends BaseAgent {
   name = "Patcher";
   description = `This agent is prepared to work on the codebase by leveraging patches`;
 
-  constructor() {
-    super();
-    this.disableTool("sendVimInput");
-    this.disableTool("openFileInVim");
+  constructor(context: AgentContext) {
+    super(context);
 
     this.setModelPreferences([
-      { model: Models.anthropic.Sonnet4, provider: "anthropic" },
-      {
-        model: Models.openai.GPT_41,
-        provider: "openai",
-      },
+      { model: Models.anthropic.Sonnet4_6, provider: "anthropic" },
+      { model: Models.xai.GrokCodeFast, provider: "xai" },
+      { model: Models.openai.GPT_5, provider: "openai" },
     ]);
   }
 
@@ -98,13 +94,38 @@ export class PatchingAgent extends BaseAgent {
         ${systemReminder}
 
         Specialization: Patcher Agent, ${this.description}
+
+        # Language Server Integration:
+        Use ycmd tools (ycmdDiagnostics, ycmdCompletion, ycmdRefactor, ycmdGoTo) to get error diagnostics, code completions, refactor symbols, and navigate definitions before making changes.
+        This helps ensure accurate modifications and can suggest fixes for compilation errors.
+
         IF you fail twice to patch a file, you may switch using writeFileChunk to rewrite the whole file.
+
+        If you need to know about a type, you should use the ycmd completion tool to discovery the properties, and fallback to reading the source files if the ycmd tools are not available.
+
+        # Debugging Workflow
+        If a build or test command fails due to compilation errors:
+
+        ALWAYS start by running ycmdDiagnostics on the file with errors to get a structured list of issues.
+
+        Address the errors one at a time, from top to bottom.
+
+        For each error, use ycmdGoTo to find the correct definition or readFile on the relevant source file to understand the correct implementation.
+
+        If an error is related to properties not being named correctly, you can use ycmdCompletion to get suggestions for the correct property or method names.
+
+        Apply a small, targeted patch to fix only that single error.
+
+        After every 2-3 fixes, run ycmdDiagnostics again to confirm progress.
+
+        # Test Writing Workflow
+        When writing tests, you proceed incrementally, writing one test, verifying it compiles and works before moving on to the next test.
+        You ALWAYS get to a stable state with tests compiling / running before adding the next test.
+        When writing tests, you never change the source code to pass the test, you always change the test to match the existing source code.
+
         `,
       },
-      // { role: "user", content: systemReminder },
       { role: "user", content: userInput },
     ] as Message[];
   }
 }
-
-export const Patcher = new PatchingAgent();

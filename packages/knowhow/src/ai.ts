@@ -11,15 +11,42 @@ const config = getConfigSync();
 const OPENAI_KEY = process.env.OPENAI_KEY;
 
 import { Models } from "./types";
-import { Agents } from "./services";
+import { services } from "./services";
 export { Models };
 
-export const openai = new OpenAI({
-  apiKey: process.env.OPENAI_KEY,
-  ...(config.openaiBaseUrl && { baseURL: config.openaiBaseUrl }),
-});
+export const openai = () =>
+  new OpenAI({
+    apiKey: OPENAI_KEY,
+    ...(config.openaiBaseUrl && { baseURL: config.openaiBaseUrl }),
+  });
+
+export function readPromptFile(promptFile: string, input: string) {
+  if (promptFile) {
+    if (fs.existsSync(promptFile)) {
+      const promptTemplate = fs.readFileSync(promptFile, "utf-8");
+      if (promptTemplate.includes("{text}")) {
+        // Only replace if input is provided
+        if (input) {
+          return promptTemplate.replaceAll("{text}", input);
+        }
+        // If no input provided but template expects it, return template as-is
+        // This allows the calling code to handle the missing input
+        return promptTemplate;
+      } else {
+        // Template doesn't have {text}, so input is optional
+        if (input) {
+          return `${promptTemplate}\n\n${input}`;
+        }
+        return promptTemplate;
+      }
+    }
+  }
+
+  return input;
+}
 
 export async function singlePrompt(userPrompt: string, model = "", agent = "") {
+  const { Agents } = services();
   if (agent) {
     const agentConfig = await Agents.getAgent(agent);
     if (!agentConfig) {
@@ -56,7 +83,9 @@ export async function summarizeTexts(
 
     console.log(content);
 
-    const summary = await singlePrompt(content, model, agent);
+    const summary = await singlePrompt(content, model, agent).catch((err) => {
+      return `Text of length ${text.length} could not be summarized due to error: ${err.message}`;
+    });
     summaries.push(summary);
   }
 
@@ -163,5 +192,5 @@ export async function askGptVision(
     ],
   });
 
-  return response.choices[0].message.content;
+  return response;
 }

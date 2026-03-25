@@ -1,22 +1,38 @@
 import fs from "fs";
-import { Plugin } from "../types";
+import { PluginBase, PluginMeta } from "../PluginBase";
 import { MinimalEmbedding } from "../../types";
+import { PluginContext } from "../types";
 import { convertToText, processVideo } from "../../conversion";
-import { Downloader } from "./downloader";
+import { services } from "../../services";
 
-export class DownloaderPlugin implements Plugin {
+export class DownloaderPlugin extends PluginBase {
+  static readonly meta: PluginMeta = {
+    key: "downloader",
+    name: "Downloader Plugin",
+    requires: [],
+  };
+
+  meta = DownloaderPlugin.meta;
+
+  constructor(context: PluginContext) {
+    super(context);
+  }
+
   skipExt = ["jpg", "jpeg", "png", "gif"];
 
   extractUrls(userInput: string): string[] {
     const urlRegex = /https:\/\/[^\s]+/gim;
     const matches = userInput.match(urlRegex) || [];
-    return matches;
+    return Array.from(new Set(matches));
   }
 
   async call(userInput: string): Promise<string> {
     const urls = this.extractUrls(userInput);
     if (urls.length === 0) {
       return "DOWNLOADER PLUGIN: No URLs found in the input";
+    }
+    if (urls.length > 10) {
+      return "DOWNLOADER PLUGIN: Too many URLs found in the input. Skipping likely unintentional bulk download.";
     }
     let transcript = "";
     for (const url of urls) {
@@ -27,6 +43,7 @@ export class DownloaderPlugin implements Plugin {
       try {
         console.log("DOWNLOADER PLUGIN: attempting", url);
         const downloadDir = ".knowhow/downloads/";
+        const { Downloader } = services();
         const fileInfo = await Downloader.download(url, downloadDir);
         const filePath = `${downloadDir}${fileInfo.id}.${fileInfo.ext}`;
         transcript += await convertToText(filePath);
@@ -46,6 +63,7 @@ export class DownloaderPlugin implements Plugin {
     const embeddings: MinimalEmbedding[] = [];
     for (const url of urls) {
       const downloadDir = ".knowhow/downloads/";
+      const { Downloader } = services();
       const fileInfo = await Downloader.download(url, downloadDir);
       const filePath = `${downloadDir}${fileInfo.id}.${fileInfo.ext}`;
       const processed = await processVideo(filePath);

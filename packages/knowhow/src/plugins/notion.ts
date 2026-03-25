@@ -1,12 +1,23 @@
 import { Client } from "@notionhq/client";
-import { Plugin } from "./types";
+import { PluginBase, PluginMeta } from "./PluginBase";
+import { PluginContext } from "./types";
 import { PageObjectResponse } from "@notionhq/client/build/src/api-endpoints";
 import { Embeddable, MinimalEmbedding } from "../types";
 
-export class NotionPlugin implements Plugin {
+export class NotionPlugin extends PluginBase {
+  static readonly meta: PluginMeta = {
+    key: "notion",
+    name: "Notion Plugin",
+    requires: ["NOTION_TOKEN"]
+  };
+
+  meta = NotionPlugin.meta;
   notionClient: Client;
 
-  constructor() {
+  constructor(context: PluginContext) {
+    super(context);
+    
+    if (!this.isEnabled()) return;
     this.notionClient = new Client({
       auth: process.env.NOTION_TOKEN,
     });
@@ -47,9 +58,7 @@ export class NotionPlugin implements Plugin {
     if (processed[pageId] || currentDepth > maxDepth) {
       return { results: [] };
     }
-    console.log(
-      `Notion Plugin: Fetching all blocks for page ${pageId} at depth ${currentDepth}`
-    );
+    this.log(`Fetching all blocks for page ${pageId} at depth ${currentDepth}`);
     processed[pageId] = true;
     const response = await this.notionClient.blocks.children.list({
       block_id: pageId,
@@ -57,7 +66,7 @@ export class NotionPlugin implements Plugin {
 
     let cursor = response.next_cursor;
     while (cursor) {
-      console.log("Fetching more blocks");
+      this.log("Fetching more blocks");
       const childResponse = await this.notionClient.blocks.children.list({
         block_id: pageId,
         start_cursor: cursor,
@@ -98,7 +107,7 @@ export class NotionPlugin implements Plugin {
         (b) => "has_children" in b && b.has_children
       );
 
-      console.log(JSON.stringify(results, null, 2));
+      this.log(JSON.stringify(results, null, 2));
 
       const childBlocks = await Promise.all(
         childPages.map(async (childPage) => {
@@ -122,7 +131,7 @@ export class NotionPlugin implements Plugin {
       }
     }
 
-    console.log(JSON.stringify(embeddings, null, 2));
+    this.log(JSON.stringify(embeddings, null, 2));
     return embeddings;
   }
 
@@ -136,7 +145,7 @@ export class NotionPlugin implements Plugin {
   async getPageFromUrl(url: string) {
     const pageId = url.split("-").pop();
     if (pageId) {
-      console.log(`Fetching Notion page ${pageId}`);
+      this.log(`Fetching Notion page ${pageId}`);
       const page = await this.notionClient.pages.retrieve({ page_id: pageId });
       const blocks = await this.getAllChildBlocks(page.id);
       return { page, blocks };
@@ -164,7 +173,7 @@ export class NotionPlugin implements Plugin {
     const markdownPages = pagesDataFiltered
       .map((page) => `### Page: ${JSON.stringify(page, null, 2)}\n-`)
       .join("\n\n");
-    console.log(markdownPages);
+    this.log(markdownPages);
     return `NOTION PLUGIN: The following pages were loaded:\n\n${markdownPages}`;
   }
 }

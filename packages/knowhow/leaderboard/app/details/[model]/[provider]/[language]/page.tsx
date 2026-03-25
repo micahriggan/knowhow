@@ -1,0 +1,501 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { BenchmarkResults, ExerciseResult } from "@/types/benchmark";
+import {
+  formatCurrency,
+  formatTime,
+  formatPercentage,
+} from "@/utils/dataProcessor";
+
+interface HistoricalRun {
+  endTime: string;
+  successRate: number;
+  totalExercises: number;
+  totalCost: number;
+  averageTime: number;
+  averageTurns: number;
+  commitHash: string;
+  averageCost: number;
+}
+
+interface DetailResponse {
+  latest: BenchmarkResults;
+  history: HistoricalRun[];
+  totalRuns: number;
+}
+
+export default function ModelDetailPage() {
+  const params = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [detailData, setDetailData] = useState<DetailResponse | null>(
+    null
+  );
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const model = decodeURIComponent(params.model as string);
+  const provider = decodeURIComponent(params.provider as string);
+  const language = decodeURIComponent(params.language as string);
+  const timestamp = searchParams.get('timestamp');
+
+  useEffect(() => {
+    async function fetchDetailData() {
+      try {
+        const response = await fetch(
+          `/api/benchmark-detail?model=${encodeURIComponent(
+            model
+          )}&provider=${encodeURIComponent(
+            provider
+          )}&language=${encodeURIComponent(language)}${
+            timestamp ? `&timestamp=${timestamp}` : ''
+          }`
+        );
+        if (!response.ok) {
+          throw new Error("Failed to fetch benchmark details");
+        }
+        const data = await response.json();
+        setDetailData(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "An error occurred");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchDetailData();
+  }, [model, provider, language, timestamp]);
+
+  const loadHistoricalRun = async (timestamp: string) => {
+    // Navigate to the same page but with timestamp parameter
+    router.push(`/details/${encodeURIComponent(model)}/${encodeURIComponent(provider)}/${encodeURIComponent(language)}?timestamp=${timestamp}`);
+  };
+
+  const backToLatestRun = () => {
+    // Navigate to the same page without timestamp parameter
+    router.push(`/details/${encodeURIComponent(model)}/${encodeURIComponent(provider)}/${encodeURIComponent(language)}`);
+  };
+
+  const getStatusBadge = (status: string) => {
+    const baseClasses = "px-2 py-1 text-xs font-medium rounded-full";
+    switch (status) {
+      case "success":
+        return `${baseClasses} bg-green-100 text-green-800`;
+      case "failure":
+        return `${baseClasses} bg-red-100 text-red-800`;
+      case "timeout":
+        return `${baseClasses} bg-yellow-100 text-yellow-800`;
+      case "cost_limit":
+        return `${baseClasses} bg-orange-100 text-orange-800`;
+      case "turn_limit":
+        return `${baseClasses} bg-purple-100 text-purple-800`;
+      default:
+        return `${baseClasses} bg-gray-100 text-gray-800`;
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "success":
+        return "✅";
+      case "failure":
+        return "❌";
+      case "timeout":
+        return "⏰";
+      case "cost_limit":
+        return "💰";
+      case "turn_limit":
+        return "🔄";
+      default:
+        return "❓";
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading benchmark details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !detailData) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            Error Loading Details
+          </h3>
+          <p className="text-gray-500 mb-4">
+            {error || "Benchmark data not found"}
+          </p>
+          <button
+            onClick={() => router.back()}
+            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Extract the latest benchmark data for display
+  const benchmarkData = detailData.latest;
+  const isHistoricalView = timestamp !== null;
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <button
+            onClick={() => router.push("/")}
+            className="mb-4 text-blue-600 hover:text-blue-800 flex items-center"
+          >
+            ← Back to Leaderboard
+          </button>
+          <h1 className="text-3xl font-bold text-gray-900">
+            Benchmark Details: {model}
+          </h1>
+          <p className="mt-2 text-gray-600">
+            Provider: {provider} • Language: {language}
+          </p>
+          {isHistoricalView && (
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-blue-800 text-sm">
+                Viewing historical run from {new Date(benchmarkData.endTime).toLocaleString()}
+              </p>
+              <button
+                onClick={backToLatestRun}
+                className="mt-2 text-blue-600 hover:text-blue-800 text-sm underline"
+              >
+                ← Back to latest run
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
+                  <span className="text-white font-bold">%</span>
+                </div>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">
+                  Success Rate
+                </p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {formatPercentage(benchmarkData.summary.successRate * 100)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
+                  <span className="text-white font-bold">E</span>
+                </div>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">
+                  Total Exercises
+                </p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {benchmarkData.summary.totalExercises}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-yellow-500 rounded-md flex items-center justify-center">
+                  <span className="text-white font-bold">$</span>
+                </div>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">Total Cost</p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {formatCurrency(benchmarkData.summary.totalCost)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center">
+                  <span className="text-white font-bold">T</span>
+                </div>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">Total Time</p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {formatTime(benchmarkData.summary.totalTime)}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Exercise Results Table */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Exercise Results
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Detailed breakdown of each exercise performance
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Exercise
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Pass / Total
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Time
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Cost
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Turns
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Output
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {benchmarkData.exercises.map((exercise, index) => (
+                  <tr key={exercise.exerciseName} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      <button
+                        onClick={() => router.push(`/exercise/${encodeURIComponent(model)}/${encodeURIComponent(provider)}/${encodeURIComponent(language)}/${encodeURIComponent(exercise.exerciseName)}`)}
+                        className="text-blue-600 hover:text-blue-800 hover:underline text-left"
+                        title="Click to view detailed exercise results"
+                      >
+                        {exercise.exerciseName}
+                      </button>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <span className="mr-2">
+                          {getStatusIcon(
+                            exercise.testResult?.success ? "success" : "failure"
+                          )}
+                        </span>
+                        <span
+                          className={getStatusBadge(
+                            exercise.testResult?.success
+                          )}
+                        >
+                          {exercise.testResult?.success ? "Pass" : "Fail"}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {exercise.testResult?.passed} /{" "}
+                      {exercise.testResult?.total}{" "}
+                      <div>
+                        {exercise.testResult?.skipped
+                          ? `(${exercise.testResult?.skipped} skipped)`
+                          : ""}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {formatTime(exercise.timeElapsed)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {formatCurrency(exercise.cost)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {exercise.turns}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
+                      {exercise.finalOutput?.slice(0, 100) || "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Historical Performance Section */}
+        {detailData.history.length > 0 && (
+          <div className="mt-8 bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-xl font-semibold text-gray-900">
+                Historical Performance
+              </h2>
+              <p className="mt-1 text-sm text-gray-500">
+                Previous runs for this model/provider/language combination ({detailData.totalRuns} total runs)
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Run Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Success Rate
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Exercises
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Avg Cost
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Avg Time
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Avg Turns
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Commit
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {detailData.history.map((run, index) => (
+                    <tr
+                      key={`${run.endTime}-${index}`}
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() => loadHistoricalRun(run.endTime)}
+                      title="Click to view detailed results for this run"
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {new Date(run.endTime).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatPercentage(run.successRate)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {run.totalExercises}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatCurrency(run.averageCost)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatTime(run.averageTime)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {run.averageTurns.toFixed(1)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
+                        {run.commitHash.slice(0, 8)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Run Information */}
+        <div className="mt-8 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            Run Information
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h4 className="text-sm font-medium text-gray-500 mb-2">
+                Configuration
+              </h4>
+              <dl className="space-y-1">
+                <div className="flex">
+                  <dt className="text-sm text-gray-500 w-24">Model:</dt>
+                  <dd className="text-sm text-gray-900">
+                    {benchmarkData.config.model}
+                  </dd>
+                </div>
+                <div className="flex">
+                  <dt className="text-sm text-gray-500 w-24">Provider:</dt>
+                  <dd className="text-sm text-gray-900">
+                    {benchmarkData.config.provider}
+                  </dd>
+                </div>
+                <div className="flex">
+                  <dt className="text-sm text-gray-500 w-24">Language:</dt>
+                  <dd className="text-sm text-gray-900">
+                    {benchmarkData.config.language}
+                  </dd>
+                </div>
+                {benchmarkData.config.agent && (
+                  <div className="flex">
+                    <dt className="text-sm text-gray-500 w-24">Agent:</dt>
+                    <dd className="text-sm text-gray-900">
+                      {benchmarkData.config.agent}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            </div>
+            <div>
+              <h4 className="text-sm font-medium text-gray-500 mb-2">Limits</h4>
+              <dl className="space-y-1">
+                <div className="flex">
+                  <dt className="text-sm text-gray-500 w-24">Max Turns:</dt>
+                  <dd className="text-sm text-gray-900">
+                    {benchmarkData.config.limits.maxTurns}
+                  </dd>
+                </div>
+                <div className="flex">
+                  <dt className="text-sm text-gray-500 w-24">Max Time:</dt>
+                  <dd className="text-sm text-gray-900">
+                    {formatTime(benchmarkData.config.limits.maxTime)}
+                  </dd>
+                </div>
+                <div className="flex">
+                  <dt className="text-sm text-gray-500 w-24">Max Cost:</dt>
+                  <dd className="text-sm text-gray-900">
+                    {formatCurrency(benchmarkData.config.limits.maxCost)}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="flex justify-between text-sm text-gray-500">
+              <span>
+                Started: {new Date(benchmarkData.startTime).toLocaleString()}
+              </span>
+              <span>
+                Completed: {new Date(benchmarkData.endTime).toLocaleString()}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

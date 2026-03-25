@@ -1,22 +1,24 @@
-import { EventEmitter } from "events";
+import { EventEmitter } from "events";  // kept for reference; agentEvents now uses EventService
 import {
   GenericClient,
   Message,
+  MessageContent,
   OutputMessage,
   Tool,
   ToolCall,
 } from "../../clients/types";
 import { IAgent } from "../interface";
-import { ToolsService, Tools } from "../../services/Tools";
+import { ToolsService } from "../../services/Tools";
 import {
   mcpToolName,
   replaceEscapedNewLines,
   restoreEscapedNewLines,
 } from "../../utils";
-import { Agents, AgentService } from "../../services/AgentService";
-import { Events, EventService } from "../../services/EventService";
+import { EventService } from "../../services/EventService";
 import { AIClient, Clients } from "../../clients";
-import { Models, openai } from "../../ai";
+import { Models } from "../../ai";
+import { MessageProcessor } from "../../services/MessageProcessor";
+import { Marked } from "../../utils";
 
 export { Message, Tool, ToolCall };
 export interface ModelPreference {
@@ -24,11 +26,23 @@ export interface ModelPreference {
   provider: keyof typeof Clients.clients;
 }
 
+export interface AgentContext {
+  Tools?: ToolsService;
+  Events?: EventService;
+  messageProcessor?: MessageProcessor;
+  Clients?: AIClient;
+}
+
+export interface ToolCallEvent {
+  toolCall: ToolCall;
+  functionResp: any;
+}
+
 export abstract class BaseAgent implements IAgent {
   abstract name: string;
   abstract description: string;
 
-  private status = "in_progress";
+  private status = "not_started";
   private lastHealthCheckTime: number = 0;
   protected provider = "openai";
   protected modelName: string = Models.openai.GPT_4o;
@@ -37,39 +51,116 @@ export abstract class BaseAgent implements IAgent {
   protected currentModelPreferenceIndex = 0;
   protected easyFinalAnswer = false;
   protected requiredToolNames = ["finalAnswer"];
+  protected maxTurns: number | null = null;
+  protected maxSpend: number | null = null;
+  protected maxRunTimeMs: number | null = null;
+  protected startTimeMs: number | null = null;
+  protected turnCount = 0;
   protected totalCostUsd = 0;
   protected currentThread = 0;
   protected threads = [] as Message[][];
   protected pendingUserMessages = [] as Message[];
   protected taskBreakdown = "";
   protected summaries = [] as string[];
+  protected currentTaskId: string | null = null;
 
-  public agentEvents = new EventEmitter();
+  public agentEvents = new EventService();
   public eventTypes = {
     newThread: "new_thread",
     threadUpdate: "thread_update",
     costUpdate: "cost_update",
-    toolUsed: "tool_used",
+    agentLog: "agent:log",
+    toolCall: "tool:pre_call",
+    toolUsed: "tool:post_call",
+    agentStatus: "agent:status",
+    notStarted: "not_started",
+    inProgress: "in_progress",
     done: "done",
     pause: "pause",
     kill: "kill",
     unpause: "unpause",
+    agentMsg: "agent:msg",
+    userSay: "user:say",
+    agentSay: "agent:say",
+    agentNewTask: "agent:newTask",
+    agentTaskComplete: "agent:taskComplete",
   };
+
+  public tools: ToolsService;
+  public events: EventService;
+  public messageProcessor: MessageProcessor;
+  public clientService: AIClient;
 
   disabledTools = [];
 
-  constructor(
-    public tools: ToolsService = Tools,
-    public events: EventService = Events
-  ) {}
+  constructor(context: AgentContext) {
+    this.tools = context.Tools;
+    this.events = context.Events;
+    this.messageProcessor = context.messageProcessor || new MessageProcessor();
+    this.clientService = context.Clients || Clients;
 
-  newTask() {
+    if (!this.tools) {
+      throw new Error("ToolsService is required for BaseAgent");
+    }
+
+    if (!this.events) {
+      throw new Error("EventService is required for BaseAgent");
+    }
+
+    // Subscribe to "agent:msg" events for dynamic context loading
+    // Use setListener with a key so re-creating the agent doesn't double-subscribe
+    this.events.setListener({ key: `agent:msg:${this.constructor.name}`, event: this.eventTypes.agentMsg }, (eventData: any) => {
+      if (
+        this.status === this.eventTypes.inProgress ||
+        this.status === this.eventTypes.pause
+      ) {
+        const message = {
+          role: "user",
+          content: JSON.stringify(eventData),
+        } as Message;
+        this.addPendingMessage(message);
+      }
+    });
+  }
+
+  protected log(message: string, level: "info" | "warn" | "error" = "info"): void {
+    this.agentEvents.emit(this.eventTypes.agentLog, {
+      agentName: this.name,
+      message,
+      level,
+      timestamp: Date.now(),
+      taskId: this.currentTaskId,
+    });
+  }
+
+  setMaxTurns(maxTurns: number | null) {
+    this.maxTurns = maxTurns;
+  }
+
+  setMaxSpend(maxSpend: number | null) {
+    this.maxSpend = maxSpend;
+  }
+
+  setMaxRunTime(maxRunTimeMs: number | null) {
+    this.maxRunTimeMs = maxRunTimeMs;
+  }
+
+  newTask(taskId?: string) {
     this.currentThread = 0;
     this.threads = [];
     this.taskBreakdown = "";
     this.summaries = [];
     this.totalCostUsd = 0;
-    this.status = "in_progress";
+    this.status = this.eventTypes.inProgress;
+    this.turnCount = 0;
+    this.startTimeMs = Date.now();
+    this.currentTaskId = taskId || this.startTimeMs.toString();
+
+    // Emit event for plugin integration
+    const id = taskId || this.startTimeMs.toString();
+    this.events.emit(this.eventTypes.agentNewTask, {
+      taskId: id,
+    });
   }
 
   register() {
@@ -103,6 +194,7 @@ export abstract class BaseAgent implements IAgent {
 
   setModel(value: string) {
     this.modelName = value;
+    this.client = null; // Reset client to force re-fetch
   }
 
   getProvider() {
@@ -111,11 +203,23 @@ export abstract class BaseAgent implements IAgent {
 
   setProvider(value: keyof typeof Clients.clients) {
     this.provider = value;
+    this.client = null; // Reset client to force re-fetch
   }
 
   getClient() {
     if (!this.client) {
-      this.client = Clients.getClient(this.provider)?.client;
+      if (this.provider) {
+        this.log(`Getting client for provider ${this.provider}`);
+        this.client = this.clientService.getClient(this.provider)?.client;
+      }
+
+      if (!this.client) {
+        this.log(`Getting client for model ${this.modelName}`);
+        this.client = this.clientService.getClient(
+          undefined,
+          this.modelName
+        )?.client;
+      }
     }
     return this.client;
   }
@@ -152,6 +256,53 @@ export abstract class BaseAgent implements IAgent {
     }
   }
 
+  private checkLimits(): boolean {
+    // Check turn limit
+    if (this.maxTurns !== null && this.turnCount >= this.maxTurns) {
+      this.log(`Turn limit reached: ${this.turnCount}/${this.maxTurns}`, "warn");
+      return true;
+    }
+
+    // Check spend limit
+    if (this.maxSpend !== null && this.totalCostUsd >= this.maxSpend) {
+      this.log(
+        `Spend limit reached: $${this.totalCostUsd.toFixed(
+          4
+        )}/$${this.maxSpend.toFixed(4)}`
+      , "warn");
+      return true;
+    }
+
+    // Check runtime limit
+    if (this.maxRunTimeMs !== null && this.startTimeMs !== null) {
+      const currentRunTimeMs = this.runTime();
+      if (currentRunTimeMs >= this.maxRunTimeMs) {
+        this.log(
+          `Runtime limit reached: ${currentRunTimeMs}ms/${this.maxRunTimeMs}ms`,
+          "warn"
+        );
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  public runTime() {
+    if (this.startTimeMs) {
+      return Date.now() - this.startTimeMs;
+    }
+    return 0;
+  }
+
+  private shouldTerminateFromLimits(): boolean {
+    return this.checkLimits();
+  }
+
+  getTurnCount(): number {
+    return this.turnCount;
+  }
+
   adjustTotalCostUsd(cost: number) {
     if (cost) {
       this.totalCostUsd += cost;
@@ -182,96 +333,30 @@ export abstract class BaseAgent implements IAgent {
     return this.summaries;
   }
 
-  abstract getInitialMessages(userInput: string): Promise<Message[]>;
+  abstract getInitialMessages(userInput: string | MessageContent[]): Promise<Message[]>;
 
   async processToolMessages(toolCall: ToolCall) {
-    const functionName = toolCall.function.name;
-    const functionToCall = this.tools.getFunction(functionName);
+    this.agentEvents.emit(this.eventTypes.toolCall, { toolCall });
 
-    console.log(toolCall);
-    const functionArgs = JSON.parse(
-      this.formatAiResponse(toolCall.function.arguments)
+    const { functionResp, toolMessages } = await this.tools.callTool(
+      toolCall,
+      this.getEnabledToolNames()
     );
-
-    const toJsonIfObject = (arg: any) => {
-      if (typeof arg === "object") {
-        return JSON.stringify(arg, null, 2);
-      }
-      return arg;
-    };
-
-    const toolDefinition = this.tools.getTool(functionName);
-    const properties = toolDefinition?.function?.parameters?.properties || {};
-    const isPositional =
-      toolDefinition?.function?.parameters?.positional || false;
-    const fnArgs = isPositional
-      ? Object.keys(properties).map((p) => functionArgs[p])
-      : functionArgs;
-
-    console.log(
-      `Calling function ${functionName} with args:`,
-      JSON.stringify(fnArgs, null, 2)
-    );
-
-    if (!functionToCall) {
-      const options = this.getEnabledToolNames().join(", ");
-      const error = `Function ${functionName} not found, options are ${options}`;
-      console.log(error);
-      return [
-        {
-          tool_call_id: toolCall.id,
-          role: "tool",
-          name: "error",
-          content: error,
-        },
-      ];
-    }
-
-    const functionResponse = await Promise.resolve(
-      isPositional ? functionToCall(...fnArgs) : functionToCall(fnArgs)
-    ).catch((e) => e.message);
 
     this.agentEvents.emit(this.eventTypes.toolUsed, {
       toolCall,
-      functionResponse,
+      functionResp,
     });
-
-    let toolMessages = [];
-
-    if (functionName === "multi_tool_use.parallel") {
-      const args = fnArgs[0] as {
-        recipient_name: string;
-        parameters: any;
-      }[];
-
-      toolMessages = args.map((call, index) => {
-        return {
-          tool_call_id: toolCall.id + "_" + index,
-          role: "tool",
-          name: call.recipient_name.split(".").pop(),
-          content: toJsonIfObject(functionResponse[index]) || "Done",
-        };
-      });
-    }
-
-    toolMessages = [
-      {
-        tool_call_id: toolCall.id,
-        role: "tool",
-        name: functionName,
-        content: toJsonIfObject(functionResponse) || "Done",
-      },
-    ];
-
-    console.log(toolMessages);
 
     return toolMessages;
   }
 
   logMessages(messages: Message[]) {
     for (const message of messages) {
-      if (message.role === "assistant") {
-        console.log(message.content);
+      if (message.role === "assistant" && message.content) {
+        this.agentEvents.emit(this.eventTypes.agentSay, {
+          message: message.content,
+        });
       }
     }
   }
@@ -313,7 +398,7 @@ export abstract class BaseAgent implements IAgent {
       });
       return true;
     } catch (e) {
-      console.error(e);
+      this.log(String(e), "error");
       return false;
     }
   }
@@ -333,27 +418,60 @@ export abstract class BaseAgent implements IAgent {
     await this.healthCheck();
   }
 
+  isRequiredToolMissing() {
+    const requiredToolAvailable = this.getEnabledToolNames().some(
+      (enabled) =>
+        this.requiredToolNames.includes(enabled) ||
+        this.requiredToolNames.includes(mcpToolName(enabled)) ||
+        this.requiredToolNames.some((required) => enabled.endsWith(required))
+    );
+
+    if (requiredToolAvailable) {
+      return false;
+    }
+
+    this.log(
+      `Required tool: [${this.requiredToolNames}] not available, checking for finalAnswer. Enabled: ${this.getEnabledToolNames().join(", ")}`
+    );
+
+    // Otherwise we're missing the required tool, lets use finalAnswer if we have it
+    const finalAnswer = "finalAnswer";
+    const requiredFinalAnswer = this.requiredToolNames.includes(finalAnswer);
+    const hasFinalAnswer = this.getEnabledToolNames().includes(finalAnswer);
+
+    // We have the final answer tool, but it wasn't required
+    if (hasFinalAnswer && !requiredFinalAnswer) {
+      this.log(
+        "Required tool not available, setting finalAnswer as required tool"
+      , "warn");
+      this.requiredToolNames.push("finalAnswer");
+      return false;
+    }
+
+    return true;
+  }
+
   setNotHealthy() {
     this.lastHealthCheckTime = 0;
   }
 
   pause() {
-    console.log("Pausing agent");
+    this.log("Pausing agent");
     this.agentEvents.emit(this.eventTypes.pause, this);
     this.status = this.eventTypes.pause;
   }
 
   unpause() {
-    console.log("Unpausing agent");
+    this.log("Unpausing agent");
     this.agentEvents.emit(this.eventTypes.unpause, this);
-    this.status = "in_progress";
+    this.status = this.eventTypes.inProgress;
   }
 
   async unpaused() {
     return new Promise((resolve) => {
-      console.log("Waiting for agent to unpause");
+      this.log("Waiting for agent to unpause");
       this.agentEvents.once(this.eventTypes.unpause, () => {
-        console.log("Agent resumed");
+        this.log("Agent resumed");
         resolve(true);
       });
       this.agentEvents.once(this.eventTypes.done, () => {
@@ -363,7 +481,7 @@ export abstract class BaseAgent implements IAgent {
   }
 
   async kill() {
-    console.log("Killing agent");
+    this.log("Killing agent");
     this.agentEvents.emit(this.eventTypes.kill, this);
     this.status = this.eventTypes.kill;
 
@@ -373,17 +491,48 @@ export abstract class BaseAgent implements IAgent {
     } as Message);
   }
 
-  async call(userInput: string, _messages?: Message[]) {
+  async call(userInput: string | MessageContent[], _messages?: Message[], retryCount = 0) {
+    if (this.status === this.eventTypes.notStarted) {
+      this.status = this.eventTypes.inProgress;
+    }
+
     if (this.status === this.eventTypes.pause) {
       await this.unpaused();
     }
 
     await this.selectHealthyModel();
 
+    // Increment turn count and check limits (only for new calls, not recursive ones)
+    this.turnCount++;
+    if (this.shouldTerminateFromLimits()) {
+      const currentRunTimeMs = this.startTimeMs
+        ? Date.now() - this.startTimeMs
+        : 0;
+      const limitMsg = `Task terminated due to limits reached. Turn: ${
+        this.turnCount
+      }/${this.maxTurns || "unlimited"}, Cost: $${this.totalCostUsd.toFixed(
+        4
+      )}/${
+        this.maxSpend ? "$" + this.maxSpend.toFixed(4) : "unlimited"
+      }, Runtime: ${currentRunTimeMs}ms/${
+        this.maxRunTimeMs ? this.maxRunTimeMs + "ms" : "unlimited"
+      }`;
+      this.status = this.eventTypes.done;
+      this.agentEvents.emit(this.eventTypes.done, limitMsg);
+      return limitMsg;
+    }
+
     try {
       const model = this.getModel();
       let messages = _messages || (await this.getInitialMessages(userInput));
-      const taskBreakdown = await this.getTaskBreakdown(messages);
+
+      // Process initial messages if this is the first call
+      if (!_messages) {
+        messages = await this.messageProcessor.processMessages(
+          messages,
+          "initial_call"
+        );
+      }
 
       if (this.pendingUserMessages.length) {
         messages.push(...this.pendingUserMessages);
@@ -392,10 +541,17 @@ export abstract class BaseAgent implements IAgent {
 
       messages = this.formatInputMessages(messages);
       this.updateCurrentThread(messages);
+      const isMissingTool = this.isRequiredToolMissing();
 
       const startIndex = 0;
       const endIndex = messages.length;
-      const compressThreshold = 10000;
+
+      // Process messages before each AI call
+      messages = await this.messageProcessor.processMessages(
+        messages,
+        "pre_call"
+      );
+      const compressThreshold = 30000;
 
       const response = await this.getClient().createChatCompletion({
         model,
@@ -405,25 +561,45 @@ export abstract class BaseAgent implements IAgent {
       });
 
       if (response?.usd_cost === undefined) {
-        console.warn("Response cost is undefined", response);
+        this.log(
+          `Response cost is undefined: ${JSON.stringify(response, null, 2)}`,
+          "warn"
+        );
+        const error = response as any;
+        if ("response" in error && "data" in error.response) {
+          this.log(
+            `Response data: ${JSON.stringify(error.response.data, null, 2)}`,
+            "warn"
+          );
+        }
       }
 
       this.adjustTotalCostUsd(response?.usd_cost);
-      this.logMessages(response.choices.map((c) => c.message));
 
-      const firstMessage = response.choices[0].message;
-      const newToolCalls = response.choices.flatMap(
-        (c) => c.message.tool_calls
-      );
-
+      // Typically, there's only one choice in the array, but you could have many
+      // If you set `n` to more than 1, you will get multiple choices
       for (const choice of response.choices) {
-        const responseMessage = choice.message;
-        console.log(responseMessage);
+        messages.push(choice.message);
 
-        const toolCalls = responseMessage.tool_calls;
-        if (responseMessage.tool_calls) {
-          // extend conversation with assistant's reply
-          messages.push(responseMessage);
+        messages = await this.messageProcessor.processMessages(
+          messages,
+          "post_call"
+        );
+
+        const lastMessage = messages[messages.length - 1];
+
+        this.logMessages([lastMessage]);
+
+        const toolCalls = lastMessage.tool_calls;
+        if (lastMessage.tool_calls) {
+          // About to call a tool, process the messages
+          // We could add all the tool calls, and do this once
+          messages = await this.messageProcessor.processMessages(
+            messages,
+            "pre_tools"
+          );
+
+          this.updateCurrentThread(messages);
 
           for (const toolCall of toolCalls) {
             const toolMessages = await this.processToolMessages(toolCall);
@@ -431,44 +607,84 @@ export abstract class BaseAgent implements IAgent {
             messages.push(...(toolMessages as Message[]));
 
             const finalMessage = toolMessages.find(
-              (m) =>
-                this.requiredToolNames.includes(m.name) ||
-                this.requiredToolNames.includes(mcpToolName(m.name))
+              (called) =>
+                this.requiredToolNames.includes(called.name) ||
+                this.requiredToolNames.includes(mcpToolName(called.name)) ||
+                this.requiredToolNames.some((required) =>
+                  called.name.endsWith(required)
+                )
             );
 
             if (finalMessage) {
+              // Emit task completion event for plugins (like GitPlugin)
+              this.events.emit(this.eventTypes.agentTaskComplete, {
+                taskId:
+                  this.currentTaskId ||
+                  this.startTimeMs?.toString() ||
+                  Date.now().toString(),
+                result: finalMessage.content || "Done",
+              });
               const doneMsg = finalMessage.content || "Done";
               this.agentEvents.emit(this.eventTypes.done, doneMsg);
+              this.status = this.eventTypes.done;
               return doneMsg;
             }
           }
         }
       }
 
+      const newToolCalls = response.choices.flatMap(
+        (c) => c.message.tool_calls
+      );
+      // Process messages after tool execution
+      if (newToolCalls && newToolCalls.length > 0) {
+        messages = await this.messageProcessor.processMessages(
+          messages,
+          "post_tools"
+        );
+      }
+
       // Early exit: not required to call tool
+      const firstMessage = response.choices[0].message;
       if (
         response.choices.length === 1 &&
         firstMessage.content &&
         this.easyFinalAnswer
       ) {
+        this.status = this.eventTypes.done;
         this.agentEvents.emit(this.eventTypes.done, firstMessage.content);
         return firstMessage.content;
+      }
+
+      // infinite loop if we cannot exit
+      if (isMissingTool) {
+        const error = `Required tool: ${JSON.stringify(
+          this.requiredToolNames
+        )} not available, options are ${this.getEnabledToolNames().join(", ")}`;
+        this.log(error, "error");
+        this.status = this.eventTypes.done;
+        this.agentEvents.emit(this.eventTypes.done, error);
+        return error;
       }
 
       // Early exit: killed, agent was requested to wrap up
-      if (this.pendingUserMessages.length === 0 && this.status === "killed") {
-        console.log("Agent killed, stopping execution");
-        this.status = "killed";
+      if (
+        this.pendingUserMessages.length === 0 &&
+        this.status === this.eventTypes.kill
+      ) {
+        this.log("Agent killed, stopping execution");
+        this.status = this.eventTypes.done;
         this.agentEvents.emit(this.eventTypes.done, firstMessage.content);
         return firstMessage.content;
       }
 
-      if (this.getMessagesLength(messages) > compressThreshold) {
-        console.log(
-          "Compressing messages",
-          this.getMessagesLength(messages),
-          "exceeds",
-          compressThreshold
+      if (
+        this.getMessagesLength(messages) > compressThreshold &&
+        messages.length > 30
+      ) {
+        const taskBreakdown = await this.getTaskBreakdown(messages);
+        this.log(
+          `Compressing messages: ${this.getMessagesLength(messages)} exceeds ${compressThreshold}`
         );
         messages = await this.compressMessages(messages, startIndex, endIndex);
         this.startNewThread(messages);
@@ -476,12 +692,18 @@ export abstract class BaseAgent implements IAgent {
 
       if (["assistant", "tool"].includes(messages[messages.length - 1].role)) {
         // sometimes the agent just says a message and doesn't call a tool, or compression ends on a tool message
-        console.log(
-          "Agent continuing to the next iteration, reminding agent how to terminate"
-        );
+
+        const statusMessage = this.getStatusMessage();
+        this.logStatus();
+
+        const continuation = `<Workflow>
+        workflow continues until you call one of ${this.requiredToolNames}.\n
+        ${statusMessage}
+        </Workflow>`;
+
         messages.push({
           role: "user",
-          content: `<Workflow>workflow continues until you call on of ${this.requiredToolNames}. Any continuation messages should be enclosed in workflow tags to hide intermediate work from users.</Workflow>`,
+          content: continuation,
         });
       }
 
@@ -490,17 +712,118 @@ export abstract class BaseAgent implements IAgent {
     } catch (e) {
       if (e.toString().includes("429")) {
         this.setNotHealthy();
-        return this.call(userInput, _messages);
+        return this.call(userInput, _messages, retryCount);
+      const errorStr = e.toString();
+      const isNonRetriable =
+        errorStr.includes("401") ||
+        errorStr.includes("403") ||
+        errorStr.includes("404");
+
+      const isRetriable =
+        !isNonRetriable &&
+        (errorStr.match(/5\d\d/) ||
+          errorStr.includes("Failed to get models") ||
+          errorStr.includes("timeout") ||
+          errorStr.includes("ECONNRESET") ||
+          errorStr.includes("ETIMEDOUT") ||
+          errorStr.includes("Invalid response format from MCP"));
+
+      if (isRetriable && retryCount < 3) {
+        const delay = 1000 * Math.pow(2, retryCount);
+        this.log(
+          `Agent request failed (attempt ${retryCount + 1}/3), retrying in ${delay}ms: ${e.message}`,
+          "warn"
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        return this.call(userInput, _messages, retryCount + 1);
       }
 
-      console.error(e);
+      }
+
+      this.log(`Agent failed: ${e}`, "error");
+
+      if ("response" in e && "data" in e.response) {
+        this.log(
+          `Error response data: ${JSON.stringify(e.response.data, null, 2)}`,
+          "error"
+        );
+      }
+
       this.agentEvents.emit(this.eventTypes.done, e.message);
       return e.message;
     }
   }
 
+  getStatusMessage() {
+    const baseMessage = `$${this.getTotalCostUsd().toPrecision(
+      3
+    )}\nElapsed: ${Math.floor(this.runTime() / 1000)}s\n`;
+
+    const remainingTime =
+      this.maxRunTimeMs && this.startTimeMs
+        ? this.maxRunTimeMs - (Date.now() - this.startTimeMs)
+        : null;
+
+    const remainingTurns = this.maxTurns
+      ? this.maxTurns - this.turnCount
+      : null;
+
+    const timeRemainingMsg = remainingTime
+      ? `You have approximately ${Math.floor(
+          remainingTime / 1000
+        )} seconds remaining for this task. `
+      : "";
+
+    const turnsRemainingMsg = remainingTurns
+      ? `You have ${remainingTurns} turns remaining. `
+      : "";
+
+    const remainingBudget = this.maxSpend
+      ? this.maxSpend - this.totalCostUsd
+      : null;
+    const budgetRemainingMsg = remainingBudget
+      ? `You have $${remainingBudget.toFixed(4)} remaining in your budget.`
+      : "";
+
+    const statusMessage = `${baseMessage}\n${timeRemainingMsg}\n${turnsRemainingMsg}\n${budgetRemainingMsg}`;
+    return statusMessage;
+  }
+
+  logStatus() {
+    const statusMessage = this.getStatusMessage();
+    this.agentEvents.emit(this.eventTypes.agentStatus, {
+      agentName: this.name,
+      taskId: this.currentTaskId,
+      statusMessage,
+      details: {
+        totalCostUsd: this.getTotalCostUsd(),
+        elapsedMs: this.runTime(),
+        remainingTimeMs: this.maxRunTimeMs && this.startTimeMs
+          ? this.maxRunTimeMs - (Date.now() - this.startTimeMs)
+          : undefined,
+        remainingTurns: this.maxTurns ? this.maxTurns - this.turnCount : undefined,
+        remainingBudget: this.maxSpend ? this.maxSpend - this.totalCostUsd : undefined,
+      },
+      timestamp: Date.now(),
+    });
+  }
+
+  addPendingMessage(message: Message) {
+    if (this.status === this.eventTypes.done) {
+      this.log("Agent is done, cannot take more messages", "warn");
+    } else {
+      const pendingMessages = this.pendingUserMessages.map((m) => m.content);
+      if (pendingMessages.includes(message.content)) {
+        // Ignore messages we already have queue'd up
+        return;
+      }
+      this.pendingUserMessages.push(message);
+    }
+  }
+
   addPendingUserMessage(message: Message) {
-    this.pendingUserMessages.push(message);
+    this.addPendingMessage(message);
+    this.events.emit(this.eventTypes.userSay, message.content);
   }
 
   getMessagesLength(messages: Message[]) {
@@ -517,7 +840,9 @@ export abstract class BaseAgent implements IAgent {
     1. Task List
     2. Completion Criteria - when the agent should stop
 
-      : \n\n${JSON.stringify(messages)}`;
+    This output will be used to guide the work of the agent, and determine when we've accomplished the goal
+
+    \n\n<ToAnalyze>${JSON.stringify(messages)}</ToAnalyze>`;
 
     const model = this.getModel();
 
@@ -529,11 +854,12 @@ export abstract class BaseAgent implements IAgent {
           content: taskPrompt,
         },
       ],
+      max_tokens: 2000,
     });
 
     this.adjustTotalCostUsd(response.usd_cost);
 
-    console.log(response);
+    this.log(String(response));
 
     this.taskBreakdown = response.choices[0].message.content;
     return this.taskBreakdown;
@@ -544,6 +870,9 @@ export abstract class BaseAgent implements IAgent {
     startIndex: number,
     endIndex: number
   ) {
+    this.log(
+      `Compressing messages from ${startIndex} to ${endIndex}, total messages: ${messages.length}`
+    );
     const toCompress = messages.slice(startIndex, endIndex);
     const toCompressPrompt = `We are compressing our conversation to save memory.
     Please summarize the conversation so far, so that we may continue the original task with a smaller context
@@ -554,16 +883,18 @@ export abstract class BaseAgent implements IAgent {
     3. Next Steps - what we're about to do next to continue the user's original request.
     4. Tasks remaining - what tasks are left from the initial task breakdown.
 
-      This summary will become the agent's only memory of the past, all other messages will be dropped:
-    ${JSON.stringify(toCompress)}
+    Our initial task breakdown: ${this.taskBreakdown}
 
-      Our initial task breakdown: ${this.taskBreakdown}`;
+    This summary will become the agent's only memory of the past, all other messages will be dropped:
+
+      `;
 
     const model = this.getModel();
 
     const response = await this.getClient().createChatCompletion({
       model,
       messages: [
+        ...messages,
         {
           role: "user",
           content: toCompressPrompt,
@@ -605,13 +936,8 @@ export abstract class BaseAgent implements IAgent {
       100
     ).toFixed(2);
 
-    console.log(
-      "Compressed messages from",
-      oldLength,
-      "to",
-      newLength,
-      compressionRatio + "%",
-      "reduction in size"
+    this.log(
+      `Compressed messages from ${oldLength} to ${newLength}, ${compressionRatio}% reduction in size`
     );
 
     return newMessages;

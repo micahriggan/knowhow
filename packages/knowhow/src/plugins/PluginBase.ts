@@ -1,0 +1,72 @@
+import { MinimalEmbedding } from "../types";
+import { Plugin, PluginContext, PluginMeta } from "./types";
+
+export abstract class PluginBase implements Plugin {
+  /** Manual on/off toggle (default ON) */
+  private active = true;
+
+  abstract readonly meta: PluginMeta;
+
+  constructor(protected context: PluginContext = {}) {}
+
+  /* ------------------------------------------------------------------ */
+  /** Public helpers called by PluginService -------------------------- */
+  /* ------------------------------------------------------------------ */
+  enable(): void {
+    this.active = true;
+  }
+
+  disable(): void {
+    this.active = false;
+  }
+
+  isEnabled(): boolean {
+    if (!this.active) return false;
+
+    const envOk = this.hasRequiredEnv();
+
+    const extraOk = this.customEnableCheck();
+
+    const enabled = envOk && extraOk;
+    return enabled;
+  }
+
+  protected hasRequiredEnv(): boolean {
+    const isGood =
+      !this.meta.requires ||
+      this.meta.requires.every((k) => process.env[k] && process.env[k] !== "");
+
+    return isGood;
+  }
+
+  protected customEnableCheck(): boolean {
+    return true; // subclasses override if needed
+  }
+
+  protected log(message: string, level: "info" | "warn" | "error" = "info"): void {
+    if (this.context.Events) {
+      this.context.Events.log(this.meta.name, message, level);
+    } else {
+      // Fallback to console if no Events service
+      if (level === "error") console.error(`[${this.meta.name}] ${message}`);
+      else if (level === "warn") console.warn(`[${this.meta.name}] ${message}`);
+      else console.log(`[${this.meta.name}] ${message}`);
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /** Default callMany implementation - delegates to call ------------ */
+  /* ------------------------------------------------------------------ */
+  async callMany(input?: string): Promise<string> {
+    // Default behavior: callMany just calls call
+    return this.call(input);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /** Mandatory plugin actions ---------------------------------------- */
+  /* ------------------------------------------------------------------ */
+  abstract call(input?: string): Promise<string>;
+  abstract embed(input: string): Promise<MinimalEmbedding[]>;
+}
+
+export { PluginMeta, Plugin } from "./types";

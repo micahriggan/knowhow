@@ -1,11 +1,22 @@
 import JiraClient from "jira-client";
-import { Plugin } from "./types";
+import { PluginBase, PluginMeta } from "./PluginBase";
+import { PluginContext } from "./types";
 import { MinimalEmbedding } from "../types";
 
-export class JiraPlugin implements Plugin {
+export class JiraPlugin extends PluginBase {
+  static readonly meta: PluginMeta = {
+    key: "jira",
+    name: "Jira Plugin",
+    requires: ["JIRA_HOST", "JIRA_USER", "JIRA_PASSWORD"]
+  };
+
+  meta = JiraPlugin.meta;
   jiraClient: JiraClient;
 
-  constructor() {
+  constructor(context: PluginContext) {
+    super(context);
+    
+    if (!this.isEnabled()) return;
     this.jiraClient = new JiraClient({
       protocol: "https",
       host: process.env.JIRA_HOST,
@@ -42,7 +53,7 @@ export class JiraPlugin implements Plugin {
   async getTaskFromUrl(url: string) {
     const issueId = this.extractIdFromUrl(url);
     if (issueId) {
-      console.log(`Fetching Jira issue ${issueId}`);
+      this.log(`Fetching Jira issue ${issueId}`);
       return await this.getIssueData(issueId);
     }
     return null;
@@ -53,7 +64,7 @@ export class JiraPlugin implements Plugin {
       const issue = await this.jiraClient.findIssue(issueId);
       return issue;
     } catch (error) {
-      console.error("Error fetching Jira issue:", error);
+      this.log(`Error fetching Jira issue: ${error}`, "error");
       return null;
     }
   }

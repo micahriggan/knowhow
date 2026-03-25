@@ -1,18 +1,20 @@
 import { getConfigSync } from "../config";
 import { IAgent } from "../agents/interface";
+import { EventService } from "./EventService";
+import { ToolsService } from "./Tools";
 import { ConfigAgent } from "../agents/configurable/ConfigAgent";
-import { Events } from "./EventService";
-import { Tools } from "./Tools";
+import { AgentContext } from "../agents/base/base";
 
 export class AgentService {
   private agents: Map<string, IAgent> = new Map();
+  private agentContext: AgentContext | null = null;
 
-  constructor() {
+  constructor(private tools: ToolsService, private events: EventService) {
     this.wireUp();
   }
 
   public wireUp() {
-    Tools.addTool({
+    this.tools.addTool({
       type: "function",
       function: {
         name: "agentCall",
@@ -35,13 +37,13 @@ export class AgentService {
         },
       },
     });
-    Events.on("agents:register", (data) => {
+    this.events.on("agents:register", (data) => {
       console.log(`Agent registered: ${data.name}`);
       const { name, agent } = data;
       this.registerAgentByName(name, agent);
     });
 
-    Events.on("agents:call", (data) => {
+    this.events.on("agents:call", (data) => {
       console.log(`Agent called: ${data.name}`);
       const { name, query, resolve, reject } = data;
       this.callAgent(name, query).then(resolve).catch(reject);
@@ -54,6 +56,22 @@ export class AgentService {
 
   public registerAgentByName(name: string, agent: IAgent): void {
     this.agents.set(name, agent);
+  }
+
+  /**
+   * Set the AgentContext that will be used when creating new agent instances.
+   * Should be called from cli.ts after all services are wired up (including LazyToolsService).
+   */
+  public setAgentContext(context: AgentContext): void {
+    this.agentContext = context;
+  }
+
+  /**
+   * Get the current AgentContext. Falls back to a minimal context using this service's
+   * own tools/events if none has been explicitly set.
+   */
+  public getAgentContext(): AgentContext {
+    return this.agentContext ?? { Tools: this.tools, Events: this.events };
   }
 
   public getAgent(name: string): IAgent {
@@ -77,12 +95,12 @@ export class AgentService {
     });
   }
 
-  public loadAgentsFromConfig() {
+  public loadAgentsFromConfig(context: AgentContext) {
     const config = getConfigSync();
     const agents = config.agents || [];
 
     for (const agent of agents) {
-      this.registerAgent(new ConfigAgent(agent));
+      this.registerAgent(new ConfigAgent(agent, context));
     }
   }
 
@@ -94,5 +112,3 @@ export class AgentService {
     return agent.call(query);
   }
 }
-
-export const Agents = new AgentService();

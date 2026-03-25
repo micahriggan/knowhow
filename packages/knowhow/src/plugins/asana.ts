@@ -1,10 +1,22 @@
-import { Plugin } from "./types";
+import { PluginBase, PluginMeta } from "./PluginBase";
 import { Embeddable, MinimalEmbedding } from "../types";
+import { PluginContext } from "./types";
 
-export class AsanaPlugin implements Plugin {
+export class AsanaPlugin extends PluginBase {
+  static readonly meta: PluginMeta = {
+    key: "asana",
+    name: "Asana Plugin",
+    requires: ["ASANA_TOKEN"]
+  };
+
+  meta = AsanaPlugin.meta;
   private asanaClient = require("asana").ApiClient.instance;
 
-  constructor() {
+  constructor(context: PluginContext) {
+    super(context);
+    
+    if (!this.isEnabled()) return;
+    
     this.asanaClient.authentications.token = process.env.ASANA_TOKEN;
     this.asanaClient.defaultHeaders = {
       "Asana-Enable": "new_user_task_lists,new_goal_memberships",
@@ -45,7 +57,7 @@ export class AsanaPlugin implements Plugin {
     });
 
     const allTasks = tasksEmbeddings.concat(projectTaskEmbeddings);
-    console.log("Found ", allTasks.length, "tasks");
+    this.log(`Found ${allTasks.length} tasks`);
     return allTasks;
   }
 
@@ -80,7 +92,7 @@ export class AsanaPlugin implements Plugin {
   async getTasksFromProjectUrl(url: string) {
     const urlParts = url.split("/");
     const projectId = urlParts[4];
-    console.log({ projectId });
+    this.log(`Project ID: ${projectId}`);
     if (!projectId) {
       return null;
     }
@@ -101,7 +113,7 @@ export class AsanaPlugin implements Plugin {
   async getTaskFromUrl(url: string) {
     const taskId = url.split("/").pop();
     if (taskId) {
-      console.log(`Fetching Asana task ${taskId}`);
+      this.log(`Fetching Asana task ${taskId}`);
       return await this.getTaskData(taskId);
     }
     return null;
@@ -112,7 +124,7 @@ export class AsanaPlugin implements Plugin {
       const task = await this.asanaClient.tasks.findById(taskId);
       return task;
     } catch (error) {
-      console.error("Error fetching Asana task:", error);
+      this.log(`Error fetching Asana task: ${error}`, "error");
       return null;
     }
   }

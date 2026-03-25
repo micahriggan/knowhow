@@ -5,6 +5,7 @@ import { exec } from "child_process";
 import * as fs from "fs";
 import { marked } from "marked";
 import { markedTerminal } from "marked-terminal";
+import { InputQueueManager } from "./InputQueueManager";
 
 marked.use(markedTerminal());
 
@@ -16,30 +17,27 @@ export const execAsync = util.promisify(exec);
 export const fileStat = promisify(fs.stat);
 export const wait = promisify(setTimeout);
 
-export const askHistory = [];
+
+// Create singleton instance
+const inputQueue = new InputQueueManager();
 
 export const ask = async (
   question: string,
   options: string[] = [],
   history = []
-) => {
-  const fullHistory = [...askHistory, ...history];
-  const readline = require("readline").createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    history: fullHistory,
-    completer: (line) => {
-      const hits = options.filter((c) => c.startsWith(line));
-      return [hits.length ? hits : options, line];
-    },
-    terminal: true,
-  });
+): Promise<string> => {
+  return inputQueue.ask(question, options, history);
+};
 
-  const _ask = util.promisify(readline.question).bind(readline);
-  const answer = await _ask(question);
-  readline.close();
-
-  return answer;
+/**
+ * Set a callback to be notified when user enters a new history entry.
+ * This allows the caller to update their history source immediately,
+ * ensuring the next ask() call has the updated history.
+ */
+export const setOnNewHistoryEntry = (
+  callback: ((entry: string) => void) | undefined
+): void => {
+  inputQueue.setOnNewEntry(callback);
 };
 
 export const Marked = marked;
@@ -64,6 +62,10 @@ const NEWLINE_REPLACE = "<ESC_NEWLINE>";
 export function replaceEscapedNewLines(str: string): string {
   // const replacedStr = str.replace(/\\n/g, NEWLINE_REPLACE);
   return str;
+}
+
+export function escapeNewLines(str: string): string {
+  return str.replace(/\\n/g, "\\n");
 }
 
 export function restoreEscapedNewLines(str: string): string {
@@ -97,4 +99,12 @@ export function mcpToolName(toolName: string): string {
   }
 
   return split.slice(2).join("_");
+}
+
+export function takeFirstNWords(str: string, n: number): string {
+  const words = str.split(" ");
+  if (words.length <= n) {
+    return str;
+  }
+  return words.slice(n).join(" ");
 }
