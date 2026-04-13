@@ -34,10 +34,8 @@ import {
   createAgent,
   agentConstructors,
   AgentName,
-  agents,
 } from "../../agents";
 import { ToolCallEvent } from "../../agents/base/base";
-import { $Command } from "@aws-sdk/client-s3";
 import { KnowhowSimpleClient } from "../../services/KnowhowClient";
 
 export class AgentModule extends BaseChatModule {
@@ -245,20 +243,28 @@ export class AgentModule extends BaseChatModule {
     }
 
     const agentName = args[0];
-    const allAgents = agents();
 
     try {
-      if (allAgents && allAgents[agentName]) {
+      if (agentConstructors[agentName as AgentName]) {
         // Set selected agent in context and enable agent mode
         if (context) {
-          const selectedAgent = allAgents[agentName];
-          context.selectedAgent = selectedAgent;
+          // Create a temporary agent instance to read its default model/provider
+          const agentContext = services().Agents.getAgentContext();
+          const tempAgent = createAgent(agentName as AgentName, agentContext) as BaseAgent;
+          context.selectedAgent = tempAgent;
           context.agentMode = true;
           context.currentAgent = agentName;
           // Update context's model/provider to reflect the agent's settings
           // so /model and /provider commands show accurate information
-          context.currentModel = selectedAgent.getModel();
-          context.currentProvider = selectedAgent.getProvider();
+
+          const clientInfo = await tempAgent.clientService.getClient(
+            undefined,
+            tempAgent.getModel()
+          );
+
+          context.currentModel = clientInfo.model;
+          context.currentProvider = clientInfo.provider;
+
           this.chatService.setMode("agent");
         }
 
@@ -436,16 +442,13 @@ export class AgentModule extends BaseChatModule {
    */
   async handleAgentsCommand(args: string[]): Promise<void> {
     try {
-      const allAgents = agents();
+      const agentNames = Object.keys(agentConstructors);
 
-      if (allAgents && Object.keys(allAgents).length > 0) {
-        const agentNames = Object.keys(allAgents);
+      if (agentNames.length > 0) {
 
         console.log("\nAvailable agents:");
-        Object.entries(allAgents).forEach(([name, agent]: [string, any]) => {
-          console.log(
-            `  - ${name}: ${(agent as any).description || "No description"}`
-          );
+        agentNames.forEach((name) => {
+          console.log(`  - ${name}`);
         });
         console.log("─".repeat(80), "\n");
 
@@ -463,8 +466,6 @@ export class AgentModule extends BaseChatModule {
         } else if (selectedAgent && selectedAgent.trim()) {
           console.log(`Agent "${selectedAgent.trim()}" not found.`);
         }
-      } else {
-        console.log("No agents available.");
       }
     } catch (error) {
       console.error("Error listing agents:", error);
@@ -517,18 +518,16 @@ Please continue from where you left off and complete the original request.
 
       console.log("🚀 Session resuming...");
       const context = this.chatService?.getContext();
-      const allAgents = agents();
-      const selectedAgent =
-        allAgents[session.agentName] || allAgents[context.currentAgent];
+      const agentName = session.agentName || context.currentAgent;
 
-      if (!selectedAgent) {
-        console.error(`Agent ${session.agentName} not found.`);
+      if (!agentName || !agentConstructors[agentName as AgentName]) {
+        console.error(`Agent ${agentName} not found.`);
         return;
       }
 
       // Start agent with Knowhow task context if available
       const { agent, taskId } = await this.setupAgent({
-        agentName: selectedAgent.name,
+        agentName,
         input: resumePrompt,
         messageId: session.knowhowMessageId,
         existingKnowhowTaskId: session.knowhowTaskId,
@@ -556,28 +555,21 @@ Please continue from where you left off and complete the original request.
         return true;
       }
 
-      // Otherwise start a new agent task
-      // Create initial interaction for the chatHistory
-      const initialInteraction: ChatInteraction = {
-        input,
-        output: "", // Will be filled after agent completion
-        summaries: [],
-        lastThread: [],
-      };
+      context.chatHistory = context.chatHistory || [];
 
-      const { result, finalOutput } = await this.startAgent(
+      const { taskId } = await this.startAgent(
         context.selectedAgent,
         input,
-        context.chatHistory || []
+        context.chatHistory
       );
 
-      // Update the chatHistory with the completed interaction
-      if (result && finalOutput) {
-        initialInteraction.output = finalOutput;
-        context.chatHistory.push(initialInteraction);
-      }
+      context.chatHistory.push({
+        input,
+        output: "", // Output will be filled in when the agent responds and the session is updated
+        taskId,
+      });
 
-      return result;
+      return true;
     }
     return false;
   }
@@ -1005,23 +997,22 @@ Please continue from where you left off and complete the original request.
     selectedAgent: BaseAgent,
     initialInput: string,
     chatHistory: ChatInteraction[] = []
-  ): Promise<{ result: boolean; finalOutput?: string }> {
+  ) {
     try {
       const { agent, taskId, formattedPrompt } = await this.setupAgent({
         agentName: selectedAgent.name,
         input: initialInput,
         chatHistory,
+        model: selectedAgent.getModel(),
+        provider: selectedAgent.getProvider() as any,
         run: false, // Don't run yet, we need to set up event listeners first
       });
-      const result = await this.attachedAgentChatLoop(
-        taskId,
-        agent,
-        formattedPrompt
-      );
-      return result;
+
+      await this.attachedAgentChatLoop(taskId, agent, formattedPrompt);
+
+      return { taskId };
     } catch (error) {
       console.error("Error starting agent:", error);
-      return { result: false, finalOutput: "Error starting agent" };
     }
   }
 
@@ -1029,7 +1020,7 @@ Please continue from where you left off and complete the original request.
     taskId: string,
     agent: AttachableAgent,
     initialInput?: string
-  ): Promise<{ result: boolean; finalOutput?: string }> {
+  ): Promise<void> {
     try {
       let agentFinalOutput: string | undefined;
 
@@ -1068,6 +1059,11 @@ Please continue from where you left off and complete the original request.
             }
           }
 
+          if (context.chatHistory) {
+            const found = context.chatHistory.find((h) => h.taskId === taskId);
+            found.output = agentFinalOutput;
+          }
+
           resolve("done");
           // Exit agent:attached mode so the prompt resets back to the default
           this.detachFromAgent();
@@ -1081,14 +1077,8 @@ Please continue from where you left off and complete the original request.
           taskInfo?.formattedPrompt || taskInfo?.initialInput || initialInput
         );
       }
-
-      // Return immediately — the main startChatLoop on CliChatService
-      // now handles all user input via the registered agent:attached commands.
-      // Any non-command input is forwarded to the agent via handleInput below.
-      return { result: true, finalOutput: agentFinalOutput };
     } catch (error) {
       console.error("Agent execution failed:", error);
-      return { result: false, finalOutput: "Error during agent execution" };
     }
   }
 }

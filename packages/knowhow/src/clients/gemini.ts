@@ -13,8 +13,18 @@ import * as os from "os";
 import * as fsSync from "fs";
 import * as pathSync from "path";
 import { wait } from "../utils";
-import { EmbeddingModels, Models } from "../types";
+import {
+  EmbeddingModels,
+  Models,
+  GoogleImageModels,
+  GoogleVideoModels,
+  GoogleTTSModels,
+  GoogleEmbeddingModels,
+  GoogleReasoningModels,
+} from "../types";
 import { GeminiTextPricing } from "./pricing";
+import { ContextLimits } from "./contextLimits";
+import { ModelModality } from "./types";
 
 import {
   GenericClient,
@@ -498,29 +508,81 @@ export class GenericGeminiClient implements GenericClient {
 
     let cost = 0;
 
-    if ("promptTokenCount" in usage && usage.promptTokenCount) {
-      if (usage.promptTokenCount > 200000 && pricing.input_gt_200k) {
-        cost += (usage.promptTokenCount * pricing.input_gt_200k) / 1e6;
-      } else {
-        cost += (usage.promptTokenCount * pricing.input) / 1e6;
+    // ── Input tokens ──────────────────────────────────────────────────────────
+    // Use per-modality breakdowns when available (inputTokensDetails) so that
+    // audio tokens (which can cost 3–10× more than text) are billed correctly.
+    const inputDetails = (usage as any).inputTokensDetails as
+      | { modality?: string; tokenCount?: number }[]
+      | undefined;
+
+    if (
+      inputDetails &&
+      inputDetails.length > 0 &&
+      pricing.input_audio !== undefined
+    ) {
+      // Modality-aware billing
+      for (const detail of inputDetails) {
+        const tokens = detail.tokenCount || 0;
+        if (!tokens) continue;
+        const modality = (detail.modality || "").toUpperCase();
+        if (modality === "AUDIO") {
+          const rate = pricing.input_audio ?? pricing.input ?? 0;
+          cost += (tokens * rate) / 1e6;
+        } else {
+          // TEXT / IMAGE / VIDEO all use the base `input` rate
+          const isGt200k = tokens > 200_000 && pricing.input_gt_200k;
+          const rate = isGt200k ? pricing.input_gt_200k! : pricing.input ?? 0;
+          cost += (tokens * rate) / 1e6;
+        }
       }
+    } else if ("promptTokenCount" in usage && usage.promptTokenCount) {
+      // Fallback: no modality breakdown available — use total token count
+      const isGt200k =
+        usage.promptTokenCount > 200_000 && pricing.input_gt_200k;
+      const rate = isGt200k ? pricing.input_gt_200k! : pricing.input ?? 0;
+      cost += (usage.promptTokenCount * rate) / 1e6;
     }
 
-    if ("responseTokenCount" in usage && usage.responseTokenCount) {
-      if (usage.responseTokenCount > 200000 && pricing.output_gt_200k) {
-        cost += (usage.responseTokenCount * pricing.output_gt_200k) / 1e6;
-      } else {
-        cost += (usage.responseTokenCount * pricing.output) / 1e6;
+    // ── Output tokens ─────────────────────────────────────────────────────────
+    const outputDetails = (usage as any).outputTokensDetails as
+      | { modality?: string; tokenCount?: number }[]
+      | undefined;
+
+    if (
+      outputDetails &&
+      outputDetails.length > 0 &&
+      pricing.output_audio !== undefined
+    ) {
+      // Modality-aware billing
+      for (const detail of outputDetails) {
+        const tokens = detail.tokenCount || 0;
+        if (!tokens) continue;
+        const modality = (detail.modality || "").toUpperCase();
+        if (modality === "AUDIO") {
+          const rate = pricing.output_audio ?? pricing.output ?? 0;
+          cost += (tokens * rate) / 1e6;
+        } else {
+          const isGt200k = tokens > 200_000 && pricing.output_gt_200k;
+          const rate = isGt200k ? pricing.output_gt_200k! : pricing.output ?? 0;
+          cost += (tokens * rate) / 1e6;
+        }
       }
+    } else if ("responseTokenCount" in usage && usage.responseTokenCount) {
+      // Fallback: no modality breakdown — use total token count
+      const isGt200k =
+        usage.responseTokenCount > 200_000 && pricing.output_gt_200k;
+      const rate = isGt200k ? pricing.output_gt_200k! : pricing.output ?? 0;
+      cost += (usage.responseTokenCount * rate) / 1e6;
     }
 
+    // ── Context caching ───────────────────────────────────────────────────────
     if (
       "cachedContentTokenCount" in usage &&
       usage.cachedContentTokenCount &&
       pricing.context_caching
     ) {
       if (
-        usage.cachedContentTokenCount > 200000 &&
+        usage.cachedContentTokenCount > 200_000 &&
         pricing.context_caching_gt_200k
       ) {
         cost +=
@@ -530,15 +592,25 @@ export class GenericGeminiClient implements GenericClient {
         cost += (usage.cachedContentTokenCount * pricing.context_caching) / 1e6;
       }
     }
+
     return cost;
   }
 
-  async getModels() {
+  async getModels(modality?: ModelModality): Promise<{ id: string }[]> {
+    if (modality) {
+      const map: Partial<Record<ModelModality, string[]>> = {
+        completion: GoogleReasoningModels,
+        embedding: GoogleEmbeddingModels,
+        image: GoogleImageModels,
+        audio: GoogleTTSModels,
+        video: GoogleVideoModels,
+      };
+      return (map[modality] ?? []).map((id) => ({ id }));
+    }
+    // No modality — live API call (backward compat)
     try {
       const models = await this.client.models.list();
-      return models.page.map((m) => ({
-        id: m.name!,
-      }));
+      return models.page.map((m) => ({ id: m.name! }));
     } catch (error) {
       console.error("Error fetching Google GenAI models:", error);
       throw error;
@@ -634,7 +706,7 @@ export class GenericGeminiClient implements GenericClient {
       const mimeType = audioPart.inlineData.mimeType || "audio/wav";
 
       // Gemini returns raw PCM (audio/L16) - convert to WAV format for playability
-      let audioBuffer = rawBuffer;
+      let audioBuffer: Buffer = rawBuffer;
       if (mimeType.includes("L16") || mimeType.includes("pcm")) {
         // Parse sample rate from mime type e.g. "audio/L16;codec=pcm;rate=24000"
         const rateMatch = mimeType.match(/rate=(\d+)/);
@@ -674,9 +746,7 @@ export class GenericGeminiClient implements GenericClient {
         const images = generatedImages.map((img) => ({
           // imageBytes is already a base64-encoded string from the API
           // Don't re-encode it, just use it directly
-          b64_json: img.image?.imageBytes
-            ? img.image.imageBytes
-            : "",
+          b64_json: img.image?.imageBytes ? img.image.imageBytes : "",
           revised_prompt: options.prompt,
         }));
 
@@ -751,9 +821,11 @@ export class GenericGeminiClient implements GenericClient {
         },
       });
 
-      // Calculate estimated cost: $0.35 per second of video
+      // Calculate estimated cost using model-specific per-second rate
       const duration = options.duration || 5; // Default 5 seconds
-      const usdCost = (options.n || 1) * duration * 0.35;
+      const pricingEntry = GeminiTextPricing[options.model];
+      const ratePerSec = pricingEntry?.video_generation ?? 0.4; // default to $0.40/sec (Veo 3 rate)
+      const usdCost = (options.n || 1) * duration * ratePerSec;
 
       // Return the operation name as jobId so callers can use getVideoStatus / downloadVideo
       return {
@@ -768,7 +840,9 @@ export class GenericGeminiClient implements GenericClient {
     }
   }
 
-  async getVideoStatus(options: VideoStatusOptions): Promise<VideoStatusResponse> {
+  async getVideoStatus(
+    options: VideoStatusOptions
+  ): Promise<VideoStatusResponse> {
     try {
       const operation = await this.client.operations.getVideosOperation({
         operation: { name: options.jobId },
@@ -816,7 +890,9 @@ export class GenericGeminiClient implements GenericClient {
    * Download a video (or any file) via the Google GenAI Files API.
    * Pass either `fileId` (the files/* name) or `uri` (the full URI).
    */
-  async downloadVideo(options: FileDownloadOptions): Promise<FileDownloadResponse> {
+  async downloadVideo(
+    options: FileDownloadOptions
+  ): Promise<FileDownloadResponse> {
     return this.downloadFile(options);
   }
 
@@ -825,7 +901,7 @@ export class GenericGeminiClient implements GenericClient {
    */
   async uploadFile(options: FileUploadOptions): Promise<FileUploadResponse> {
     try {
-      const blob = new Blob([options.data], { type: options.mimeType });
+      const blob = new Blob([new Uint8Array(options.data)], { type: options.mimeType });
       const uploadedFile = await this.client.files.upload({
         file: blob,
         config: {
@@ -840,7 +916,9 @@ export class GenericGeminiClient implements GenericClient {
         uri: uploadedFile.uri,
         url: uploadedFile.downloadUri || uploadedFile.uri,
         mimeType: uploadedFile.mimeType,
-        sizeBytes: uploadedFile.sizeBytes ? Number(uploadedFile.sizeBytes) : undefined,
+        sizeBytes: uploadedFile.sizeBytes
+          ? Number(uploadedFile.sizeBytes)
+          : undefined,
       };
     } catch (error) {
       console.error("Error uploading file to Google GenAI Files API:", error);
@@ -859,7 +937,9 @@ export class GenericGeminiClient implements GenericClient {
    * For generated videos the `file` param accepts the Video object directly
    * (uri + optional mimeType), which the SDK resolves to a download URL.
    */
-  async downloadFile(options: FileDownloadOptions): Promise<FileDownloadResponse> {
+  async downloadFile(
+    options: FileDownloadOptions
+  ): Promise<FileDownloadResponse> {
     const mimeMap: Record<string, string> = {
       ".mp4": "video/mp4",
       ".webm": "video/webm",
@@ -893,7 +973,9 @@ export class GenericGeminiClient implements GenericClient {
 
       const response = await fetch(downloadUrl);
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status} ${response.statusText} downloading ${downloadUrl}`);
+        throw new Error(
+          `HTTP ${response.status} ${response.statusText} downloading ${downloadUrl}`
+        );
       }
 
       const arrayBuffer = await response.arrayBuffer();
@@ -901,19 +983,37 @@ export class GenericGeminiClient implements GenericClient {
 
       // If caller supplied a filePath, write to it (creating dirs as needed)
       if (options.filePath) {
-        fsSync.mkdirSync(pathSync.dirname(options.filePath), { recursive: true });
+        fsSync.mkdirSync(pathSync.dirname(options.filePath), {
+          recursive: true,
+        });
         fsSync.writeFileSync(options.filePath, data);
       }
 
       // Infer mime type from the URI/fileId first (more reliable), then from the path
-      const sourceForExt = options.uri || options.fileId || options.filePath || "";
+      const sourceForExt =
+        options.uri || options.fileId || options.filePath || "";
       const ext = pathSync.extname(sourceForExt.split("?")[0]).toLowerCase();
       const mimeType = mimeMap[ext] || "video/mp4";
 
       return { data, mimeType };
     } catch (error) {
-      console.error("Error downloading file from Google GenAI Files API:", error);
+      console.error(
+        "Error downloading file from Google GenAI Files API:",
+        error
+      );
       throw error;
     }
+  }
+
+  getContextLimit(
+    model: string
+  ): { contextLimit: number; threshold: number } | undefined {
+    const contextLimit = ContextLimits[model];
+    if (contextLimit === undefined) return undefined;
+    const pricing = GeminiTextPricing[model];
+    // If the model has tiered pricing above 200k tokens, use 200k as the threshold
+    const threshold =
+      pricing && "input_gt_200k" in pricing ? 200_000 : contextLimit;
+    return { contextLimit, threshold };
   }
 }

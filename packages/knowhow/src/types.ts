@@ -132,8 +132,9 @@ export type McpConfig = {
 };
 
 export type ModelProvider = {
-  url: string;
+  url?: string;
   provider: string;
+  envKey?: string;
   headers?: { [key: string]: string };
   jwtFile?: string;
 };
@@ -179,8 +180,7 @@ export type Language = {
 export type ChatInteraction = {
   input: string;
   output: string;
-  summaries: string[];
-  lastThread: string[];
+  taskId: string;
 };
 
 export const Models = {
@@ -216,6 +216,12 @@ export const Models = {
   openai: {
     GPT_5_2: "gpt-5.2",
     GPT_5_1: "gpt-5.1",
+    GPT_54: "gpt-5.4",
+    GPT_54_Mini: "gpt-5.4-mini",
+    GPT_54_Nano: "gpt-5.4-nano",
+    GPT_54_Pro: "gpt-5.4-pro",
+    GPT_53_Chat: "gpt-5.3-chat-latest",
+    GPT_53_Codex: "gpt-5.3-codex",
     GPT_5: "gpt-5",
     GPT_5_Mini: "gpt-5-mini",
     GPT_5_Nano: "gpt-5-nano",
@@ -239,6 +245,12 @@ export const Models = {
     GPT_4o_Mini_Search: "gpt-4o-mini-search-preview-2025-03-11",
     GPT_4o_Search: "gpt-4o-search-preview-2025-03-11",
 
+    GPT_4o_Transcribe: "gpt-4o-transcribe",
+    GPT_4o_Mini_Transcribe: "gpt-4o-mini-transcribe",
+    GPT_Realtime_15: "gpt-realtime-1.5",
+    GPT_Realtime_Mini: "gpt-realtime-mini",
+    GPT_Image_15: "gpt-image-1.5",
+    GPT_Image_1_Mini: "gpt-image-1-mini",
     TTS_1: "tts-1",
     Whisper_1: "whisper-1",
     DALL_E_3: "dall-e-3",
@@ -250,19 +262,42 @@ export const Models = {
     // Codex_Mini: "codex-mini-latest",
   },
   google: {
-    Gemini_3_Preview: "gemini-3-pro-preview",
+    // Gemini 3.x
+    Gemini_31_Pro_Preview: "gemini-3.1-pro-preview",
+    Gemini_31_Flash_Image_Preview: "gemini-3.1-flash-image-preview",
+    Gemini_31_Flash_Lite_Preview: "gemini-3.1-flash-lite-preview",
+    Gemini_31_Flash_Live_Preview: "gemini-3.1-flash-live-preview",
+    Gemini_3_Flash_Preview: "gemini-3-flash-preview",
+    Gemini_3_Pro_Image_Preview: "gemini-3-pro-image-preview",
+    // Gemini 2.5
+    Gemini_25_Pro: "gemini-2.5-pro",
+    Gemini_25_Flash: "gemini-2.5-flash",
+    Gemini_25_Flash_Lite: "gemini-2.5-flash-lite",
     Gemini_25_Flash_Preview: "gemini-2.5-flash-preview-05-20",
     Gemini_25_Pro_Preview: "gemini-2.5-pro-preview-05-06",
+    Gemini_25_Flash_Image: "gemini-2.5-flash-image",
+    Gemini_25_Flash_Live: "gemini-2.5-flash-live-preview",
+    Gemini_25_Flash_Native_Audio: "gemini-2.5-flash-native-audio-preview-12-2025",
+    Gemini_25_Pro_TTS: "gemini-2.5-pro-preview-tts",
+    // Gemini 2.0 (deprecated)
     Gemini_20_Flash: "gemini-2.0-flash",
     Gemini_20_Flash_Preview_Image_Generation:
       "gemini-2.0-flash-exp-image-generation",
     Gemini_20_Flash_Lite: "gemini-2.0-flash-lite",
+    // Gemini 1.5 (legacy)
     Gemini_15_Flash: "gemini-1.5-flash",
     Gemini_15_Flash_8B: "gemini-1.5-flash-8b",
     Gemini_15_Pro: "gemini-1.5-pro",
+    // Media generation
     Imagen_3: "imagen-4.0-generate-001",
+    Imagen_4_Fast: "imagen-4.0-fast-generate-001",
+    Imagen_4_Ultra: "imagen-4.0-ultra-generate-001",
     Veo_2: "veo-2.0-generate-001",
+    Veo_3: "veo-3.0-generate-001",
+    Veo_3_Fast: "veo-3.0-fast-generate-001",
     Veo_3_1: "veo-3.1-generate-preview",
+    Veo_3_1_Fast: "veo-3.1-fast-generate-preview",
+    // Audio / Live
     Gemini_20_Flash_Live: "gemini-2.0-flash-live-001",
     Gemini_25_Flash_TTS: "gemini-2.5-flash-preview-tts",
     Gemini_20_Flash_TTS: "gemini-2.0-flash-preview-tts",
@@ -277,6 +312,7 @@ export const EmbeddingModels = {
   },
   google: {
     Gemini_Embedding: "gemini-embedding-exp",
+    Gemini_Embedding_001: "gemini-embedding-001",
   },
 };
 
@@ -306,6 +342,12 @@ export const OpenAiReasoningModels = [
   Models.openai.o3,
   Models.openai.o3_Pro,
   Models.openai.o4_Mini,
+  Models.openai.GPT_54,
+  Models.openai.GPT_54_Mini,
+  Models.openai.GPT_54_Nano,
+  Models.openai.GPT_54_Pro,
+  Models.openai.GPT_53_Chat,
+  Models.openai.GPT_53_Codex,
   Models.openai.GPT_5,
   Models.openai.GPT_5_Mini,
   Models.openai.GPT_5_Nano,
@@ -318,9 +360,23 @@ export const OpenAiEmbeddingModels = [
   EmbeddingModels.openai.EmbeddingLarge3,
   EmbeddingModels.openai.EmbeddingSmall3,
 ];
-// export const OpenAiResponseOnlyModels = [Models.openai.Codex_Mini];
+
+// Models that ONLY support the Responses API (not Chat Completions)
+export const OpenAiResponsesOnlyModels = [
+  Models.openai.GPT_53_Codex,
+  Models.openai.GPT_54,
+  Models.openai.GPT_54_Mini,
+  Models.openai.GPT_54_Nano,
+  Models.openai.GPT_54_Pro,
+];
 
 export const GoogleReasoningModels = [
+  Models.google.Gemini_31_Pro_Preview,
+  Models.google.Gemini_31_Flash_Lite_Preview,
+  Models.google.Gemini_3_Flash_Preview,
+  Models.google.Gemini_25_Pro,
+  Models.google.Gemini_25_Flash,
+  Models.google.Gemini_25_Flash_Lite,
   Models.google.Gemini_25_Flash_Preview,
   Models.google.Gemini_25_Pro_Preview,
   Models.google.Gemini_20_Flash,
@@ -331,13 +387,20 @@ export const GoogleReasoningModels = [
 ];
 
 export const GoogleImageModels = [
+  Models.google.Gemini_31_Flash_Image_Preview,
+  Models.google.Gemini_3_Pro_Image_Preview,
+  Models.google.Gemini_25_Flash_Image,
   Models.google.Gemini_20_Flash_Preview_Image_Generation,
   Models.google.Imagen_3,
+  Models.google.Imagen_4_Fast,
+  Models.google.Imagen_4_Ultra,
 ];
 
 export const OpenAiImageModels = [
   Models.openai.DALL_E_3,
   Models.openai.DALL_E_2,
+  Models.openai.GPT_Image_15,
+  Models.openai.GPT_Image_1_Mini,
 ];
 
 export const OpenAiVideoModels = [
@@ -348,17 +411,36 @@ export const OpenAiVideoModels = [
 
 export const OpenAiTTSModels = [Models.openai.TTS_1];
 
-export const OpenAiTranscriptionModels = [Models.openai.Whisper_1];
-
 export const XaiImageModels = [Models.xai.GrokImagineImage];
+export const OpenAiTranscriptionModels = [
+  Models.openai.Whisper_1,
+  Models.openai.GPT_4o_Transcribe,
+  Models.openai.GPT_4o_Mini_Transcribe,
+];
 
+export const OpenAiRealtimeModels = [
+  Models.openai.GPT_4o_Realtime,
+  Models.openai.GPT_4o_Mini_Realtime,
+  Models.openai.GPT_Realtime_15,
+  Models.openai.GPT_Realtime_Mini,
+];
 export const XaiVideoModels = [Models.xai.GrokImagineVideo];
 
 export const GoogleTTSModels = [
   Models.google.Gemini_25_Flash_TTS,
+  Models.google.Gemini_25_Pro_TTS,
   Models.google.Gemini_20_Flash_TTS,
 ];
 
-export const GoogleVideoModels = [Models.google.Veo_2, Models.google.Veo_3_1];
+export const GoogleVideoModels = [
+  Models.google.Veo_2,
+  Models.google.Veo_3,
+  Models.google.Veo_3_Fast,
+  Models.google.Veo_3_1,
+  Models.google.Veo_3_1_Fast,
+];
 
-export const GoogleEmbeddingModels = [EmbeddingModels.google.Gemini_Embedding];
+export const GoogleEmbeddingModels = [
+  EmbeddingModels.google.Gemini_Embedding,
+  EmbeddingModels.google.Gemini_Embedding_001,
+];

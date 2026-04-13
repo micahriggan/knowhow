@@ -1,12 +1,14 @@
-import { Plugin } from "../../plugins/types";
+import { Plugin, PluginContext } from "../../plugins/types";
 import { IAgent } from "../../agents/interface";
 import { Tool } from "../../clients/types";
 import { Config } from "../../types";
 import { GenericClient } from "../../clients/types";
 import { AgentService } from "../AgentService";
+import { EmbeddingsService } from "../EmbeddingsService";
 import { PluginService } from "../../plugins/plugins";
 import { AIClient } from "../../clients";
 import { ToolsService } from "../Tools";
+import { MediaProcessorService } from "../MediaProcessorService";
 
 /*
  *
@@ -29,7 +31,8 @@ export interface ModuleTool {
 
 export type ModuleAgent = IAgent;
 
-export type ModulePlugin = { name: string; plugin: Plugin };
+export type PluginConstructor = new (context: PluginContext) => Plugin;
+export type ModulePlugin = { name: string; plugin: PluginConstructor };
 
 export type ModuleClient = {
   client: GenericClient;
@@ -40,13 +43,16 @@ export type ModuleClient = {
 export type InitParams = {
   config: Config;
   cwd: string;
+  context?: ModuleContext;
 };
 
 export interface ModuleContext {
   Agents: AgentService;
+  Embeddings: EmbeddingsService;
   Plugins: PluginService;
   Clients: AIClient;
   Tools: ToolsService;
+  MediaProcessor?: MediaProcessorService;
 }
 
 export interface KnowhowModule {

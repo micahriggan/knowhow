@@ -1,8 +1,8 @@
-import { 
-  ResourceQuotas, 
+import {
+  ResourceQuotas,
   SecurityPolicy,
   QuotaUsage,
-  PolicyViolation 
+  PolicyViolation
 } from './types';
 
 /**
@@ -11,10 +11,11 @@ import {
 export class ScriptPolicyEnforcer {
   private usage: QuotaUsage;
   private violations: PolicyViolation[] = [];
+  private complexityLimit: number = 150; // Arbitrary limit for script complexity
 
   constructor(
     private quotas: ResourceQuotas,
-    private policy: SecurityPolicy
+    private policy: SecurityPolicy,
   ) {
     this.usage = {
       toolCalls: 0,
@@ -35,7 +36,7 @@ export class ScriptPolicyEnforcer {
     }
 
     // Check if tool is in allowlist (if allowlist is defined and not empty)
-    if (this.policy.allowlistedTools && this.policy.allowlistedTools.length > 0 && 
+    if (this.policy.allowlistedTools && this.policy.allowlistedTools.length > 0 &&
         !this.policy.allowlistedTools.includes(toolName)) {
       this.recordViolation('tool_not_allowed', `Tool '${toolName}' is not in allowlist`);
       return false;
@@ -162,7 +163,7 @@ export class ScriptPolicyEnforcer {
   /**
    * Validate script content for security issues
    */
-  validateScript(scriptContent: string): { valid: boolean; issues: string[] } {
+  validateScript(scriptContent: string, allowNetworkAccess?: boolean): { valid: boolean; issues: string[] } {
     const issues: string[] = [];
 
     // Check for dangerous patterns
@@ -175,10 +176,14 @@ export class ScriptPolicyEnforcer {
       /Function\s*\(/gi,          // Function constructor
       /setTimeout/gi,             // setTimeout
       /setInterval/gi,            // setInterval
-      /fetch\s*\(/gi,             // Direct fetch calls
       /XMLHttpRequest/gi,         // XHR
       /WebSocket/gi,              // WebSocket
     ];
+
+    // Block direct fetch calls when network access is not explicitly allowed
+    if (!allowNetworkAccess) {
+      dangerousPatterns.push(/fetch\s*\(/gi);
+    }
 
     for (const pattern of dangerousPatterns) {
       if (pattern.test(scriptContent)) {
@@ -206,7 +211,7 @@ export class ScriptPolicyEnforcer {
       complexityScore += matches ? matches.length : 0;
     }
 
-    if (complexityScore > 50) {
+    if (complexityScore > this.complexityLimit) {
       issues.push(`Script complexity too high: ${complexityScore} constructs detected`);
     }
 

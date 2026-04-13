@@ -5,7 +5,6 @@ import {
   getHashes,
   checkNoFilesChanged,
 } from "./hashes";
-import axios from "axios";
 import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
@@ -51,6 +50,14 @@ export * as embeddings from "./embeddings";
 export * as types from "./types";
 export * as processors from "./processors";
 export * as ai from "./ai";
+
+// Export module system types for external modules
+export * from "./services/modules/types";
+// Export plugin types for external plugins
+export { PluginBase } from "./plugins/PluginBase";
+export { PluginMeta, Plugin, PluginContext } from "./plugins/types";
+// Export embedding types
+export { MinimalEmbedding, Embeddable } from "./types";
 
 export async function embed() {
   // load config
@@ -98,7 +105,7 @@ export async function purge(globPath: string) {
 
 export async function upload() {
   const config = await getConfig();
-  const { AwsS3, knowhowApiClient } = services();
+  const { AwsS3, Embeddings, knowhowApiClient } = services();
 
   for (const source of config.embedSources) {
     const bucketName = source.remote;
@@ -118,16 +125,15 @@ export async function upload() {
       items,
     };
 
-    if (source.remoteType === "s3") {
+    if (Embeddings.hasResolver(source.remoteType) && source.remoteType !== "knowhow") {
       console.log(
         "Uploading",
         source.output,
         "to",
         `${bucketName}/${embeddingName}.json`
       );
-
-      const s3Key = `${embeddingName}.json`;
-      await AwsS3.uploadFile(source.output, bucketName, s3Key);
+      const remoteKey = `${embeddingName}.json`;
+      await Embeddings.upload(source.remoteType, source.output, bucketName, remoteKey);
     } else if (source.remoteType === "knowhow") {
       if (!source.remoteId) {
         throw new Error("remoteId is required for knowhow uploads");
@@ -154,12 +160,32 @@ export async function upload() {
   }
 }
 
+/**
+ * Normalizes an input pattern to a valid glob pattern.
+ * Supports:
+ *   - Standard glob patterns (e.g. "src/**\/*.ts")
+ *   - Brace expansion (e.g. "{src/a.ts,src/b.ts}")
+ *   - Comma-separated file paths (e.g. "src/a.ts,src/b.ts") — auto-converted to brace expansion
+ */
+function normalizeInputPattern(input: string): string {
+  // If it already has braces or glob chars other than comma, use as-is
+  if (input.includes("{") || input.includes("*") || input.includes("?")) {
+    return input;
+  }
+  // If it contains commas, treat as comma-separated list and wrap in braces
+  if (input.includes(",")) {
+    const parts = input.split(",").map((p) => p.trim());
+    return `{${parts.join(",")}}`;
+  }
+  return input;
+}
+
 export async function generate(): Promise<void> {
   const config = await getConfig();
   for (const source of config.sources) {
     console.log("Generating", source.input, "to", source.output);
     if (source.kind === "file" || !source.kind) {
-      const files = globSync(source.input);
+      const files = globSync(normalizeInputPattern(source.input));
       const prompt = await loadPrompt(source.prompt);
 
       if (source.output.endsWith("/")) {
@@ -205,7 +231,7 @@ async function handleAllKindsGeneration(source: GenerationSource) {
 
 async function handleFileKindGeneration(source: GenerationSource) {
   const prompt = await loadPrompt(source.prompt);
-  const files = globSync(source.input);
+  const files = globSync(normalizeInputPattern(source.input));
   console.log("Analyzing files: ", files);
 
   if (source.output.endsWith("/")) {
@@ -330,7 +356,7 @@ export async function handleSingleOutputGeneration(
 
 export async function download() {
   const config = await getConfig();
-  const { AwsS3, GitHub, knowhowApiClient } = services();
+  const { AwsS3, Embeddings, knowhowApiClient } = services();
 
   for (const source of config.embedSources) {
     const { remote, remoteType } = source;
@@ -348,28 +374,17 @@ export async function download() {
     const fileName = `${name}.json`;
     const destinationPath = source.output;
 
-    if (remoteType === "s3") {
-      const bucketName = remote;
+    if (Embeddings.hasResolver(remoteType)) {
       console.log(
         "Downloading",
         fileName,
         `from ${remoteType}`,
-        bucketName,
-        "to",
-        destinationPath
-      );
-      await AwsS3.downloadFile(bucketName, fileName, destinationPath);
-    } else if (remoteType === "github") {
-      console.log(
-        "Downloading",
-        fileName,
-        "from GitHub repo",
         remote,
         "to",
         destinationPath
       );
       const embeddingPath = ".knowhow/embeddings/" + fileName;
-      await GitHub.downloadFile(remote, embeddingPath, destinationPath);
+      await Embeddings.download(remoteType, remote, embeddingPath, destinationPath);
     } else if (remoteType === "knowhow") {
       if (!source.remoteId) {
         throw new Error("remoteId is required for knowhow downloads");

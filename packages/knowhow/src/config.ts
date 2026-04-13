@@ -4,6 +4,7 @@ import * as os from "os";
 import gitignoreToGlob from "gitignore-to-glob";
 import { Prompts } from "./prompts";
 import { promisify } from "util";
+import { KNOWHOW_API_URL } from "./services/KnowhowClient";
 import {
   Config,
   Language,
@@ -85,7 +86,14 @@ const defaultConfig = {
     },
   ],
 
-  modelProviders: [{ url: "http://localhost:1234", provider: "lms" }],
+  modelProviders: [
+    { provider: "openai", envKey: "OPENAI_API_KEY" },
+    { provider: "anthropic", envKey: "ANTHROPIC_API_KEY" },
+    { provider: "google", envKey: "GEMINI_API_KEY" },
+    { provider: "xai", envKey: "XAI_API_KEY" },
+    { provider: "knowhow" },
+    { provider: "lms", url: "http://localhost:1234" },
+  ],
 
   ycmd: {
     enabled: false,
@@ -316,10 +324,34 @@ export async function loadPrompt(promptName: string) {
     return "";
   }
 
-  const prompt = await readFile(
-    path.join(config.promptsDir, `${promptName}.mdx`),
-    "utf8"
-  );
+  const promptsDir = config.promptsDir || ".knowhow/prompts";
+
+  // Try to find the prompt as a file in promptsDir (with .mdx extension)
+  const promptFilePath = path.join(promptsDir, `${promptName}.mdx`);
+  if (fs.existsSync(promptFilePath)) {
+    const prompt = await readFile(promptFilePath, "utf8");
+    return ensureTextPlaceholder(prompt);
+  }
+
+  // Try as a direct file path (in case promptName is a path or has its own extension)
+  if (fs.existsSync(promptName)) {
+    const prompt = await readFile(promptName, "utf8");
+    return ensureTextPlaceholder(prompt);
+  }
+
+  // Otherwise treat promptName itself as the prompt string
+  return ensureTextPlaceholder(promptName);
+}
+
+/**
+ * Ensures that the prompt contains a {text} placeholder.
+ * If it doesn't, appends \n\n{text} to the end so that
+ * the input text is included when the prompt is rendered.
+ */
+function ensureTextPlaceholder(prompt: string): string {
+  if (!prompt.includes("{text}")) {
+    return `${prompt}\n\n{text}`;
+  }
   return prompt;
 }
 

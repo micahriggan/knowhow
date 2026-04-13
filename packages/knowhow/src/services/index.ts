@@ -1,9 +1,8 @@
-import { DownloaderService } from "../plugins/downloader/downloader";
 import { AIClient, Clients } from "../clients";
 import { AgentService } from "./AgentService";
 import { EventService } from "./EventService";
 import { FlagsService } from "./flags";
-import { GitHubService } from "./GitHub";
+import { EmbeddingsService } from "./EmbeddingsService";
 import { KnowhowSimpleClient } from "./KnowhowClient";
 import { McpService } from "./Mcp";
 import { S3Service } from "./S3";
@@ -14,17 +13,19 @@ import { AgentSyncKnowhowWeb } from "./AgentSyncKnowhowWeb";
 import { AgentSyncFs } from "./AgentSyncFs";
 import { SessionManager } from "./SessionManager";
 import { TaskRegistry } from "./TaskRegistry";
+import { MediaProcessorService } from "./MediaProcessorService";
 
 export * from "./AgentService";
 export * from "./EventService";
 export * from "./flags";
-export * from "./GitHub";
+export * from "./EmbeddingsService";
 export * from "./S3";
 export * from "./Tools";
 export * from "./LazyToolsService";
 export * as MCP from "./Mcp";
 export * from "./EmbeddingService";
 export * from "./DockerService";
+export * from "./MediaProcessorService";
 export * from "./AgentSyncKnowhowWeb";
 export * from "./AgentSyncFs";
 export * from "./SessionManager";
@@ -37,15 +38,15 @@ let Singletons = {} as {
   Tools: ToolsService;
   Events: EventService;
   Agents: AgentService;
+  Embeddings: EmbeddingsService;
   Flags: FlagsService;
-  GitHub: GitHubService;
   Mcp: McpService;
   AwsS3: S3Service;
   Docker: DockerService;
   knowhowApiClient: KnowhowSimpleClient;
   Plugins: PluginService;
   Clients: AIClient;
-  Downloader: DownloaderService;
+  MediaProcessor: MediaProcessorService;
 };
 
 export const services = (): typeof Singletons => {
@@ -53,7 +54,6 @@ export const services = (): typeof Singletons => {
     const Tools = new ToolsService();
     const Events = new EventService();
     const Agents = new AgentService(Tools, Events);
-    const Downloader = new DownloaderService(Clients);
     const Plugins = new PluginService({
       Agents,
       Events,
@@ -66,11 +66,11 @@ export const services = (): typeof Singletons => {
       AwsS3: new S3Service(),
       Clients,
       Docker: new DockerService(),
-      Downloader,
       Events,
+      Embeddings: new EmbeddingsService(),
       Flags: new FlagsService(),
-      GitHub: new GitHubService(),
       Mcp: new McpService(),
+      MediaProcessor: new MediaProcessorService(Clients),
       Plugins,
       Tools,
       knowhowApiClient: new KnowhowSimpleClient(),

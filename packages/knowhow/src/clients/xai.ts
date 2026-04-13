@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { XaiTextPricing, XaiImagePricing, XaiVideoPricing } from "./pricing";
+import { ContextLimits } from "./contextLimits";
 import {
   GenericClient,
   CompletionOptions,
@@ -26,7 +27,8 @@ import {
   ChatCompletionToolMessageParam,
 } from "openai/resources/chat";
 
-import { Models } from "../types";
+import { Models, XaiImageModels, XaiVideoModels } from "../types";
+import { ModelModality } from "./types";
 
 export class GenericXAIClient implements GenericClient {
   private client: OpenAI;
@@ -123,11 +125,17 @@ export class GenericXAIClient implements GenericClient {
     return total;
   }
 
-  async getModels() {
-    // XAI doesn't provide a model listing endpoint, so we'll return the static list
-    return Object.keys(Models.xai).map((key) => ({
-      id: Models.xai[key],
-    }));
+  async getModels(modality?: ModelModality): Promise<{ id: string }[]> {
+    if (modality) {
+      const map: Partial<Record<ModelModality, string[]>> = {
+        completion: Object.values(Models.xai),
+        image: XaiImageModels,
+        video: XaiVideoModels,
+      };
+      return (map[modality] ?? []).map((id) => ({ id }));
+    }
+    // No modality — return full static list (XAI has no /models endpoint)
+    return Object.values(Models.xai).map((id) => ({ id }));
   }
 
   async createEmbedding(options: EmbeddingOptions): Promise<EmbeddingResponse> {
@@ -344,7 +352,7 @@ export class GenericXAIClient implements GenericClient {
 
     const formData = new FormData();
     formData.append("purpose", "assistants");
-    const blob = new Blob([options.data], { type: options.mimeType || "application/octet-stream" });
+    const blob = new Blob([new Uint8Array(options.data)], { type: options.mimeType || "application/octet-stream" });
     formData.append("file", blob, options.fileName || "upload");
 
     const response = await fetch("https://api.x.ai/v1/files", {
@@ -391,5 +399,15 @@ export class GenericXAIClient implements GenericClient {
       data,
       mimeType,
     };
+  }
+
+  getContextLimit(model: string): { contextLimit: number; threshold: number } | undefined {
+    const contextLimit = ContextLimits[model];
+    if (contextLimit === undefined) return undefined;
+    const pricing = XaiTextPricing[model];
+    // If the model has tiered pricing above 200k tokens, use 200k as the threshold
+    const threshold =
+      pricing && "input_gt_200k" in pricing ? 200_000 : contextLimit;
+    return { contextLimit, threshold };
   }
 }

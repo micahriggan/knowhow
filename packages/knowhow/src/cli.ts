@@ -1,5 +1,4 @@
 #!/usr/bin/env node --no-node-snapshot
-import "source-map-support/register";
 import * as fs from "fs";
 import * as fsPromises from "fs/promises";
 import * as path from "path";
@@ -26,7 +25,6 @@ import {
 } from "./workerRegistry";
 import { agents } from "./agents";
 import { startChat } from "./chat";
-import { askAI } from "./chat-old";
 import { getConfiguredEmbeddingMap, queryEmbedding } from "./embeddings";
 import { getConfig } from "./config";
 import { getEnabledPlugins } from "./types";
@@ -42,7 +40,7 @@ import { CliChatService } from "./chat/CliChatService";
 
 async function setupServices() {
   const { Agents, Mcp, Clients, Tools: OldTools } = services();
-  const Tools = new LazyToolsService();
+  const Tools = new LazyToolsService(); // eslint-disable-line no-shadow
 
   // We need to wireup the LazyTools to be connected to the same singletons that are in services()
   Tools.setContext({
@@ -80,6 +78,9 @@ async function setupServices() {
   console.log("Connecting to clients...");
   await Clients.registerConfiguredModels();
   console.log("✓ Services are set up and ready to go!");
+
+  // Return both LazyToolsService (for agents) and OldTools (plain ToolsService with all tools for scripts)
+  return { Tools, Clients, PlainTools: OldTools };
 }
 
 // Utility function to read from stdin
@@ -242,14 +243,15 @@ async function main() {
             options.input || "Please continue from where you left off.";
 
           await agentModule.initialize(chatService);
-          const { taskCompleted } = await agentModule.resumeFromMessages({
-            agentName: options.agentName || "Patcher",
-            input: resumeInput,
-            threads,
-            messageId: options.messageId,
-            taskId: options.taskId,
-          });
-          await taskCompleted;
+          const { taskCompleted: resumed } =
+            await agentModule.resumeFromMessages({
+              agentName: options.agentName || "Patcher",
+              input: resumeInput,
+              threads,
+              messageId: options.messageId,
+              taskId: options.taskId,
+            });
+          await resumed;
           return;
         }
 
@@ -320,6 +322,7 @@ async function main() {
           plugins: config.plugins.enabled,
           currentModel: options.model,
           currentProvider: options.provider,
+          chatHistory: [],
         });
       } catch (error) {
         console.error("Error asking AI:", error);
@@ -380,7 +383,10 @@ async function main() {
   program
     .command("sessions")
     .description("Manage agent sessions from CLI")
-    .option("--all", "Show all historical sessions (default: current process only)")
+    .option(
+      "--all",
+      "Show all historical sessions (default: current process only)"
+    )
     .option("--csv", "Output sessions as CSV")
     .action(async (options) => {
       try {
@@ -388,7 +394,11 @@ async function main() {
         await agentModule.initialize(chatService);
         const sessionsModule = new SessionsModule(agentModule);
         await sessionsModule.initialize(chatService);
-        await sessionsModule.logSessionTable(options.all || false, options.csv || false, true);
+        await sessionsModule.logSessionTable(
+          options.all || false,
+          options.csv || false,
+          true
+        );
       } catch (error) {
         console.error("Error listing sessions:", error);
         process.exit(1);
@@ -475,6 +485,82 @@ async function main() {
         await startAllWorkers();
       } catch (error) {
         console.error("Error managing workers:", error);
+        process.exit(1);
+      }
+    });
+
+  program
+    .command("cloudworker")
+    .description("Create or sync a cloud worker with your local knowhow config")
+    .option("--create", "Create a new cloud worker with synced config and files")
+    .option("--push <uid>", "Push/sync local config and files to an existing cloud worker")
+    .option("--name <name>", "Name for the cloud worker (used with --create)")
+    .option("--dry-run", "Print what would be synced without doing it")
+    .action(async (options) => {
+      try {
+        const { cloudWorker } = await import("./cloudWorker");
+        await cloudWorker(options);
+      } catch (error) {
+        console.error("Error running cloudworker:", error);
+        process.exit(1);
+      }
+    });
+
+  program
+    .command("script")
+    .description("Run a local tool script file using the executeScript sandbox")
+    .option("--input-file <path>", "Path to a local .js/.ts script file to run")
+    .option(
+      "--allow-network",
+      "Allow fetch() calls in the script (disabled by default for security)"
+    )
+    .action(async (options) => {
+      try {
+        if (!options.inputFile) {
+          console.error(
+            "Error: Provide --input-file <path> to the script file to run"
+          );
+          process.exit(1);
+        }
+
+        // Run a local script file
+        const scriptPath = path.resolve(options.inputFile);
+        if (!fs.existsSync(scriptPath)) {
+          console.error(`Error: Script file not found: ${scriptPath}`);
+          process.exit(1);
+        }
+        const scriptContent = fs.readFileSync(scriptPath, "utf-8");
+
+        const { Tools, Clients } = await setupServices();
+
+        // Enable all tools on the LazyToolsService so scripts can access MCP tools
+        // (LazyToolsService starts with only meta-tools enabled; we need all for scripts)
+        Tools.enableTools(["*"]);
+
+        const { ScriptExecutor } = await import(
+          "./services/script-execution/ScriptExecutor"
+        );
+        const executor = new ScriptExecutor(Tools, Clients);
+        const result = await executor.execute({
+          script: scriptContent,
+          policy: {
+            allowNetworkAccess: !!options.allowNetwork,
+          },
+          quotas: {
+            maxExecutionTimeMs: 5 * 60 * 1000, // 5 minutes for CLI scripts
+          },
+        });
+
+        if (result.consoleOutput?.length) {
+          console.log(result.consoleOutput.join("\n"));
+        }
+        console.log(JSON.stringify(result.result, null, 2));
+        if (!result.success) {
+          console.error("Script error:", result.error);
+          process.exit(1);
+        }
+      } catch (error) {
+        console.error("Error running script:", error);
         process.exit(1);
       }
     });

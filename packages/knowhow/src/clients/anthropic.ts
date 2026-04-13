@@ -1,6 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { wait } from "../utils";
 import { AnthropicTextPricing } from "./pricing";
+import { ContextLimits } from "./contextLimits";
+import { ModelModality } from "./types";
 import { Models } from "../types";
 import {
   GenericClient,
@@ -466,11 +468,16 @@ export class GenericAnthropicClient implements GenericClient {
     return nonCachedInputCost + cacheWriteCost + cacheReadCost + outputCost;
   }
 
-  async getModels() {
+  async getModels(modality?: ModelModality): Promise<{ id: string }[]> {
+    if (modality) {
+      if (modality === "completion") {
+        return Object.values(Models.anthropic).map((id) => ({ id }));
+      }
+      return [];
+    }
+    // No modality — live API call (backward compat)
     const models = await this.client.models.list();
-    return models.data.map((m) => ({
-      id: m.id,
-    }));
+    return models.data.map((m) => ({ id: m.id }));
   }
 
   async createEmbedding(options: EmbeddingOptions): Promise<EmbeddingResponse> {
@@ -481,6 +488,16 @@ export class GenericAnthropicClient implements GenericClient {
     options: AudioTranscriptionOptions
   ): Promise<AudioTranscriptionResponse> {
     throw new Error("Anthropic does not support audio transcription");
+  }
+
+  getContextLimit(model: string): { contextLimit: number; threshold: number } | undefined {
+    const contextLimit = ContextLimits[model];
+    if (contextLimit === undefined) return undefined;
+    const pricing = AnthropicTextPricing[model];
+    // If the model has tiered pricing above 200k tokens, use 200k as the threshold
+    const threshold =
+      pricing && "input_gt_200k" in pricing ? 200_000 : contextLimit;
+    return { contextLimit, threshold };
   }
 
   async createAudioGeneration(
