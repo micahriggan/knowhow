@@ -6,7 +6,7 @@ import { loadJwt } from "./login";
 import { services } from "./services";
 import { PasskeySetupService } from "./workers/auth/PasskeySetup";
 import { WorkerPasskeyAuthService } from "./workers/auth/WorkerPasskeyAuth";
-import { makeUnlockTool, makeLockTool } from "./workers/tools";
+import { makeUnlockTool, makeLockTool, makeReloadConfigTool } from "./workers/tools";
 import { McpServerService } from "./services/Mcp";
 import * as allTools from "./agents/tools";
 import workerTools from "./workers/tools";
@@ -14,6 +14,7 @@ import { wait } from "./utils";
 import { getConfig, updateConfig } from "./config";
 import { KNOWHOW_API_URL } from "./services/KnowhowClient";
 import { registerWorkerPath } from "./workerRegistry";
+import { ModulesService } from "./services/modules";
 
 const API_URL = KNOWHOW_API_URL;
 
@@ -264,11 +265,29 @@ export async function worker(options?: {
     console.log("🔑 Auth tools registered: unlock, lock");
   }
 
+  // Register the reloadConfig tool so agents can hot-reload MCPs/config
+  // without restarting the worker process.
+  // Uses a closure over `toolsToUse` so the tool can update it in-place.
+  const { reloadConfig, reloadConfigDefinition } = makeReloadConfigTool(
+    Mcp,
+    Tools,
+    mcpServer,
+    (newTools) => {
+      toolsToUse = newTools;
+    }
+  );
+  Tools.addFunctions({ reloadConfig });
+  toolsToUse = [...toolsToUse, reloadConfigDefinition];
+
+  console.log("🔄 reloadConfig tool registered");
+
   mcpServer.createServer(clientName, clientVersion).withTools(toolsToUse);
 
   let connected = false;
   let tunnelHandler: TunnelHandler | null = null;
   let tunnelWs: WebSocket | null = null;
+  let lastJwt: string | null = null;
+  let unauthorizedJwt: string | null = null;
 
   // Check if tunnel is enabled
   const tunnelEnabled = config.worker?.tunnel?.enabled ?? false;
@@ -339,6 +358,7 @@ export async function worker(options?: {
   async function connectWebSocket() {
     const jwt = await loadJwt();
     console.log(`Connecting to ${API_URL}`);
+    lastJwt = jwt;
 
     // Reset the MCP server to avoid "Already connected to a transport" error on reconnects
     await mcpServer.reset();
@@ -377,6 +397,61 @@ export async function worker(options?: {
     const ws = new WebSocket(`${API_URL}/ws/worker`, {
       headers,
     });
+
+    // Listen for workerRegistered message from the backend before MCP transport takes over.
+    // The MCP transport will swallow non-JSONRPC messages silently, but we attach a raw
+    // listener here first to capture the workerId sent back by the backend after upsert.
+    const workerRegisteredHandler = async (data: any) => {
+      try {
+        const parsed = JSON.parse(
+          typeof data === "string" ? data : data.toString()
+        );
+        if (parsed?.type === "workerRegistered" && parsed?.workerId) {
+          const currentConfig = await getConfig();
+          const currentWorkerId = currentConfig.worker?.workerId;
+          if (currentWorkerId !== parsed.workerId) {
+            await updateConfig({
+              ...currentConfig,
+              worker: {
+                ...currentConfig.worker,
+                workerId: parsed.workerId,
+              },
+            });
+            console.log(`✅ Worker ID recorded: ${parsed.workerId}`);
+          }
+        }
+
+        // Hot-reload: re-read config, reconnect MCPs, and rebuild the tool list
+        // without restarting the worker process.
+        if (parsed?.type === "reloadConfig") {
+          console.log("🔄 Received reloadConfig — reloading MCPs, modules and tools...");
+          try {
+            // Re-read fresh config from disk
+            const freshConfig = await getConfig();
+
+            // Close all existing MCP connections
+            await Mcp.closeAll();
+
+            // Reconnect from fresh config and re-register tools
+            await Mcp.connectToConfigured(Tools);
+
+            // Rebuild the allowed tools list from fresh config
+            const allowedToolNames = freshConfig.worker?.allowedTools ?? Tools.getToolNames();
+            toolsToUse = Tools.getToolsByNames(allowedToolNames);
+
+            // Update the MCP server with new tool list
+            mcpServer.withTools(toolsToUse);
+
+            console.log(`✅ Config reloaded: ${toolsToUse.length} tools active`);
+          } catch (err) {
+            console.error("❌ Failed to reload config:", err);
+          }
+        }
+      } catch {
+        // Not our message — ignore parse errors
+      }
+    };
+    ws.on("message", workerRegisteredHandler);
 
     // Create separate WebSocket connection for tunnel if enabled
     let tunnelConnection: WebSocket | null = null;
@@ -431,15 +506,33 @@ export async function worker(options?: {
         tunnelHandler = createTunnelHandler(tunnelConnection!, tunnelConfig);
         console.log("🌐 Tunnel handler initialized");
         console.log(tunnelConfig);
+
+        // Let modules that need the tunnel handler register their addons now
+        const tunnelModulesService = new ModulesService();
+        const { Agents, Embeddings, Plugins, Clients, Tools, MediaProcessor } = services();
+        tunnelModulesService.loadModulesFromConfig({
+          Agents, Embeddings, Plugins, Clients, Tools, MediaProcessor,
+          Tunnel: tunnelHandler,
+        }).catch((err) => {
+          console.error("Failed to load tunnel modules:", err);
+        });
       });
 
       tunnelConnection.on("close", (code, reason) => {
         console.log(
           `Tunnel WebSocket closed. Code: ${code}, Reason: ${reason.toString()}`
         );
-        console.log(
-          "Tunnel connection will reconnect on next connection cycle..."
-        );
+        if (code === 1008) {
+          unauthorizedJwt = lastJwt;
+          console.error(
+            "❌ Tunnel received Unauthorized (1008). The JWT may be expired."
+          );
+          console.error("   Pausing reconnection until JWT changes...");
+        } else {
+          console.log(
+            "Tunnel connection will reconnect on next connection cycle..."
+          );
+        }
 
         // Cleanup tunnel handler
         if (tunnelHandler) {
@@ -471,7 +564,6 @@ export async function worker(options?: {
       console.log(
         `WebSocket closed. Code: ${code}, Reason: ${reason.toString()}`
       );
-      console.log("Attempting to reconnect...");
 
       // Cleanup tunnel handler
       if (tunnelHandler) {
@@ -479,6 +571,21 @@ export async function worker(options?: {
       }
 
       connected = false;
+
+      // If we got an Unauthorized (1008) close, record the JWT that failed
+      // so we don't keep hammering the server with the same expired token
+      if (code === 1008) {
+        unauthorizedJwt = lastJwt;
+        console.error(
+          "❌ Worker received Unauthorized (1008). The JWT may be expired."
+        );
+        console.error(
+          "   Run 'knowhow login' to refresh your token, then restart the worker."
+        );
+        console.error("   Pausing reconnection until JWT changes...");
+      } else {
+        console.log("Attempting to reconnect...");
+      }
     });
 
     ws.on("error", (error) => {
@@ -498,6 +605,19 @@ export async function worker(options?: {
     } | null = null;
 
     if (!connected) {
+      // If we got an Unauthorized error, check if the JWT has changed before retrying
+      if (unauthorizedJwt !== null) {
+        const currentJwt = await loadJwt().catch(() => null);
+        if (currentJwt === unauthorizedJwt) {
+          // JWT hasn't changed - don't reconnect, just wait
+          await wait(5000);
+          continue;
+        }
+        // JWT changed - clear the unauthorized state and reconnect
+        console.log("🔄 JWT has changed, attempting to reconnect...");
+        unauthorizedJwt = null;
+      }
+
       console.log("Attempting to connect...");
       connection = await connectWebSocket();
     }
@@ -508,6 +628,190 @@ export async function worker(options?: {
         console.error("WebSocket ping failed:", error);
         connected = false;
       }
+    }
+    await wait(5000);
+  }
+}
+
+/**
+ * Run tunnel-only mode: connects to the Knowhow tunnel WebSocket without
+ * registering any MCP tools. Useful for users who only want the web tunnel
+ * feature to expose local ports to the cloud.
+ */
+export async function tunnel(options?: {
+  share?: boolean;
+  unshare?: boolean;
+}) {
+  const config = await getConfig();
+
+  const isInsideDocker = process.env.KNOWHOW_DOCKER === "true";
+
+  // Determine localHost based on environment
+  let tunnelLocalHost = config.worker?.tunnel?.localHost;
+  if (!tunnelLocalHost) {
+    if (isInsideDocker) {
+      tunnelLocalHost = "host.docker.internal";
+      console.log(
+        "🐳 Docker detected: tunnel will use host.docker.internal to reach host services"
+      );
+    } else {
+      tunnelLocalHost = "127.0.0.1";
+    }
+  }
+
+  // Check for port mapping configuration
+  const portMapping = config.worker?.tunnel?.portMapping || {};
+  if (Object.keys(portMapping).length > 0) {
+    console.log("🔀 Port mapping configured:");
+    for (const [containerPort, hostPort] of Object.entries(portMapping)) {
+      console.log(`   Container port ${containerPort} → Host port ${hostPort}`);
+    }
+  }
+
+  const tunnelPorts = config.worker?.tunnel?.allowedPorts || [];
+  if (tunnelPorts.length === 0) {
+    console.warn(
+      "⚠️  No allowedPorts configured. Add worker.tunnel.allowedPorts to knowhow.json"
+    );
+  } else {
+    console.log(`🌐 Tunnel mode for ports: ${tunnelPorts.join(", ")}`);
+  }
+
+  // Extract tunnel domain from API_URL
+  function extractTunnelDomain(apiUrl: string): {
+    domain: string;
+    useHttps: boolean;
+  } {
+    try {
+      const url = new URL(apiUrl);
+      const useHttps = url.protocol === "https:";
+      if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
+        return {
+          domain: `worker.${url.hostname}:${url.port || "80"}`,
+          useHttps,
+        };
+      }
+      return { domain: `worker.${url.hostname}`, useHttps };
+    } catch (err) {
+      console.error("Failed to parse API_URL for tunnel domain:", err);
+      return { domain: "worker.localhost:4000", useHttps: false };
+    }
+  }
+
+  let connected = false;
+  let tunnelHandler: TunnelHandler | null = null;
+  let lastJwt: string | null = null;
+  let unauthorizedJwt: string | null = null;
+
+  async function connectTunnel() {
+    const jwt = await loadJwt();
+    lastJwt = jwt;
+    console.log(`Connecting tunnel to ${API_URL}`);
+
+    const dir = process.cwd();
+    const homedir = os.homedir();
+    const hostname = process.env.WORKER_HOSTNAME || os.hostname();
+    const root =
+      process.env.WORKER_ROOT ||
+      (dir === homedir ? "~" : dir.replace(homedir, "~"));
+
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${jwt}`,
+      "User-Agent": `knowhow-tunnel/1.0.0/${hostname}`,
+      Root: root,
+    };
+
+    if (options?.share) {
+      headers.Shared = "true";
+      console.log("🔓 Tunnel shared with organization");
+    } else if (options?.unshare) {
+      headers.Shared = "false";
+      console.log("🔒 Tunnel is now private (unshared)");
+    } else {
+      console.log("🔒 Tunnel is private (only you can use it)");
+    }
+
+    const { domain: tunnelDomain, useHttps: tunnelUseHttps } =
+      extractTunnelDomain(API_URL);
+
+    const tunnelConnection = new WebSocket(`${API_URL}/ws/tunnel`, { headers });
+
+    tunnelConnection.on("open", () => {
+      console.log("🌐 Tunnel WebSocket connected");
+      connected = true;
+
+      const allowedPorts = config.worker?.tunnel?.allowedPorts || [];
+      const urlRewriter = (port: number, metadata?: any) => {
+        const workerId = metadata?.workerId;
+        const secret = metadata?.secret;
+        const subdomain = secret ? `${secret}-p${port}` : `${workerId}-p${port}`;
+        return `${subdomain}.${tunnelDomain}`;
+      };
+
+      const tunnelConfig = {
+        allowedPorts,
+        maxConcurrentStreams: config.worker?.tunnel?.maxConcurrentStreams || 50,
+        tunnelUseHttps,
+        localHost: tunnelLocalHost,
+        urlRewriter,
+        enableUrlRewriting: config.worker?.tunnel?.enableUrlRewriting !== false,
+        portMapping,
+        logLevel: "debug" as const,
+      };
+
+      tunnelHandler = createTunnelHandler(tunnelConnection, tunnelConfig);
+      console.log("🌐 Tunnel handler initialized");
+      console.log(tunnelConfig);
+
+      // Let modules that need the tunnel handler register their addons now
+      const tunnelModulesService2 = new ModulesService();
+      const { Agents: A2, Embeddings: E2, Plugins: P2, Clients: C2, Tools: T2, MediaProcessor: MP2 } = services();
+      tunnelModulesService2.loadModulesFromConfig({
+        Agents: A2, Embeddings: E2, Plugins: P2, Clients: C2, Tools: T2, MediaProcessor: MP2,
+        Tunnel: tunnelHandler,
+      }).catch((err) => {
+        console.error("Failed to load tunnel modules:", err);
+      });
+    });
+
+    tunnelConnection.on("close", (code, reason) => {
+      console.log(`Tunnel WebSocket closed. Code: ${code}, Reason: ${reason.toString()}`);
+      if (code === 1008) {
+        unauthorizedJwt = lastJwt;
+        console.error("❌ Tunnel received Unauthorized (1008). The JWT may be expired.");
+        console.error("   Run 'knowhow login' to refresh your token, then restart.");
+        console.error("   Pausing reconnection until JWT changes...");
+      } else {
+        console.log("Tunnel connection will reconnect on next cycle...");
+      }
+      if (tunnelHandler) {
+        tunnelHandler.cleanup();
+        tunnelHandler = null;
+      }
+      connected = false;
+    });
+
+    tunnelConnection.on("error", (error) => {
+      console.error("Tunnel WebSocket error:", error);
+      connected = false;
+    });
+
+    return tunnelConnection;
+  }
+
+  while (true) {
+    if (!connected) {
+      if (unauthorizedJwt !== null) {
+        const currentJwt = await loadJwt().catch(() => null);
+        if (currentJwt === unauthorizedJwt) {
+          await wait(5000);
+          continue;
+        }
+        console.log("🔄 JWT has changed, attempting to reconnect tunnel...");
+        unauthorizedJwt = null;
+      }
+      console.log("Attempting to connect tunnel...");
+      await connectTunnel();
     }
     await wait(5000);
   }

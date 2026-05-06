@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import { createWriteStream, createReadStream } from "fs";
+import * as crypto from "crypto";
 import { pipeline, Readable } from "stream";
 import * as util from "util";
 
@@ -11,19 +12,31 @@ export class S3Service {
     filePath: string
   ): Promise<void> {
     try {
-      const fileStream = createReadStream(filePath);
+      const fileContent = fs.readFileSync(filePath);
       const fileStats = await fs.promises.stat(filePath);
+
+      // Compute SHA-256 checksum (base64) — required when presigned URL was
+      // generated with ChecksumAlgorithm: SHA256
+      const sha256Base64 = crypto
+        .createHash("sha256")
+        .update(fileContent)
+        .digest("base64");
 
       const response = await fetch(presignedUrl, {
         method: "PUT",
-        headers: { "Content-Length": String(fileStats.size) },
-        body: fileStream as any,
-        // @ts-ignore - Node 18+ supports ReadableStream body with duplex
+        headers: {
+          "Content-Length": String(fileStats.size),
+          "x-amz-checksum-sha256": sha256Base64,
+          "x-amz-sdk-checksum-algorithm": "SHA256",
+        },
+        body: fileContent,
+        // @ts-ignore
         duplex: "half",
       });
 
       if (!response.ok) {
-        throw new Error(`Upload failed with status code: ${response.status}`);
+        const text = await response.text();
+        throw new Error(`Upload failed with status code: ${response.status} - ${text}`);
       }
 
       console.log("File uploaded successfully to pre-signed URL");

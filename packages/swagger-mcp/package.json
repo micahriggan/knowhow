@@ -1,6 +1,6 @@
 {
   "name": "@tyvm/swagger-mcp",
-  "version": "0.0.18",
+  "version": "0.0.19",
   "description": "Generate MCP servers from Swagger/OpenAPI specifications",
   "main": "dist/index.js",
   "bin": {
@@ -31,7 +31,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.6.3",
-    "typescript": "^4.6.3",
+    "typescript": "^5.0.0",
     "ts-node": "^10.7.0",
     "jest": "^29.7.0",
     "@types/jest": "^29.5.13",

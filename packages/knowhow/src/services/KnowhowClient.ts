@@ -24,6 +24,30 @@ import {
 } from "../clients";
 import { Config } from "../types";
 
+// Remote sync placeholder interfaces
+export interface CreateSessionPlaceholderRequest {
+  title?: string;
+  workerId?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface CreateSessionPlaceholderResponse {
+  sessionId: string;
+  orgId: string;
+}
+
+export interface CreateMessagePlaceholderRequest {
+  content: string;
+  agentName?: string;
+  modelName?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface CreateMessagePlaceholderResponse {
+  messageId: string;
+  taskId?: string;
+}
+
 // Chat Task interfaces
 export interface CreateMessageTaskRequest {
   messageId: string;
@@ -120,6 +144,17 @@ export class KnowhowSimpleClient {
     this.setJwt(jwt);
   }
 
+  /**
+   * Reload the JWT from disk (useful after login refreshes the token).
+   */
+  refreshJwt() {
+    const freshJwt = loadKnowhowJwt();
+    if (freshJwt) {
+      this.setJwt(freshJwt);
+      this.jwtValidated = false;
+    }
+  }
+
   setJwt(jwt: string) {
     this.jwt = jwt;
     this.headers = {
@@ -136,11 +171,9 @@ export class KnowhowSimpleClient {
       try {
         this.jwtValidated = true;
         const response = await this.me();
-
         const user = response.data.user;
         const orgs = user.orgs;
         const orgId = response.data.orgId;
-
         const currentOrg = orgs.find((org) => {
           return org.organizationId === orgId;
         });
@@ -190,6 +223,17 @@ export class KnowhowSimpleClient {
 
     const presignedUrl = presignedUrlResp.data.downloadUrl;
     return presignedUrl;
+  }
+
+  async getOrgEmbedding(id: string) {
+    await this.checkJwt();
+    const resp = await http.get(
+      `${this.baseUrl}/api/org-embeddings/${id}`,
+      {
+        headers: this.headers,
+      }
+    );
+    return resp.data as { id: string; modelName: string; name: string; [key: string]: unknown };
   }
 
   async updateEmbeddingMetadata(
@@ -575,7 +619,9 @@ export class KnowhowSimpleClient {
    * Get presigned S3 URL for downloading a file from Knowhow FS.
    * First finds or creates the file by path, then gets its download URL.
    */
-  async getOrgFilePresignedDownloadUrl(filePath: string): Promise<string> {
+  async getOrgFilePresignedDownloadUrl(
+    filePath: string
+  ): Promise<{ downloadUrl: string; checksumSHA256: string | null }> {
     await this.checkJwt();
 
     // Find the file by path
@@ -585,12 +631,15 @@ export class KnowhowSimpleClient {
     }
 
     // Get download URL using the file ID
-    const response = await http.post<{ downloadUrl: string }>(
+    const response = await http.post<{ downloadUrl: string; checksumSHA256: string | null }>(
       `${this.baseUrl}/api/org-files/download/${file.id}`,
       {},
       { headers: this.headers }
     );
-    return response.data.downloadUrl;
+    return {
+      downloadUrl: response.data.downloadUrl,
+      checksumSHA256: response.data.checksumSHA256 ?? null,
+    };
   }
 
   /**
@@ -679,6 +728,17 @@ export class KnowhowSimpleClient {
   }
 
   /**
+   * Get a single cloud worker by ID
+   */
+  async getCloudWorker(id: string) {
+    await this.checkJwt();
+    return http.get<{ id: string; name: string; status: string; workerConfigJson?: Record<string, unknown> }>(
+      `${this.baseUrl}/api/cloud-workers/${id}`,
+      { headers: this.headers }
+    );
+  }
+
+  /**
    * Update an existing cloud worker
    */
   async updateCloudWorker(
@@ -691,5 +751,42 @@ export class KnowhowSimpleClient {
       data,
       { headers: this.headers }
     );
+  }
+
+  // ============================================
+  // Remote Sync Placeholder Methods
+  // ============================================
+
+  /**
+   * Create a bare session stub without triggering AI inference.
+   * Used by the CLI remote sync feature to establish a remote session.
+   */
+  async createSessionPlaceholder(
+    request: CreateSessionPlaceholderRequest = {}
+  ): Promise<CreateSessionPlaceholderResponse> {
+    await this.checkJwt();
+    const response = await http.post<CreateSessionPlaceholderResponse>(
+      `${this.baseUrl}/api/chat/sessions/placeholder`,
+      request,
+      { headers: this.headers }
+    );
+    return response.data;
+  }
+
+  /**
+   * Create a message placeholder in a session without triggering AI inference.
+   * Used by the CLI remote sync feature to register a message before syncing threads.
+   */
+  async createMessagePlaceholder(
+    sessionId: string,
+    request: CreateMessagePlaceholderRequest
+  ): Promise<CreateMessagePlaceholderResponse> {
+    await this.checkJwt();
+    const response = await http.post<CreateMessagePlaceholderResponse>(
+      `${this.baseUrl}/api/chat/sessions/${sessionId}/messages/placeholder`,
+      request,
+      { headers: this.headers }
+    );
+    return response.data;
   }
 }

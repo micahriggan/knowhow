@@ -1,12 +1,16 @@
 import * as fs from "fs";
 import * as path from "path";
-import { glob } from "glob";
 import { KnowhowSimpleClient, KNOWHOW_API_URL } from "./services/KnowhowClient";
 import { loadJwt } from "./login";
 import { getConfig, updateConfig, getLanguageConfig } from "./config";
 import { services } from "./services";
-import { Language, Config } from "./types";
+import { Language, Config, McpConfig } from "./types";
 import { S3Service } from "./services/S3";
+
+export interface CloudWorkerPullOptions {
+  id: string;
+  apiUrl?: string;
+}
 
 export interface CloudWorkerOptions {
   create?: boolean;
@@ -23,6 +27,26 @@ interface FileToSync {
   localPath: string;
   remotePath: string;
   downloadLocalPath?: string; // override localPath used when worker downloads the file
+  isDirectory?: boolean; // true if this represents a whole directory
+}
+
+/**
+ * Recursively list all files in a local directory, returning relative paths
+ */
+function listFilesRecursively(dir: string): string[] {
+  const results: string[] = [];
+  if (!fs.existsSync(dir)) return results;
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      listFilesRecursively(path.join(dir, entry.name)).forEach((f) =>
+        results.push(entry.name + "/" + f)
+      );
+    } else {
+      results.push(entry.name);
+    }
+  }
+  return results;
 }
 
 /**
@@ -48,6 +72,8 @@ function buildWorkerConfigJson(config: Config, files: { remotePath: string; loca
 
 /**
  * Collect all files from the .knowhow directory that should be synced
+ * Uses directory-level entries where possible so the worker config stays compact
+ * and the folder upload/download feature handles individual files automatically.
  */
 async function collectFilesToSync(projectName: string): Promise<FileToSync[]> {
   const filesToSync: FileToSync[] = [];
@@ -59,39 +85,24 @@ async function collectFilesToSync(projectName: string): Promise<FileToSync[]> {
     }
   };
 
+  // Helper to add a directory entry if it exists (trailing slash = directory mode)
+  const addDirIfExists = (localPath: string, remotePath: string) => {
+    if (fs.existsSync(localPath)) {
+      filesToSync.push({ localPath: localPath + "/", remotePath: remotePath + "/", isDirectory: true });
+    }
+  };
+
   // .knowhow/language.json
   addIfExists(".knowhow/language.json", `${projectName}/.knowhow/language.json`);
 
   // .knowhow/hashes.json
   addIfExists(".knowhow/hashes.json", `${projectName}/.knowhow/hashes.json`);
 
-  // .knowhow/prompts/**/*
-  const promptFiles = await glob(".knowhow/prompts/**/*", { nodir: true });
-  for (const filePath of promptFiles) {
-    const relativeToDotKnowhow = filePath.replace(/^\.knowhow\//, "");
-    const remotePath = `${projectName}/.knowhow/${relativeToDotKnowhow}`;
-    filesToSync.push({ localPath: filePath, remotePath });
-  }
-
-  // .knowhow/scripts/**/* (if exists)
-  if (fs.existsSync(".knowhow/scripts")) {
-    const scriptFiles = await glob(".knowhow/scripts/**/*", { nodir: true });
-    for (const filePath of scriptFiles) {
-      const relativeToDotKnowhow = filePath.replace(/^\.knowhow\//, "");
-      const remotePath = `${projectName}/.knowhow/${relativeToDotKnowhow}`;
-      filesToSync.push({ localPath: filePath, remotePath });
-    }
-  }
-
-  // .knowhow/skills/**/* (if exists)
-  if (fs.existsSync(".knowhow/skills")) {
-    const skillFiles = await glob(".knowhow/skills/**/*", { nodir: true });
-    for (const filePath of skillFiles) {
-      const relativeToDotKnowhow = filePath.replace(/^\.knowhow\//, "");
-      const remotePath = `${projectName}/.knowhow/${relativeToDotKnowhow}`;
-      filesToSync.push({ localPath: filePath, remotePath });
-    }
-  }
+  // Directories — use trailing-slash entries so folder upload/download handles them
+  addDirIfExists(".knowhow/prompts", `${projectName}/.knowhow/prompts`);
+  addDirIfExists(".knowhow/scripts", `${projectName}/.knowhow/scripts`);
+  addDirIfExists(".knowhow/skills", `${projectName}/.knowhow/skills`);
+  addDirIfExists(".knowhow/tasks", `${projectName}/.knowhow/tasks`);
 
   return filesToSync;
 }
@@ -264,8 +275,20 @@ export async function cloudWorker(options: CloudWorkerOptions) {
 
   for (const file of allFiles) {
     try {
-      await uploadSingleFile(client, AwsS3, file.localPath, file.remotePath, dryRun);
-      successCount++;
+      if (file.isDirectory) {
+        // Upload all files recursively in the local directory
+        const localDir = file.localPath.endsWith("/") ? file.localPath : file.localPath + "/";
+        const remoteDir = file.remotePath.endsWith("/") ? file.remotePath : file.remotePath + "/";
+        const relFiles = listFilesRecursively(localDir);
+        console.log(`  📁 Uploading directory ${localDir} → ${remoteDir} (${relFiles.length} files)`);
+        for (const relFile of relFiles) {
+          await uploadSingleFile(client, AwsS3, localDir + relFile, remoteDir + relFile, dryRun);
+          successCount++;
+        }
+      } else {
+        await uploadSingleFile(client, AwsS3, file.localPath, file.remotePath, dryRun);
+        successCount++;
+      }
     } catch (error) {
       console.error(`  ❌ Failed to upload ${file.localPath}: ${error.message}`);
       failCount++;
@@ -311,4 +334,73 @@ export async function cloudWorker(options: CloudWorkerOptions) {
   } else {
     console.log(`\n✅ Cloud worker sync complete!`);
   }
+}
+
+/**
+ * Pull the latest workerConfigJson from the cloud worker API and update the
+ * local knowhow.json config to match.
+ *
+ * This is the "pull" half of the config sync cycle.  After running this,
+ * you can reload the worker's MCPs (in-process) via the reloadConfig
+ * WebSocket message or by calling `knowhow worker` again.
+ *
+ * Merged fields from workerConfigJson:
+ *   - mcps        → overwrites config.mcps
+ *   - modules     → overwrites config.modules  (optional, only if present)
+ *   - plugins     → overwrites config.plugins  (optional, only if present)
+ *   - agents      → overwrites config.agents   (optional, only if present)
+ */
+export async function pullCloudWorkerConfig(options: CloudWorkerPullOptions) {
+  const { id, apiUrl = KNOWHOW_API_URL } = options;
+
+  // Load JWT
+  const jwt = await loadJwt();
+  if (!jwt) {
+    console.error("❌ No JWT token found. Please run 'knowhow login' first.");
+    process.exit(1);
+  }
+
+  const client = new KnowhowSimpleClient(apiUrl, jwt);
+
+  console.log(`🔄 Pulling config for cloud worker ${id}...`);
+
+  const resp = await client.getCloudWorker(id);
+  const remoteWorker = resp.data;
+
+  if (!remoteWorker) {
+    console.error(`❌ Cloud worker ${id} not found.`);
+    process.exit(1);
+  }
+
+  const remoteConfig = (remoteWorker.workerConfigJson ?? {}) as {
+    mcps?: McpConfig[];
+    modules?: string[];
+    plugins?: Config["plugins"];
+    agents?: Config["agents"];
+  };
+
+  // Load current local config
+  const localConfig = await getConfig();
+
+  // Merge remote fields into local config
+  if (remoteConfig.mcps !== undefined) {
+    localConfig.mcps = remoteConfig.mcps;
+  }
+  if (remoteConfig.modules !== undefined) {
+    localConfig.modules = remoteConfig.modules;
+  }
+  if (remoteConfig.plugins !== undefined) {
+    localConfig.plugins = remoteConfig.plugins;
+  }
+  if (remoteConfig.agents !== undefined) {
+    localConfig.agents = remoteConfig.agents;
+  }
+
+  await updateConfig(localConfig);
+
+  const mcpCount = remoteConfig.mcps?.length ?? 0;
+  console.log(`✅ Config pulled! ${mcpCount} MCP(s) now configured locally.`);
+  console.log(`   Run 'knowhow worker' or trigger reloadConfig to apply changes.`);
+
+  return { mcps: remoteConfig.mcps, modules: remoteConfig.modules };
 }
